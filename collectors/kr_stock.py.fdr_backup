@@ -1,0 +1,68 @@
+# collectors/kr_stock.py
+from __future__ import annotations
+import FinanceDataReader as fdr
+import pandas as pd
+from core.base_collector import BaseCollector
+from core.db_manager import DBManager
+
+
+class KRStockCollector(BaseCollector):
+    category = "stock"
+
+    def __init__(self, engine, table: str = "stock_prices"):
+        self.engine = engine
+        self.table = table
+
+    def fetch(self, symbol: str, start, end) -> pd.DataFrame:
+        """Fetch price data from FinanceDataReader for a KRX symbol.
+        Returns columns: symbol,date,open,high,low,close,adj_close,volume,market,source
+        """
+        df = fdr.DataReader(symbol, start=start, end=end)  # index: Date
+        if df is None or df.empty:
+            return df
+        # FDR columns are usually: Open High Low Close Volume Change (and sometimes Adj Close)
+        df = df.reset_index().rename(columns=str.lower)
+        # Normalize expected columns
+        cols = {c: c for c in df.columns}
+        if "adj close" in cols:
+            df = df.rename(columns={"adj close": "adj_close"})
+        if "change" in df.columns:
+            # Drop change for storage schema
+            df = df.drop(columns=["change"])  # optional
+        df["symbol"] = symbol
+        df["market"] = "XKRX"
+        df["source"] = "FDR"
+        expected = [
+            "symbol",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "adj_close",
+            "volume",
+            "market",
+            "source",
+        ]
+        # Ensure missing expected columns exist (e.g., adj_close sometimes absent)
+        for c in expected:
+            if c not in df.columns:
+                df[c] = pd.NA
+        df = df[expected]
+        # Convert date to date type
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        return df
+
+    def save(self, df: pd.DataFrame, symbol: str, mode: str = "upsert") -> int:
+        """
+        Save price data to database.
+
+        Args:
+            df: DataFrame with price data
+            symbol: Stock symbol
+            mode: "upsert" (default, overwrites) or "insert_only" (preserves existing)
+
+        Returns:
+            Number of rows processed
+        """
+        return DBManager.upsert_dataframe(self.engine, df, table=self.table, mode=mode)

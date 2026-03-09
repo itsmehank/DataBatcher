@@ -1,0 +1,374 @@
+# DataBatcher runtime configuration (skeleton)
+
+database:
+  # 예: mysql+pymysql://user:pass@host:3306/market?charset=utf8mb4
+  url: mysql+pymysql://USER:PASS@HOST:3306/market?charset=utf8mb4
+  pool_size: 10
+  max_overflow: 20
+  pool_recycle: 1800
+  pool_pre_ping: true
+
+runtime:
+  timezone: Asia/Seoul
+  thread_workers: 8
+  batch_size: 2000
+  rate_limit_per_sec: 5
+  jitter: true
+  retry:
+    max_attempts: 5
+    backoff_base_sec: 1
+    backoff_max_sec: 30
+
+markets:
+  close_times:
+    XKRX: "16:00"
+    NYSE: "16:00"
+  safe_delay_minutes: 30
+  us_daily_cutoff: "18:00"
+
+indicators:
+  materialization:
+    mode: long      # long | wide | none | hybrid
+    table_long: stock_indicators
+    attach_to_price:
+      prefix: ind_
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+  warmup_override:
+    ema: 10x_window
+    rsi: 5x_window
+
+indicators_weekly:
+  materialization:
+    mode: long
+    table_long: stock_indicators_weekly
+  pipeline:
+#    - name: sma
+#      params: { window: 20, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 50, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 100, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 200, column: close }
+#      save: true
+#    - name: ema
+#      params: { window: 21, column: close }
+#      save: true
+  warmup_override:
+    ema: 10x_window
+    rsi: 5x_window
+
+resync:
+  enabled: true
+  detect_split_threshold: 0.6
+  monthly_full_check: true
+  full_check_day: 1
+
+# --------------------------------------------
+# Crypto (Binance Spot, USDT, Daily)
+# --------------------------------------------
+crypto:
+  exchange: BINANCE
+  quote_asset: USDT
+  timezone: UTC
+  targets:
+    # bulk/daily에서 --all/--symbols가 없을 때 기본으로 처리할 심볼 목록
+    # 예: [BTCUSDT, ETHUSDT]
+    symbols: [BTCUSDT, ETHUSDT, BNBUSDT]
+
+indicators_crypto_daily:
+  materialization:
+    mode: long
+    table_long: crypto_indicators_daily
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# Crypto (Binance Spot, USDT, Weekly)
+# --------------------------------------------
+indicators_crypto_weekly:
+  materialization:
+    mode: long
+    table_long: crypto_indicators_weekly
+  pipeline:
+    - name: sma
+      params: { window: 20, column: close }
+      save: true
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# KR Index (KOSPI/KOSDAQ Index - Daily)
+# --------------------------------------------
+indicators_kr_index:
+  materialization:
+    mode: long
+    table_long: kr_index_indicators
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# KR Index (KOSPI/KOSDAQ Index - Weekly)
+# --------------------------------------------
+indicators_kr_index_weekly:
+  materialization:
+    mode: long
+    table_long: kr_index_indicators_weekly
+  pipeline:
+#    - name: sma
+#      params: { window: 20, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 50, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 100, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 200, column: close }
+#      save: true
+#    - name: ema
+#      params: { window: 21, column: close }
+#      save: true
+
+# --------------------------------------------
+# US Stock (NYSE, NASDAQ, ETF - Daily)
+# --------------------------------------------
+indicators_us:
+  materialization:
+    mode: long
+    table_long: us_stock_indicators
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# KR Stock Indicator Backfill (독립 지표 백필 전용)
+# --------------------------------------------
+indicators_backfill:
+  materialization:
+    mode: long
+    table_long: stock_indicators
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# US Stock Indicator Backfill (독립 지표 백필 전용)
+# --------------------------------------------
+indicators_us_backfill:
+  materialization:
+    mode: long
+    table_long: us_stock_indicators
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# US Stock (NYSE, NASDAQ, ETF - Weekly)
+# --------------------------------------------
+# --------------------------------------------
+# US Index (S&P500, DJI, IXIC - Daily)
+# --------------------------------------------
+indicators_us_index:
+  materialization:
+    mode: long
+    table_long: us_index_indicators
+  pipeline:
+    - name: sma
+      params: { window: 50, column: close }
+      save: true
+    - name: sma
+      params: { window: 100, column: close }
+      save: true
+    - name: sma
+      params: { window: 150, column: close }
+      save: true
+    - name: sma
+      params: { window: 200, column: close }
+      save: true
+
+# --------------------------------------------
+# US Index (S&P500, DJI, IXIC - Weekly)
+# --------------------------------------------
+indicators_us_index_weekly:
+  materialization:
+    mode: long
+    table_long: us_index_indicators_weekly
+  pipeline:
+#    - name: sma
+#      params: { window: 20, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 50, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 100, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 200, column: close }
+#      save: true
+#    - name: ema
+#      params: { window: 21, column: close }
+#      save: true
+
+# --------------------------------------------
+# IBD RS Rating / RS Line / Blue Dot (KR/US 공용)
+# --------------------------------------------
+ibd_rs:
+  strict_12m: true          # 12개월 미만 종목 제외 (IBD 원칙)
+  rs_rating_weights:        # 기간별 가중치
+    3m: 0.4
+    6m: 0.2
+    9m: 0.2
+    12m: 0.2
+  blue_dot_lookback: 252    # Blue Dot 52주 lookback
+  us_price_column: adj_close  # US RS 계산용 가격 컬럼 (adj_close 권장, NULL이면 close fallback)
+  benchmarks:
+    kr: "1001"              # KOSPI 지수 심볼
+    us: "US500"             # S&P 500 지수 심볼
+
+indicators_us_weekly:
+  materialization:
+    mode: long
+    table_long: us_stock_indicators_weekly
+  pipeline:
+#    - name: sma
+#      params: { window: 20, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 50, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 100, column: close }
+#      save: true
+#    - name: sma
+#      params: { window: 200, column: close }
+#      save: true
+#    - name: ema
+#      params: { window: 21, column: close }
+#      save: true
+  warmup_override:
+    ema: 10x_window
+    rsi: 5x_window
+
+# --------------------------------------------
+# Minervini Trend Template Screening (KR)
+# --------------------------------------------
+minervini_kr:
+  filters:
+    ma_ordering:
+      enabled: true                # price > sma50 > sma150 > sma200
+    sma200_uptrend:
+      enabled: true
+      lookback: 22                 # 200일선이 22거래일 전보다 높음
+    price_above_52w_low:
+      enabled: true
+      pct: 1.3                     # 52주 저가 대비 130% 이상
+    price_near_52w_high:
+      enabled: true
+      pct: 0.75                    # 52주 고가의 75% 이상
+    rs_rating:
+      enabled: true
+      min: 80                      # RS Rating 80 이상
+    blue_dot:
+      enabled: false               # Blue Dot 필터 (선택적)
+  lookback_52w: 252                # 52주 = 252 거래일
+
+# --------------------------------------------
+# Minervini Trend Template Screening (US)
+# --------------------------------------------
+minervini_us:
+  price_column: adj_close          # US Minervini 가격 필터 입력 컬럼 (adj_close 우선, NULL이면 close fallback)
+  filters:
+    ma_ordering:
+      enabled: true                # price > sma50 > sma150 > sma200
+    sma200_uptrend:
+      enabled: true
+      lookback: 22                 # 200일선이 22거래일 전보다 높음
+    price_above_52w_low:
+      enabled: true
+      pct: 1.3                     # 52주 저가 대비 130% 이상
+    price_near_52w_high:
+      enabled: true
+      pct: 0.75                    # 52주 고가의 75% 이상
+    rs_rating:
+      enabled: true
+      min: 80                      # RS Rating 80 이상
+    blue_dot:
+      enabled: false               # Blue Dot 필터 (선택적)
+  lookback_52w: 252                # 52주 = 252 거래일
