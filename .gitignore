@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+
+# Virtual environments
+.venv/
+.venv1/
+venv/
+ENV/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+.claude/
+*.local
+*.iml
+
+# Secrets / local configs
+.env
+.env.*
+!.env.example
+config/settings.dev.yaml
+
+# Logs
+logs/
+*.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Test / coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+
+# Local database artifacts
+*.db
+*.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/

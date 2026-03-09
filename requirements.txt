@@ -1,0 +1,12 @@
+finance-datareader>=0.9.90
+pandas>=2.1.0
+SQLAlchemy>=2.0.0
+PyMySQL>=1.0.2
+pandas_market_calendars>=4.3
+PyYAML>=6.0
+pytz>=2023.3
+tqdm>=4.66.0
+pykrx>=1.2.3
+yfinance>=0.2.0
+pytest>=8.0.0
+python-dotenv>=1.0.1

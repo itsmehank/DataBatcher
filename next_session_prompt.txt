@@ -1,0 +1,64 @@
+작업 배경
+- 현재 프로젝트: /Users/hank.es/PythonProject/DataBatcher
+- 기본 응답 언어: 한국어
+- 작업 원칙: guides/ 문서를 1개씩 순차적으로 분석/정합성 점검/수정
+- 이미 여러 가이드 및 스크립트는 앞 세션에서 수정됨. 먼저 현재 워크트리 상태를 확인하고 이어서 진행할 것.
+
+필수 시작 절차
+1) git/status 성격 확인 (변경 파일 파악)
+2) 이번 턴 대상 문서만 분석 후 계획 제시
+3) 사용자 승인 후 수정
+4) 문법 체크/필요 검증 실행
+5) 다음 문서로 이동
+
+이번에 이어서 할 작업(우선순위 1)
+- 대상 문서: guides/암호화폐_일봉_가이드.md
+- 연관 코드:
+  - scripts/crypto_daily_update.py
+  - scripts/crypto_bulk_update_daily.py
+  - scripts/crypto_sync_symbol_master.py
+  - core/crypto_symbol_loader.py
+  - collectors/crypto_binance.py
+  - core/db_manager.py (upsert_dataframe 반환값 의미 확인용)
+
+이번 문서에 대해 확인된 포인트(요약)
+- 문서 상단 참조 링크가 현재 파일명 체계와 불일치 가능
+- Quick Start 문구 “4단계”인데 실제 커맨드는 5개
+- 로그 문구가 “saved rows”라 실제 신규 삽입 건수로 오해 가능
+  - core/db_manager.py의 upsert_dataframe은 현재 처리 건수(len(data))를 반환
+- SoT(코드 기준 진실 소스) 섹션 부재
+
+수정 계획(로직 변경 최소)
+1) guides/암호화폐_일봉_가이드.md
+   - 상단 참고 링크 최신 파일명으로 정리
+   - Quick Start 단계 수 정정
+   - SoT 섹션 추가:
+     - scripts/crypto_daily_update.py
+     - scripts/crypto_bulk_update_daily.py
+     - scripts/crypto_sync_symbol_master.py
+     - core/crypto_symbol_loader.py
+     - core/db_manager.py
+   - FAQ에 “saved/processed 건수 해석” 추가
+
+2) scripts/crypto_daily_update.py
+   - Contract 블록 주석 추가(대상 심볼 우선순위, UTC 어제 end date 기본, 최근 50일, insert_only)
+   - 로그 문구를 processed(insert-only) 의미로 정리 (로직 유지)
+
+3) scripts/crypto_bulk_update_daily.py
+   - 로그 문구를 processed(insert-only) 의미로 정리 (로직 유지)
+
+검증 계획
+- 문법:
+  - python -m compileall scripts/crypto_daily_update.py scripts/crypto_bulk_update_daily.py scripts/crypto_sync_symbol_master.py
+- 스모크:
+  - python scripts/crypto_sync_symbol_master.py --symbols BTCUSDT ETHUSDT
+  - python scripts/crypto_bulk_update_daily.py --symbols BTCUSDT --start 2026-01-01 --end 2026-01-07 --with-indicators
+  - python scripts/crypto_daily_update.py --symbols BTCUSDT --with-indicators
+- 데이터 확인:
+  - python scripts/tests/db_crypto_assert_counts.py --symbol BTCUSDT --days 14
+
+중요 작업 스타일
+- 한 번에 문서 1개만 처리
+- 코드 로직을 크게 바꾸지 말고 문서-코드 정합성/분석성 개선 중심
+- 주석은 꼭 필요한 곳에만
+- 변경 후 무엇을 왜 바꿨는지 파일 경로 기준으로 간결 보고

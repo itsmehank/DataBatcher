@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+"""
+종목 마스터 동기화 스크립트
+
+FDR(FinanceDataReader)에서 전체 KRX 종목 목록을 가져와 symbol_master 테이블에 동기화합니다.
+
+주요 기능:
+- 신규 상장 종목 추가 (status=ACTIVE)
+- 기존 종목 정보 업데이트 (name, marcap 등)
+- 상장폐지 종목 상태 변경 (status=DELISTED)
+
+실행:
+    python scripts/sync_symbol_master.py
+
+주기:
+    주 1회 실행 권장 (신규 상장/상장폐지 종목 감지용)
+"""
+from __future__ import annotations
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Tuple, Set
+
+import pandas as pd
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
+
+# Add parent directory to path for imports
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from core.config_loader import load_settings
+from core.db_manager import DBManager, DBConfig
+
+try:
+    import FinanceDataReader as fdr
+except ImportError:
+    print("Error: FinanceDataReader not installed. Run: pip install finance-datareader", file=sys.stderr)
+    sys.exit(1)
+
+
+def fetch_krx_listing() -> pd.DataFrame:
+    """
+    FDR에서 전체 KRX 종목 목록 가져오기
+
+    Returns:
+        DataFrame with columns:
+        - Code: 종목코드 (str)
+        - Name: 종목명 (str)
+        - Market: KOSPI/KOSDAQ/KONEX (str)
+        - Marcap: 시가총액 (int)
+        - Stocks: 상장주식수 (int)
+
+    Raises:
+        Exception: FDR API 호출 실패 시
+    """
+    try:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetching KRX listing from FDR...")
+        df = fdr.StockListing('KRX')
+
+        if df is None or df.empty:
+            raise ValueError("FDR returned empty result")
+
+        # Rename columns for consistency
+        df = df.rename(columns={'Code': 'symbol'})
+
+        # Ensure required columns exist
+        required = ['symbol', 'Name', 'Market']
+        missing = [col for col in required if col not in df.columns]
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetched {len(df)} symbols")
+        return df
+
+    except Exception as e:
+        print(f"Error fetching KRX listing: {e}", file=sys.stderr)
+        raise
+
+
+def load_existing_symbols(engine: Engine) -> Dict[str, Dict]:
+    """
+    DB에서 기존 종목 목록 로드
+
+    Args:
+        engine: SQLAlchemy engine
+
+    Returns:
+        {symbol: {name, market, status}, ...}
+    """
+    sql = text("""
+        SELECT symbol, name, market, status
+        FROM symbol_master
+    """)
+
+    with engine.connect() as conn:
+        result = conn.execute(sql)
+        rows = result.mappings().all()
+
+    return {
+        row['symbol']: {
+            'name': row['name'],
+            'market': row['market'],
+            'status': row['status']
+        }
+        for row in rows
+    }
+
+
+def compare_and_classify(
+    fdr_df: pd.DataFrame,
+    existing_symbols: Dict[str, Dict]
+) -> Tuple[pd.DataFrame, pd.DataFrame, Set[str]]:
+    """
+    FDR 종목과 DB 종목을 비교하여 분류
+
+    Args:
+        fdr_df: FDR에서 가져온 전체 종목 DataFrame
+        existing_symbols: DB에 이미 있는 종목 {symbol: {name, market, status}}
+
+    Returns:
+        (신규종목 DataFrame, 업데이트종목 DataFrame, 상장폐지종목 set)
+    """
+    fdr_symbols = set(fdr_df['symbol'].tolist())
+    db_symbols = set(existing_symbols.keys())
+
+    # 신규 종목: FDR에는 있지만 DB에 없음
+    new_symbols = fdr_symbols - db_symbols
+    new_df = fdr_df[fdr_df['symbol'].isin(new_symbols)].copy()
+
+    # 업데이트 종목: 둘 다 있음
+    update_symbols = fdr_symbols & db_symbols
+    update_df = fdr_df[fdr_df['symbol'].isin(update_symbols)].copy()
+
+    # 상장폐지 종목: DB에는 있지만 FDR에 없음 (단, 이미 DELISTED가 아닌 것만)
+    delisted_symbols = {
+        s for s in (db_symbols - fdr_symbols)
+        if existing_symbols[s]['status'] != 'DELISTED'
+    }
+
+    return new_df, update_df, delisted_symbols
+
+
+def upsert_symbol_master(
+    engine: Engine,
+    new_symbols: pd.DataFrame,
+    update_symbols: pd.DataFrame,
+    delisted_symbols: Set[str]
+) -> Dict[str, int]:
+    """
+    symbol_master 테이블 업데이트
+
+    Args:
+        engine: SQLAlchemy engine
+        new_symbols: 신규 종목 DataFrame
+        update_symbols: 업데이트 종목 DataFrame
+        delisted_symbols: 상장폐지 종목 set
+
+    Returns:
+        {"added": N, "updated": N, "delisted": N}
+    """
+    stats = {"added": 0, "updated": 0, "delisted": 0}
+
+    with engine.begin() as conn:
+        # 1. 신규 종목 추가
+        if not new_symbols.empty:
+            insert_sql = text("""
+                INSERT INTO symbol_master (symbol, market, name, status, updated_at)
+                VALUES (:symbol, :market, :name, 'ACTIVE', NOW())
+            """)
+
+            for _, row in new_symbols.iterrows():
+                conn.execute(insert_sql, {
+                    'symbol': row['symbol'],
+                    'market': row['Market'],
+                    'name': row['Name']
+                })
+                stats['added'] += 1
+
+        # 2. 기존 종목 업데이트
+        if not update_symbols.empty:
+            update_sql = text("""
+                UPDATE symbol_master
+                SET name = :name,
+                    market = :market,
+                    status = 'ACTIVE',
+                    updated_at = NOW()
+                WHERE symbol = :symbol
+            """)
+
+            for _, row in update_symbols.iterrows():
+                conn.execute(update_sql, {
+                    'symbol': row['symbol'],
+                    'market': row['Market'],
+                    'name': row['Name']
+                })
+                stats['updated'] += 1
+
+        # 3. 상장폐지 종목 상태 변경
+        if delisted_symbols:
+            delist_sql = text("""
+                UPDATE symbol_master
+                SET status = 'DELISTED',
+                    updated_at = NOW()
+                WHERE symbol = :symbol
+            """)
+
+            for symbol in delisted_symbols:
+                conn.execute(delist_sql, {'symbol': symbol})
+                stats['delisted'] += 1
+
+    return stats
+
+
+def main():
+    """메인 실행 함수"""
+    start_time = datetime.now()
+
+    try:
+        # 1. 설정 로드 및 DB 연결
+        cfg = load_settings()
+        db_cfg = DBConfig(**cfg.get("database", {}))
+        engine = DBManager.get_engine(db_cfg)
+
+        # 2. FDR에서 종목 목록 가져오기
+        fdr_df = fetch_krx_listing()
+
+        # 3. 기존 DB 종목 로드
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Loading existing symbols from DB...")
+        existing_symbols = load_existing_symbols(engine)
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Found {len(existing_symbols)} existing symbols in DB")
+
+        # 4. 비교 및 분류
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Comparing symbols...")
+        new_df, update_df, delisted_set = compare_and_classify(fdr_df, existing_symbols)
+
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Classification results:")
+        print(f"  - New symbols: {len(new_df)}")
+        print(f"  - Symbols to update: {len(update_df)}")
+        print(f"  - Delisted symbols: {len(delisted_set)}")
+
+        # 5. DB 업데이트
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Updating symbol_master table...")
+        stats = upsert_symbol_master(engine, new_df, update_df, delisted_set)
+
+        # 6. 결과 출력
+        elapsed = (datetime.now() - start_time).total_seconds()
+        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ✅ Sync completed successfully!")
+        print(f"Summary:")
+        print(f"  - Added: {stats['added']} symbols")
+        print(f"  - Updated: {stats['updated']} symbols")
+        print(f"  - Delisted: {stats['delisted']} symbols")
+        print(f"  - Duration: {elapsed:.1f}s")
+
+        # 7. 신규/상장폐지 종목 상세 출력 (있으면)
+        if stats['added'] > 0:
+            print(f"\nNew symbols added:")
+            for _, row in new_df.head(10).iterrows():
+                print(f"  - {row['symbol']} ({row['Name']}) [{row['Market']}]")
+            if len(new_df) > 10:
+                print(f"  ... and {len(new_df) - 10} more")
+
+        if stats['delisted'] > 0:
+            print(f"\nDelisted symbols:")
+            for symbol in list(delisted_set)[:10]:
+                print(f"  - {symbol}")
+            if len(delisted_set) > 10:
+                print(f"  ... and {len(delisted_set) - 10} more")
+
+    except Exception as e:
+        print(f"\n❌ Error during sync: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
