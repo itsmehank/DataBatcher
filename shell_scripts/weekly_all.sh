@@ -112,3 +112,9 @@ echo "  성공: ${TOTAL_SUCCESS}"
 echo "  실패: ${TOTAL_FAIL}"
 echo "  소요시간: ${TOTAL_MIN}분 ${TOTAL_SEC}초"
 echo "============================================"
+
+if [ ${TOTAL_FAIL} -gt 0 ]; then
+    exit 1
+fi
+
+exit 0
