@@ -28,6 +28,8 @@ ENV/
 .env.*
 !.env.example
 config/settings.dev.yaml
+scheduler/windows/scheduler.env
+!scheduler/windows/scheduler.env.example
 
 # Logs
 logs/
