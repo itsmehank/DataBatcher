@@ -13,10 +13,11 @@
 1. 필수 도구 설치
 2. 프로젝트 clone + Python 가상환경 + 의존성 설치
 3. DB 준비(로컬 Docker 또는 원격 DB)
-4. DB 연결 설정(`DATABASE_URL` 또는 `config/settings.dev.yaml`)
-5. `scheduler.env` 작성
-6. 작업 스케줄 등록
-7. 수동 실행으로 검증
+4. DB 연결 설정(초기화 단계 포함)
+5. 스키마 초기화(최초 1회)
+6. `scheduler.env` 작성
+7. 작업 스케줄 등록
+8. 수동 실행으로 검증
 
 ## 1) 사전 준비
 ### 필수
@@ -40,22 +41,30 @@ pip install apprise
 ### A안: 로컬 Docker MySQL 사용
 ```powershell
 copy .env.example .env
+```
+
+`.env` 파일에서 최소 아래 값을 실제 값으로 수정하세요.
+- `MYSQL_ROOT_PASSWORD`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `DATABASE_URL`
+
+수정 후 컨테이너를 시작하세요.
+
+```powershell
 docker compose -f docker/docker-compose.yml up -d
 ```
 
 ### B안: 원격 DB 사용
 - DB 서버 접근 가능(방화벽/계정/포트) 상태인지 먼저 확인합니다.
 
-## 4) DB 연결 설정 (둘 중 하나 선택)
+## 4) DB 연결 설정 (초기화 단계에서 반드시 필요)
 프로젝트는 아래 우선순위로 DB 타겟을 결정합니다.
 1. `DATABASE_URL` 환경변수
 2. `config/settings.dev.yaml`
 3. `config/settings.yaml`
 
-### 권장: `scheduler.env`의 `DATABASE_URL` 사용
-스케줄러 실행 프로세스에서만 적용되어 운영 관리가 쉽습니다.
-
-### 대안: `config/settings.dev.yaml` 작성
+### 권장(초기 사용자): `config/settings.dev.yaml` 작성
 `config/settings.dev.yaml` 파일을 만들고 아래처럼 입력:
 
 ```yaml
@@ -63,9 +72,20 @@ database:
   url: mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4
 ```
 
+### 대안: 현재 PowerShell 세션에만 `DATABASE_URL` 지정
+`config/settings.dev.yaml`을 만들지 않으려면, `init_db.py` 실행 전에 아래를 설정하세요.
+
+```powershell
+$env:DATABASE_URL="mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4"
+```
+
+주의:
+- `scheduler.env`의 `DATABASE_URL`은 **스케줄러 실행 시점**에 적용됩니다.
+- `init_db.py` 단계에서는 `scheduler.env`를 자동으로 읽지 않습니다.
+
 ## 5) 스키마 초기화 (최초 1회)
 ```powershell
-python scripts/init_db.py
+.\.venv\Scripts\python.exe scripts/init_db.py
 ```
 
 ## 6) scheduler.env 작성
@@ -83,11 +103,24 @@ copy .\scheduler\windows\scheduler.env.example .\scheduler\windows\scheduler.env
   - 비우면 `BATCH_PYTHON_EXE`를 알림에도 사용
 - `GIT_BASH_EXE` (필수)
   - 예: `C:\Program Files\Git\bin\bash.exe`
-- `DATABASE_URL` (권장)
+- `DATABASE_URL` (권장, Step 4에서 사용한 값과 동일)
   - 예: `mysql+pymysql://user:pass@127.0.0.1:3306/market?charset=utf8mb4`
 - `LOG_RETENTION_DAYS` (선택, 기본 14)
 - `APPRISE_URLS` (권장)
   - 예: `tgram://BOT_TOKEN/CHAT_ID`
+
+알림을 당장 붙이지 않을 경우:
+- `APPRISE_URLS`를 비워도 배치는 실행됩니다.
+- 이 경우 SUCCESS/FAILED 알림만 전송되지 않습니다.
+
+`APPRISE_URLS` 설정 예시(여러 채널은 `;`로 구분):
+- Telegram: `tgram://BOT_TOKEN/CHAT_ID`
+- 이메일(SMTP): `mailto://user:password@smtp.gmail.com:587/to@example.com`
+- Telegram + 이메일: `tgram://BOT_TOKEN/CHAT_ID;mailto://user:password@smtp.gmail.com:587/to@example.com`
+
+참고:
+- `scheduler/windows/scheduler.env.example`에 예시가 포함되어 있습니다.
+- Apprise 공식 URL 포맷 문서: `https://github.com/caronc/apprise/wiki`
 
 주의:
 - 스케줄러는 실행 전 `scripts/healthcheck_db.py`로 실제 DB 연결(`SELECT 1`)을 검사합니다.
