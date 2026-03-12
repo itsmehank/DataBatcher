@@ -33,6 +33,8 @@ docker compose -f docker/docker-compose.yml up -d
 
 `mysql-standalone/docker-compose-mysql.yaml`을 사용할 때도 동일하게 **루트 `.env`만** 사용합니다.
 
+MySQL 월간 백업/복구는 `shell_scripts/db_backup_monthly.sh`, `shell_scripts/db_restore_full.sh`를 사용하세요.
+
 ### 3) 스키마 초기화
 ```bash
 python scripts/init_db.py

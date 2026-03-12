@@ -35,6 +35,9 @@ scheduler/windows/scheduler.env
 logs/
 *.log
 
+# Local backup artifacts
+backups/
+
 # Build artifacts
 build/
 dist/

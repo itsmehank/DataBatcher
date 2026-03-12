@@ -71,3 +71,37 @@ This directory is a standalone MySQL project extracted from the original Grafana
   ```bash
   docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
   ```
+
+## Backup / Restore
+
+백업/복구 스크립트는 프로젝트 루트 `shell_scripts/` 아래에 있습니다.
+
+- 월간 full 백업 생성(성공 시 이전 백업 자동 삭제, 최신 1개만 유지):
+
+  ```bash
+  bash shell_scripts/db_backup_monthly.sh
+  ```
+
+  - 출력 경로: `backups/mysql/monthly/`
+  - 파일 형식: `.sql.zst` (zstd 미설치 시 `.sql.gz`)
+
+- 복구(대상 MySQL 컨테이너는 먼저 수동 기동):
+
+  ```bash
+  docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
+  bash shell_scripts/db_restore_full.sh --file backups/mysql/monthly/<backup_file>
+  ```
+
+- 대상 DB를 재생성 후 복구하려면:
+
+  ```bash
+  bash shell_scripts/db_restore_full.sh --file backups/mysql/monthly/<backup_file> --target-db trade --recreate-db --yes
+  ```
+
+## Scheduling
+
+별도 스케줄러 스크립트 없이, `db_backup_monthly.sh`를 cron에 등록해 월 1회 실행하는 방식 권장:
+
+```bash
+30 3 1 * * cd /Users/hank.es/PythonProject/DataBatcher && bash shell_scripts/db_backup_monthly.sh >> logs/db_backup_monthly.log 2>&1
+```
