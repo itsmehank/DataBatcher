@@ -12,6 +12,7 @@ $startAt = Get-Date
 $logFile = Join-Path $logDir ("weekly_{0}.log" -f $startAt.ToString("yyyyMMdd_HHmmss"))
 
 Load-SchedulerEnv -EnvFile $envFile
+$batchPython = Get-BatchPythonExe
 Write-RunLog -Message "[WEEKLY] job started" -LogFile $logFile
 
 $mutex = Acquire-SchedulerMutex -Name "Global\DataBatcherWeeklyLock"
@@ -22,14 +23,20 @@ if ($null -eq $mutex) {
 }
 
 try {
-    $containerName = [System.Environment]::GetEnvironmentVariable("DOCKER_MYSQL_CONTAINER", "Process")
-    if (-not $containerName) {
-        $containerName = "databatche_db"
+    if (-not (Test-BatchPythonRuntime -PythonExe $batchPython -LogFile $logFile)) {
+        Send-AppriseNotification -Title "[DataBatcher][WEEKLY] FAILED" -Body "Batch Python runtime check failed.`nPython: $batchPython`nLog: $logFile" -LogFile $logFile
+        exit 1
     }
 
-    if (-not (Test-DockerMySqlContainer -ContainerName $containerName)) {
-        Write-RunLog -Message "[WEEKLY] docker mysql container not running: $containerName" -LogFile $logFile
-        Send-AppriseNotification -Title "[DataBatcher][WEEKLY] FAILED" -Body "MySQL container is not running: $containerName`nLog: $logFile" -LogFile $logFile
+    $healthcheckScript = Join-Path $repoRoot "scripts\healthcheck_db.py"
+    if (-not (Test-Path -LiteralPath $healthcheckScript)) {
+        throw "Missing script: $healthcheckScript"
+    }
+    Write-RunLog -Message "[WEEKLY] DB healthcheck start" -LogFile $logFile
+    & $batchPython $healthcheckScript 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }
+    if ($LASTEXITCODE -ne 0) {
+        Write-RunLog -Message "[WEEKLY] DB healthcheck failed (exit=$LASTEXITCODE)" -LogFile $logFile
+        Send-AppriseNotification -Title "[DataBatcher][WEEKLY] FAILED" -Body "DB healthcheck failed (exit=$LASTEXITCODE).`nLog: $logFile" -LogFile $logFile
         exit 1
     }
 
@@ -42,7 +49,11 @@ try {
     }
 
     $repoPosix = Convert-ToPosixPath -WindowsPath $repoRoot
-    $cmd = "cd '$repoPosix' && bash shell_scripts/weekly_all.sh"
+    $pythonForBash = $batchPython
+    if (Test-Path -LiteralPath $batchPython) {
+        $pythonForBash = Convert-ToPosixPath -WindowsPath $batchPython
+    }
+    $cmd = "cd '$repoPosix' && PYTHON_BIN='$pythonForBash' bash shell_scripts/weekly_all.sh"
     Write-RunLog -Message "[WEEKLY] execute: $cmd" -LogFile $logFile
 
     & $gitBash -lc $cmd 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }

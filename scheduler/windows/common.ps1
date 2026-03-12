@@ -50,6 +50,45 @@ function Load-SchedulerEnv {
     }
 }
 
+function Get-BatchPythonExe {
+    $batchPython = [System.Environment]::GetEnvironmentVariable("BATCH_PYTHON_EXE", "Process")
+    if (-not $batchPython) {
+        $batchPython = [System.Environment]::GetEnvironmentVariable("SCHEDULER_PYTHON_EXE", "Process")
+    }
+    if (-not $batchPython) {
+        $batchPython = "python"
+    }
+
+    $batchPython = $batchPython.Trim()
+    $looksLikePath = $batchPython.Contains("\\") -or $batchPython.Contains("/") -or $batchPython.Contains(":")
+    if ($looksLikePath -and -not (Test-Path -LiteralPath $batchPython)) {
+        throw "Batch Python not found: $batchPython"
+    }
+
+    return $batchPython
+}
+
+function Test-BatchPythonRuntime {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PythonExe,
+        [Parameter(Mandatory = $true)]
+        [string]$LogFile
+    )
+
+    try {
+        & $PythonExe -c "import pandas, sqlalchemy, pymysql, yaml, dotenv" 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $LogFile }
+        if ($LASTEXITCODE -ne 0) {
+            Write-RunLog -Message "Batch Python runtime check failed (exit=$LASTEXITCODE)" -LogFile $LogFile
+            return $false
+        }
+        return $true
+    } catch {
+        Write-RunLog -Message "Batch Python runtime check error: $($_.Exception.Message)" -LogFile $LogFile
+        return $false
+    }
+}
+
 function Convert-ToPosixPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -109,6 +148,9 @@ function Send-AppriseNotification {
 
     $pythonExe = [System.Environment]::GetEnvironmentVariable("SCHEDULER_PYTHON_EXE", "Process")
     if (-not $pythonExe) {
+        $pythonExe = [System.Environment]::GetEnvironmentVariable("BATCH_PYTHON_EXE", "Process")
+    }
+    if (-not $pythonExe) {
         $pythonExe = "python"
     }
 
@@ -136,17 +178,4 @@ function Send-AppriseNotification {
     } catch {
         Write-RunLog -Message "Notification failed: $($_.Exception.Message)" -LogFile $LogFile
     }
-}
-
-function Test-DockerMySqlContainer {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ContainerName
-    )
-
-    $output = & docker ps --format "{{.Names}}" 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        return $false
-    }
-    return $output -contains $ContainerName
 }

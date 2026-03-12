@@ -17,6 +17,7 @@ $startAt = Get-Date
 $logFile = Join-Path $logDir ("daily_{0}_{1}.log" -f $Target.ToLower(), $startAt.ToString("yyyyMMdd_HHmmss"))
 
 Load-SchedulerEnv -EnvFile $envFile
+$batchPython = Get-BatchPythonExe
 $scriptByTarget = @{
     "KR" = "shell_scripts/daily_kr.sh"
     "US" = "shell_scripts/daily_us.sh"
@@ -40,14 +41,20 @@ if ($null -eq $mutex) {
 }
 
 try {
-    $containerName = [System.Environment]::GetEnvironmentVariable("DOCKER_MYSQL_CONTAINER", "Process")
-    if (-not $containerName) {
-        $containerName = "databatche_db"
+    if (-not (Test-BatchPythonRuntime -PythonExe $batchPython -LogFile $logFile)) {
+        Send-AppriseNotification -Title "$titlePrefix FAILED" -Body "Batch Python runtime check failed.`nPython: $batchPython`nLog: $logFile" -LogFile $logFile
+        exit 1
     }
 
-    if (-not (Test-DockerMySqlContainer -ContainerName $containerName)) {
-        Write-RunLog -Message "[DAILY-$Target] docker mysql container not running: $containerName" -LogFile $logFile
-        Send-AppriseNotification -Title "$titlePrefix FAILED" -Body "MySQL container is not running: $containerName`nLog: $logFile" -LogFile $logFile
+    $healthcheckScript = Join-Path $repoRoot "scripts\healthcheck_db.py"
+    if (-not (Test-Path -LiteralPath $healthcheckScript)) {
+        throw "Missing script: $healthcheckScript"
+    }
+    Write-RunLog -Message "[DAILY-$Target] DB healthcheck start" -LogFile $logFile
+    & $batchPython $healthcheckScript 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }
+    if ($LASTEXITCODE -ne 0) {
+        Write-RunLog -Message "[DAILY-$Target] DB healthcheck failed (exit=$LASTEXITCODE)" -LogFile $logFile
+        Send-AppriseNotification -Title "$titlePrefix FAILED" -Body "DB healthcheck failed (exit=$LASTEXITCODE).`nLog: $logFile" -LogFile $logFile
         exit 1
     }
 
@@ -60,7 +67,11 @@ try {
     }
 
     $repoPosix = Convert-ToPosixPath -WindowsPath $repoRoot
-    $cmd = "cd '$repoPosix' && bash $targetScript"
+    $pythonForBash = $batchPython
+    if (Test-Path -LiteralPath $batchPython) {
+        $pythonForBash = Convert-ToPosixPath -WindowsPath $batchPython
+    }
+    $cmd = "cd '$repoPosix' && PYTHON_BIN='$pythonForBash' bash $targetScript"
     Write-RunLog -Message "[DAILY-$Target] execute: $cmd" -LogFile $logFile
 
     & $gitBash -lc $cmd 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }

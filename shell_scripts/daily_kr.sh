@@ -15,6 +15,7 @@ fi
 TOTAL_SUCCESS=0
 TOTAL_FAIL=0
 SCRIPT_START=$(date +%s)
+PYTHON_BIN="${PYTHON_BIN:-python}"
 
 run_step() {
     local step_label="$1"
@@ -43,10 +44,10 @@ print_phase_header() {
 
 print_phase_header "KR Daily: 지수/주식/RS/Minervini"
 
-run_step "KR-1" python scripts/kr_index_daily_update.py --all
-run_step "KR-2" python scripts/daily_update.py --all
-run_step "KR-3" python scripts/kr_rs_update.py --days 7
-run_step "KR-4" python scripts/kr_minervini_update.py --days 7
+run_step "KR-1" "$PYTHON_BIN" scripts/kr_index_daily_update.py --all
+run_step "KR-2" "$PYTHON_BIN" scripts/daily_update.py --all
+run_step "KR-3" "$PYTHON_BIN" scripts/kr_rs_update.py --days 7
+run_step "KR-4" "$PYTHON_BIN" scripts/kr_minervini_update.py --days 7
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START ))
 TOTAL_MIN=$(( TOTAL_ELAPSED / 60 ))

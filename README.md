@@ -140,4 +140,6 @@ git check-ignore -v .env config/settings.dev.yaml logs/bulk_update_failed.log
 - `guides/전체_Bulk_수집_가이드.md`
 - `guides/전체_Daily_Weekly_업데이트_가이드.md`
 - `guides/DB_데이터_가이드.md`
+- `docs/windows_scheduler_guide.md`
+- `docs/operations_validation_manual.md`
 - `docs/database_schema.md`
