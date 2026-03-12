@@ -230,15 +230,12 @@ crontab -e
 
 ### Windows Task Scheduler
 
-1. **작업 스케줄러 실행** (taskschd.msc)
-2. **기본 작업 만들기** 선택
-3. **트리거**: "매일" 또는 "매주"
-4. **동작**: "프로그램 시작"
-   - 프로그램: `C:\Windows\System32\bash.exe`
-   - 인수: `shell_scripts/daily_all.sh`
-   - 시작 위치: `C:\path\to\DataBatcher`
-5. **조건**: "컴퓨터의 전원이 AC 전원에 연결되어 있을 때만 작업 시작" 체크 해제
-6. **설정**: "작업이 실패한 경우 다시 시작 간격" 설정 (선택 사항)
+Windows 스케줄링 운영 절차는 전용 문서에서 관리합니다.
+
+- 스케줄 등록/갱신: `docs/windows_scheduler_guide.md`
+- 수동 운영 검증(필요 시): `docs/operations_validation_manual.md`
+
+이 문서는 수동 실행 중심 가이드이며, 스케줄러 상세 설정은 전용 문서를 기준으로 합니다.
 
 ---
 
