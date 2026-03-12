@@ -31,6 +31,8 @@ cp .env.example .env
 docker compose -f docker/docker-compose.yml up -d
 ```
 
+`mysql-standalone/docker-compose-mysql.yaml`을 사용할 때도 동일하게 **루트 `.env`만** 사용합니다.
+
 ### 3) 스키마 초기화
 ```bash
 python scripts/init_db.py
