@@ -52,7 +52,7 @@ copy .env.example .env
 수정 후 컨테이너를 시작하세요.
 
 ```powershell
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
 ```
 
 ### B안: 원격 DB 사용

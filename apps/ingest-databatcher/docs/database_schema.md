@@ -2,7 +2,7 @@
 **Last Updated**: 2026-02-26
 **Database**: MySQL 8.0
 **Charset**: utf8mb4
-**Schema Source**: `docker/mysql/init/01_schema.sql` + running DB (`information_schema`/`SHOW CREATE`)
+**Schema Source**: `db/init/01_schema.sql` + running DB (`information_schema`/`SHOW CREATE`)
 
 ---
 

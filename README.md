@@ -28,10 +28,10 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 # .env에서 값 수정 (MYSQL_* / DATABASE_URL)
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
 ```
 
-`mysql-standalone/docker-compose-mysql.yaml`을 사용할 때도 동일하게 **루트 `.env`만** 사용합니다.
+`db/compose/mysql-standalone/docker-compose-mysql.yaml`을 사용할 때도 동일하게 **루트 `.env`만** 사용합니다.
 
 MySQL 월간 백업/복구는 `apps/ingest-databatcher/ops/shell/db_backup_monthly.sh`, `apps/ingest-databatcher/ops/shell/db_restore_full.sh`를 사용하세요.
 

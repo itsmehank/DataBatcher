@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-if [ ! -f "mysql-standalone/docker-compose-mysql.yaml" ]; then
+if [ ! -f "db/compose/mysql-standalone/docker-compose-mysql.yaml" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     echo "  bash apps/ingest-databatcher/ops/shell/db_backup_monthly.sh"
@@ -22,7 +22,7 @@ if [ ! -f "mysql-standalone/docker-compose-mysql.yaml" ]; then
 fi
 
 ENV_FILE=".env"
-COMPOSE_FILE="mysql-standalone/docker-compose-mysql.yaml"
+COMPOSE_FILE="db/compose/mysql-standalone/docker-compose-mysql.yaml"
 BACKUP_DIR="backups/mysql/monthly"
 LOG_DIR="logs"
 

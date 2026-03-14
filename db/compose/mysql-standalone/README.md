@@ -28,13 +28,13 @@ This directory is a standalone MySQL project extracted from the original Grafana
 3. Start MySQL from project root:
 
    ```bash
-   docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
+   docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
    ```
 
    If port `3306` is already in use, you can run temporary port override:
 
    ```bash
-   MYSQL_PORT=3307 docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
+   MYSQL_PORT=3307 docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
    ```
 
    In that case, update `DATABASE_URL` port to `3307` too if app scripts should target this MySQL.
@@ -42,19 +42,19 @@ This directory is a standalone MySQL project extracted from the original Grafana
 4. Check status:
 
    ```bash
-   docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env ps
+   docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env ps
    ```
 
 5. View logs:
 
    ```bash
-   docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env logs -f mysql
+   docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env logs -f mysql
    ```
 
 6. Stop service:
 
    ```bash
-   docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env down
+   docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env down
    ```
 
 ## Notes
@@ -69,7 +69,7 @@ This directory is a standalone MySQL project extracted from the original Grafana
 - To fully reset data, run:
 
   ```bash
-  docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
+  docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
   ```
 
 ## Backup / Restore
@@ -88,7 +88,7 @@ This directory is a standalone MySQL project extracted from the original Grafana
 - 복구(대상 MySQL 컨테이너는 먼저 수동 기동):
 
   ```bash
-  docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
+  docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
   bash apps/ingest-databatcher/ops/shell/db_restore_full.sh --file backups/mysql/monthly/<backup_file>
   ```
 
