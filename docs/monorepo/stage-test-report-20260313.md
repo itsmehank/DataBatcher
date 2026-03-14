@@ -52,3 +52,18 @@
   - `stock_prices_weekly`: 5
   - 최신 샘플: `(000020, 2026-03-13)`
 - Alembic env import 경로 보정 후 baseline 적용 정상 확인
+
+## 추가 검증 (2026-03-14, 경로 고정 보완)
+
+- config 탐색 로직 고정 후 테스트
+  - `apps/ingest-databatcher/core/config_loader.py`의 다중 경로 후보 탐색 정상 동작
+- schema 경로 정책 변경 테스트
+  - `db/init/01_schema.sql` 기준으로 `init_db.py`/`init_test_db.py` 실행 성공
+  - legacy fallback(`docker/mysql/init/01_schema.sql`)은 호환용으로 유지
+- compose 경로 통일 테스트
+  - `mysql-standalone/docker-compose-mysql.yaml`에서 `../db/init/01_schema.sql` 마운트 정상
+  - `docker/docker-compose.yml`에서 `../db/init` 마운트 정상
+- 3307 통합 검증
+  - `init_db -> init_test_db -> alembic -> sync -> bulk(top1,1일) -> daily(top1) -> weekly(top1)` 성공
+  - row count: `stock_prices=19`, `stock_indicators=4`, `stock_prices_weekly=5`
+  - 종료 후 `MYSQL_PORT=3307 ... down -v` 수행 및 3306 기존 DB 유지 확인
