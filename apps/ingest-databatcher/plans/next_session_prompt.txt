@@ -1,7 +1,7 @@
 작업 배경
 - 현재 프로젝트: /Users/hank.es/PythonProject/DataBatcher
 - 기본 응답 언어: 한국어
-- 작업 원칙: guides/ 문서를 1개씩 순차적으로 분석/정합성 점검/수정
+- 작업 원칙: apps/ingest-databatcher/docs/guides/ 문서를 1개씩 순차적으로 분석/정합성 점검/수정
 - 이미 여러 가이드 및 스크립트는 앞 세션에서 수정됨. 먼저 현재 워크트리 상태를 확인하고 이어서 진행할 것.
 
 필수 시작 절차
@@ -12,7 +12,7 @@
 5) 다음 문서로 이동
 
 이번에 이어서 할 작업(우선순위 1)
-- 대상 문서: guides/암호화폐_일봉_가이드.md
+- 대상 문서: apps/ingest-databatcher/docs/guides/암호화폐_일봉_가이드.md
 - 연관 코드:
   - scripts/crypto_daily_update.py
   - scripts/crypto_bulk_update_daily.py
@@ -29,7 +29,7 @@
 - SoT(코드 기준 진실 소스) 섹션 부재
 
 수정 계획(로직 변경 최소)
-1) guides/암호화폐_일봉_가이드.md
+1) apps/ingest-databatcher/docs/guides/암호화폐_일봉_가이드.md
    - 상단 참고 링크 최신 파일명으로 정리
    - Quick Start 단계 수 정정
    - SoT 섹션 추가:

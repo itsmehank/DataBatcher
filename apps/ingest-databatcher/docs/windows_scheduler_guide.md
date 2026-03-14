@@ -193,4 +193,4 @@ git check-ignore -v .env .\apps\ingest-databatcher\ops\scheduler\windows\schedul
 ```
 
 ## 12) 추가 참고
-- 수동 운영 검증 확장판: `docs/operations_validation_manual.md`
+- 수동 운영 검증 확장판: `apps/ingest-databatcher/docs/operations_validation_manual.md`

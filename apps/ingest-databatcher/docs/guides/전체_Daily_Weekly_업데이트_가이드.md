@@ -232,8 +232,8 @@ crontab -e
 
 Windows 스케줄링 운영 절차는 전용 문서에서 관리합니다.
 
-- 스케줄 등록/갱신: `docs/windows_scheduler_guide.md`
-- 수동 운영 검증(필요 시): `docs/operations_validation_manual.md`
+- 스케줄 등록/갱신: `apps/ingest-databatcher/docs/windows_scheduler_guide.md`
+- 수동 운영 검증(필요 시): `apps/ingest-databatcher/docs/operations_validation_manual.md`
 
 이 문서는 수동 실행 중심 가이드이며, 스케줄러 상세 설정은 전용 문서를 기준으로 합니다.
 
@@ -406,8 +406,8 @@ chmod +x apps/ingest-databatcher/ops/shell/weekly_all.sh
 
 ## 참고 문서
 
-- **초기 Bulk 수집**: `guides/전체_Bulk_수집_가이드.md`
-- **한국 주식 일봉**: `guides/한국주식_일봉_가이드.md`
-- **미국 주식 일봉**: `guides/미국주식_일봉_가이드.md`
-- **미너비니 스크리닝**: `guides/미너비니_트렌드_템플릿_가이드.md`
-- **데이터베이스 스키마**: `docs/database_schema.md`
+- **초기 Bulk 수집**: `apps/ingest-databatcher/docs/guides/전체_Bulk_수집_가이드.md`
+- **한국 주식 일봉**: `apps/ingest-databatcher/docs/guides/한국주식_일봉_가이드.md`
+- **미국 주식 일봉**: `apps/ingest-databatcher/docs/guides/미국주식_일봉_가이드.md`
+- **미너비니 스크리닝**: `apps/ingest-databatcher/docs/guides/미너비니_트렌드_템플릿_가이드.md`
+- **데이터베이스 스키마**: `apps/ingest-databatcher/plans/database_schema.md`
