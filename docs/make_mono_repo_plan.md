@@ -59,7 +59,7 @@
 
 - 코드와 엔트리포인트를 `apps/ingest-databatcher/` 기준으로 재배치
 - 기존 경로 참조를 전수 스캔해 새 경로로 일괄 변경
-  - 대상: `shell_scripts/`, `scheduler/`, `docs/`, `README`, 테스트, CI
+  - 대상: `apps/ingest-databatcher/ops/shell/`, `scheduler/`, `docs/`, `README`, 테스트, CI
 - 레거시 래퍼는 두지 않는다
 
 완료 기준

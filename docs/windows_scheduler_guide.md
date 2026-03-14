@@ -5,7 +5,7 @@
 
 완료 상태(이 문서의 목표):
 - DB 연결 설정 완료
-- `scheduler/windows/scheduler.env` 작성 완료
+- `apps/ingest-databatcher/ops/scheduler/windows/scheduler.env` 작성 완료
 - `DataBatcher-Daily-KR`, `DataBatcher-Daily-US`, `DataBatcher-Weekly`, `DataBatcher-LogCleanup` 등록 완료
 - 수동 검증 1회 완료
 
@@ -92,7 +92,7 @@ $env:DATABASE_URL="mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/
 샘플 복사:
 
 ```powershell
-copy .\scheduler\windows\scheduler.env.example .\scheduler\windows\scheduler.env
+copy .\apps\ingest-databatcher\ops\scheduler\windows\scheduler.env.example .\apps\ingest-databatcher\ops\scheduler\windows\scheduler.env
 ```
 
 `scheduler.env`에서 아래 키를 채웁니다.
@@ -119,7 +119,7 @@ copy .\scheduler\windows\scheduler.env.example .\scheduler\windows\scheduler.env
 - Telegram + 이메일: `tgram://BOT_TOKEN/CHAT_ID;mailto://user:password@smtp.gmail.com:587/to@example.com`
 
 참고:
-- `scheduler/windows/scheduler.env.example`에 예시가 포함되어 있습니다.
+- `apps/ingest-databatcher/ops/scheduler/windows/scheduler.env.example`에 예시가 포함되어 있습니다.
 - Apprise 공식 URL 포맷 문서: `https://github.com/caronc/apprise/wiki`
 
 주의:
@@ -135,12 +135,12 @@ copy .\scheduler\windows\scheduler.env.example .\scheduler\windows\scheduler.env
 
 등록:
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\register_tasks.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\register_tasks.ps1
 ```
 
 시각 커스터마이즈:
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\register_tasks.ps1 -KrDailyAt "18:10" -UsDailyAt "08:10" -WeeklyAt "08:30" -CleanupAt "04:00"
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\register_tasks.ps1 -KrDailyAt "18:10" -UsDailyAt "08:10" -WeeklyAt "08:30" -CleanupAt "04:00"
 ```
 
 등록 확인:
@@ -152,10 +152,10 @@ Get-ScheduledTask -TaskName "DataBatcher-*"
 아래 4개를 1회 수동 실행합니다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\run_daily.ps1 -Target KR
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\run_daily.ps1 -Target US
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\run_weekly.ps1
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\cleanup_logs.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\run_daily.ps1 -Target KR
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\run_daily.ps1 -Target US
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\run_weekly.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\cleanup_logs.ps1
 ```
 
 로그 확인 경로:
@@ -181,7 +181,7 @@ powershell -ExecutionPolicy Bypass -File .\scheduler\windows\cleanup_logs.ps1
 - PowerShell 래퍼는 종료코드를 기반으로 Apprise SUCCESS/FAILED/SKIPPED 알림 전송
 
 ## 11) 보안 수칙
-- `scheduler/windows/scheduler.env`는 로컬 전용 파일(커밋 금지)
+- `apps/ingest-databatcher/ops/scheduler/windows/scheduler.env`는 로컬 전용 파일(커밋 금지)
 - 토큰/비밀번호는 코드/문서 하드코딩 금지
 
 업로드 전 점검:
@@ -189,7 +189,7 @@ powershell -ExecutionPolicy Bypass -File .\scheduler\windows\cleanup_logs.ps1
 ```powershell
 python scripts/preflight_repo_safety.py
 git add -n .
-git check-ignore -v .env .\scheduler\windows\scheduler.env config\settings.dev.yaml
+git check-ignore -v .env .\apps\ingest-databatcher\ops\scheduler\windows\scheduler.env config\settings.dev.yaml
 ```
 
 ## 12) 추가 참고

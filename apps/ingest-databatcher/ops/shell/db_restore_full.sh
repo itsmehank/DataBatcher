@@ -8,14 +8,14 @@
 # - --recreate-db 옵션 사용 시 DB를 재생성 후 import
 #
 # 사용법:
-#   bash shell_scripts/db_restore_full.sh --file backups/mysql/monthly/trade_full_202603.sql.zst
-#   bash shell_scripts/db_restore_full.sh --file <file> --target-db trade_restore --recreate-db --yes
+#   bash apps/ingest-databatcher/ops/shell/db_restore_full.sh --file backups/mysql/monthly/trade_full_202603.sql.zst
+#   bash apps/ingest-databatcher/ops/shell/db_restore_full.sh --file <file> --target-db trade_restore --recreate-db --yes
 # ==============================================================================
 
 set -euo pipefail
 
 usage() {
-    echo "Usage: bash shell_scripts/db_restore_full.sh --file <backup_file> [--target-db <db>] [--recreate-db] [--yes]"
+    echo "Usage: bash apps/ingest-databatcher/ops/shell/db_restore_full.sh --file <backup_file> [--target-db <db>] [--recreate-db] [--yes]"
 }
 
 if [ ! -f "mysql-standalone/docker-compose-mysql.yaml" ]; then

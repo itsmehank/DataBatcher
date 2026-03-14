@@ -5,11 +5,11 @@
 DataBatcher의 **일상 운영을 위한 전체 업데이트 스크립트**입니다.
 
 **제공 스크립트**:
-- `shell_scripts/daily_kr.sh` — KR 일일 업데이트 (KR 지수 + KR 주식 + KR RS + KR 미너비니)
-- `shell_scripts/daily_us.sh` — US 일일 업데이트 (US 지수 + US 주식 + US RS + US 미너비니)
-- `shell_scripts/daily_crypto.sh` — Crypto 일일 업데이트 (가격 + 지표)
-- `shell_scripts/daily_all.sh` — 통합 실행용 래퍼(위 3개 스크립트를 순서대로 실행)
-- `shell_scripts/weekly_all.sh` — 모든 시장의 주간 업데이트 + 종목 마스터 동기화
+- `apps/ingest-databatcher/ops/shell/daily_kr.sh` — KR 일일 업데이트 (KR 지수 + KR 주식 + KR RS + KR 미너비니)
+- `apps/ingest-databatcher/ops/shell/daily_us.sh` — US 일일 업데이트 (US 지수 + US 주식 + US RS + US 미너비니)
+- `apps/ingest-databatcher/ops/shell/daily_crypto.sh` — Crypto 일일 업데이트 (가격 + 지표)
+- `apps/ingest-databatcher/ops/shell/daily_all.sh` — 통합 실행용 래퍼(위 3개 스크립트를 순서대로 실행)
+- `apps/ingest-databatcher/ops/shell/weekly_all.sh` — 모든 시장의 주간 업데이트 + 종목 마스터 동기화
 
 **대상 시장**: KR 주식, US 주식, Crypto, KR 지수, US 지수
 
@@ -17,7 +17,7 @@ DataBatcher의 **일상 운영을 위한 전체 업데이트 스크립트**입�
 
 ## 사전 요구사항
 
-1. **초기 Bulk 수집 완료**: `bash shell_scripts/bulk_all.sh` 실행 완료 상태
+1. **초기 Bulk 수집 완료**: `bash apps/ingest-databatcher/ops/shell/bulk_all.sh` 실행 완료 상태
 2. **Docker MySQL 실행 중**: `cd docker && docker compose up -d`
 3. **Python 가상환경 활성화**: `source .venv/bin/activate`
 
@@ -31,28 +31,28 @@ DataBatcher의 **일상 운영을 위한 전체 업데이트 스크립트**입�
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/daily_kr.sh
+bash apps/ingest-databatcher/ops/shell/daily_kr.sh
 ```
 
 #### US 일일 업데이트
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/daily_us.sh
+bash apps/ingest-databatcher/ops/shell/daily_us.sh
 ```
 
 #### Crypto 일일 업데이트
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/daily_crypto.sh
+bash apps/ingest-databatcher/ops/shell/daily_crypto.sh
 ```
 
 #### 통합 실행(호환용)
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/daily_all.sh
+bash apps/ingest-databatcher/ops/shell/daily_all.sh
 ```
 
 ### 실행 시각 권장
@@ -137,7 +137,7 @@ bash shell_scripts/daily_all.sh
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/weekly_all.sh
+bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 ```
 
 ### 실행 시각 권장
@@ -212,7 +212,7 @@ crontab -e
 # 추가할 내용:
 
 # --- Daily 업데이트 (전체 시장, 다음날 오전 07:30 KST) ---
-30 7 * * 2-6 cd /path/to/DataBatcher && source .venv/bin/activate && bash shell_scripts/daily_all.sh >> logs/daily_all.log 2>&1
+30 7 * * 2-6 cd /path/to/DataBatcher && source .venv/bin/activate && bash apps/ingest-databatcher/ops/shell/daily_all.sh >> logs/daily_all.log 2>&1
 
 # --- KR만 Daily 업데이트 (평일 17:00 KST) ---
 # 0 17 * * 1-5 cd /path/to/DataBatcher && source .venv/bin/activate && python scripts/kr_index_daily_update.py --all --force && python scripts/daily_update.py --all --force && python scripts/kr_rs_update.py --days 7 --force && python scripts/kr_minervini_update.py --days 7 --force >> logs/daily_kr.log 2>&1
@@ -221,7 +221,7 @@ crontab -e
 # 0 7 * * 2-6 cd /path/to/DataBatcher && source .venv/bin/activate && python scripts/us_index_daily_update.py --all --force && python scripts/us_daily_update.py --all --with-indicators --force && python scripts/us_rs_update.py --days 7 --force && python scripts/us_minervini_update.py --days 7 --force >> logs/daily_us.log 2>&1
 
 # --- Weekly 업데이트 (토요일 오전 10:00 KST) ---
-0 10 * * 6 cd /path/to/DataBatcher && source .venv/bin/activate && bash shell_scripts/weekly_all.sh >> logs/weekly_all.log 2>&1
+0 10 * * 6 cd /path/to/DataBatcher && source .venv/bin/activate && bash apps/ingest-databatcher/ops/shell/weekly_all.sh >> logs/weekly_all.log 2>&1
 ```
 
 **참고**:
@@ -398,8 +398,8 @@ less logs/weekly_all.log
 
 ```bash
 # 실행 권한 부여
-chmod +x shell_scripts/daily_all.sh
-chmod +x shell_scripts/weekly_all.sh
+chmod +x apps/ingest-databatcher/ops/shell/daily_all.sh
+chmod +x apps/ingest-databatcher/ops/shell/weekly_all.sh
 ```
 
 ---

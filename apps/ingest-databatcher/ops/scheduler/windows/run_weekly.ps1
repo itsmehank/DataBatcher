@@ -53,7 +53,7 @@ try {
     if (Test-Path -LiteralPath $batchPython) {
         $pythonForBash = Convert-ToPosixPath -WindowsPath $batchPython
     }
-    $cmd = "cd '$repoPosix' && PYTHON_BIN='$pythonForBash' bash shell_scripts/weekly_all.sh"
+    $cmd = "cd '$repoPosix' && PYTHON_BIN='$pythonForBash' bash apps/ingest-databatcher/ops/shell/weekly_all.sh"
     Write-RunLog -Message "[WEEKLY] execute: $cmd" -LogFile $logFile
 
     & $gitBash -lc $cmd 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }

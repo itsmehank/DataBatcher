@@ -9,7 +9,7 @@
 #
 # 사용법:
 #   cd /path/to/DataBatcher
-#   bash shell_scripts/db_backup_monthly.sh
+#   bash apps/ingest-databatcher/ops/shell/db_backup_monthly.sh
 # ==============================================================================
 
 set -euo pipefail
@@ -17,7 +17,7 @@ set -euo pipefail
 if [ ! -f "mysql-standalone/docker-compose-mysql.yaml" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
-    echo "  bash shell_scripts/db_backup_monthly.sh"
+    echo "  bash apps/ingest-databatcher/ops/shell/db_backup_monthly.sh"
     exit 1
 fi
 

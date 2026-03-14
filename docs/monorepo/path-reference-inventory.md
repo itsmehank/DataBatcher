@@ -12,7 +12,7 @@
 
 ```bash
 # 운영 영향 파일(실행 경로 영향)
-rg -n "python scripts/|python apps/ingest-databatcher/scripts/|shell_scripts/|scheduler/" README.md AGENTS.md shell_scripts scheduler mysql-standalone/README.md
+rg -n "python scripts/|python apps/ingest-databatcher/scripts/|apps/ingest-databatcher/ops/shell/|scheduler/" README.md AGENTS.md shell_scripts scheduler mysql-standalone/README.md
 
 # 문서/가이드(운영 영향 낮음)
 rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
@@ -23,14 +23,14 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 업데이트(2026-03-14):
 
 - 런타임 코드(`core/collectors/indicators/savers/scripts/tests`)는 `apps/ingest-databatcher/`로 이관 완료
-- 운영 스크립트(`shell_scripts/*.sh`)의 실행 경로는 1차 교체 완료
+- 운영 스크립트(`apps/ingest-databatcher/ops/shell/*.sh`)의 실행 경로는 1차 교체 완료
 - 남은 항목은 문서/가이드의 예시 문자열 정리 중심
 
 ## 분류 요약
 
 - **운영/실행 경로(필수 수정)**
-  - `shell_scripts/*.sh`
-  - `scheduler/windows/*.ps1`
+  - `apps/ingest-databatcher/ops/shell/*.sh`
+  - `apps/ingest-databatcher/ops/scheduler/windows/*.ps1`
   - `README.md`, `mysql-standalone/README.md`
 - **코드 내 사용 예시/에러 메시지(권장 수정)**
   - `apps/ingest-databatcher/scripts/*.py`의 usage/help 문자열
@@ -41,17 +41,17 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 
 ## 우선 수정 대상 (P1/P2)
 
-1. `shell_scripts/`
-2. `scheduler/windows/`
+1. `apps/ingest-databatcher/ops/shell/`
+2. `apps/ingest-databatcher/ops/scheduler/windows/`
 3. 루트 `README.md`
 4. `mysql-standalone/README.md`
 5. 실제 실행에 사용되는 테스트/CI 파일
 
 ## 대표 참조 예시
 
-- `shell_scripts/weekly_all.sh`에서 `python apps/ingest-databatcher/scripts/...` 다수 호출
-- `scheduler/windows/run_daily.ps1`, `scheduler/windows/run_weekly.ps1`에서 `shell_scripts/...` 호출
-- `README.md`의 실행 명령 대부분이 `apps/ingest-databatcher/scripts/...`, `shell_scripts/...` 기준
+- `apps/ingest-databatcher/ops/shell/weekly_all.sh`에서 `python apps/ingest-databatcher/scripts/...` 다수 호출
+- `apps/ingest-databatcher/ops/scheduler/windows/run_daily.ps1`, `apps/ingest-databatcher/ops/scheduler/windows/run_weekly.ps1`에서 `apps/ingest-databatcher/ops/shell/...` 호출
+- `README.md`의 실행 명령 대부분이 `apps/ingest-databatcher/scripts/...`, `apps/ingest-databatcher/ops/shell/...` 기준
 
 ## 교체 원칙
 

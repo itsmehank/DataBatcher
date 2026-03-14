@@ -7,7 +7,7 @@
 #
 # 사용법:
 #   cd /path/to/DataBatcher
-#   bash shell_scripts/truncate_all_tables.sh
+#   bash apps/ingest-databatcher/ops/shell/truncate_all_tables.sh
 #
 # 주의:
 #   - 모든 테이블의 데이터가 삭제됩니다. 복구 불가!
@@ -21,7 +21,7 @@ set -e
 if [ ! -f "apps/ingest-databatcher/scripts/table_manipulate/manage_table.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
-    echo "  bash shell_scripts/truncate_all_tables.sh"
+    echo "  bash apps/ingest-databatcher/ops/shell/truncate_all_tables.sh"
     exit 1
 fi
 
@@ -30,39 +30,44 @@ MANAGE="python apps/ingest-databatcher/scripts/table_manipulate/manage_table.py"
 # init_db.py(01_schema.sql)에서 생성하는 전체 테이블 목록 (26개)
 TABLES=(
     # KR Stock (Daily)
-#    stock_prices
+    stock_prices
     stock_indicators
-#    stock_prices_weekly
+    stock_prices_weekly
     stock_indicators_weekly
-#    symbol_master
+    symbol_master
+    kr_sector_snapshot
 
     # US Stock (Daily/Weekly)
-#    us_stock_prices
+    us_stock_prices
     us_stock_indicators
-#    us_stock_prices_weekly
+    us_stock_prices_weekly
     us_stock_indicators_weekly
-#    us_symbol_master
+    us_symbol_master
 
     # KR Index (Daily/Weekly)
-#    kr_index_prices
-#    kr_index_indicators
-#    kr_index_prices_weekly
-#    kr_index_indicators_weekly
-#    kr_index_master
+    kr_index_prices
+    kr_index_indicators
+    kr_index_prices_weekly
+    kr_index_indicators_weekly
+    kr_index_master
 
     # US Index (Daily/Weekly)
-#    us_index_prices
-#    us_index_indicators
-#    us_index_prices_weekly
-#    us_index_indicators_weekly
-#    us_index_master
+    us_index_prices
+    us_index_indicators
+    us_index_prices_weekly
+    us_index_indicators_weekly
+    us_index_master
+
+    # 미너비니 템플릿 목록 테이블 (Daily)
+    minervini_screen_results_kr
+    minervini_screen_results_us
 
     # Crypto (Daily/Weekly)
-#    crypto_prices_daily
-#    crypto_indicators_daily
-#    crypto_prices_weekly
-#    crypto_indicators_weekly
-#    crypto_symbol_master
+    crypto_prices_daily
+    crypto_indicators_daily
+    crypto_prices_weekly
+    crypto_indicators_weekly
+    crypto_symbol_master
 
     # System
     sync_log

@@ -19,8 +19,8 @@ $logFile = Join-Path $logDir ("daily_{0}_{1}.log" -f $Target.ToLower(), $startAt
 Load-SchedulerEnv -EnvFile $envFile
 $batchPython = Get-BatchPythonExe
 $scriptByTarget = @{
-    "KR" = "shell_scripts/daily_kr.sh"
-    "US" = "shell_scripts/daily_us.sh"
+    "KR" = "apps/ingest-databatcher/ops/shell/daily_kr.sh"
+    "US" = "apps/ingest-databatcher/ops/shell/daily_us.sh"
 }
 $mutexByTarget = @{
     "KR" = "Global\DataBatcherDailyKrLock"

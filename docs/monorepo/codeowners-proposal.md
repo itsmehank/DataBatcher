@@ -13,6 +13,6 @@ apps/ingest-databatcher/**  @<ingest-owner>
 packages/**                 @<platform-owner>
 
 # 운영 스크립트/스케줄러
-shell_scripts/**            @<ops-owner>
+apps/ingest-databatcher/ops/shell/**            @<ops-owner>
 scheduler/**                @<ops-owner>
 ```
