@@ -12,10 +12,10 @@
 
 ```bash
 # 운영 영향 파일(실행 경로 영향)
-rg -n "python scripts/|python apps/ingest-databatcher/scripts/|apps/ingest-databatcher/ops/shell/|scheduler/" README.md AGENTS.md shell_scripts scheduler mysql-standalone/README.md
+rg -n "python scripts/|python apps/ingest-databatcher/scripts/|apps/ingest-databatcher/ops/shell/|apps/ingest-databatcher/ops/scheduler/" README.md AGENTS.md apps/ingest-databatcher/ops db/compose/mysql-standalone/README.md
 
 # 문서/가이드(운영 영향 낮음)
-rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
+rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs/shared apps/ingest-databatcher/docs
 ```
 
 초기 매치 수: **421**
@@ -31,7 +31,7 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 - **운영/실행 경로(필수 수정)**
   - `apps/ingest-databatcher/ops/shell/*.sh`
   - `apps/ingest-databatcher/ops/scheduler/windows/*.ps1`
-  - `README.md`, `mysql-standalone/README.md`
+  - `README.md`, `db/compose/mysql-standalone/README.md`
 - **코드 내 사용 예시/에러 메시지(권장 수정)**
   - `apps/ingest-databatcher/scripts/*.py`의 usage/help 문자열
 - **테스트/가이드 문서(순차 수정)**
@@ -44,7 +44,7 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 1. `apps/ingest-databatcher/ops/shell/`
 2. `apps/ingest-databatcher/ops/scheduler/windows/`
 3. 루트 `README.md`
-4. `mysql-standalone/README.md`
+4. `db/compose/mysql-standalone/README.md`
 5. 실제 실행에 사용되는 테스트/CI 파일
 
 ## 대표 참조 예시
@@ -63,10 +63,10 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 
 ```bash
 # 1) 운영 영향 파일은 구경로 0건을 목표로 한다.
-rg -n "python scripts/|\"scripts/|`scripts/" README.md AGENTS.md shell_scripts scheduler mysql-standalone/README.md
+rg -n "python scripts/|\"scripts/|`scripts/" README.md AGENTS.md apps/ingest-databatcher/ops db/compose/mysql-standalone/README.md
 
 # 2) docs/guides는 실행 영향 여부에 따라 순차 정리한다.
-rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
+rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs/shared apps/ingest-databatcher/docs
 ```
 
 주의:

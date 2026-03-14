@@ -61,8 +61,7 @@
   - `db/init/01_schema.sql` 기준으로 `init_db.py`/`init_test_db.py` 실행 성공
   - legacy fallback(`db/init/01_schema.sql`)은 호환용으로 유지
 - compose 경로 통일 테스트
-  - `db/compose/mysql-standalone/docker-compose-mysql.yaml`에서 `../db/init/01_schema.sql` 마운트 정상
-  - `db/compose/mysql-standalone/docker-compose-mysql.yaml`에서 `../db/init` 마운트 정상
+  - `db/compose/mysql-standalone/docker-compose-mysql.yaml`에서 `../../init/01_schema.sql` 마운트 정상
 - 3307 통합 검증
   - `init_db -> init_test_db -> alembic -> sync -> bulk(top1,1일) -> daily(top1) -> weekly(top1)` 성공
   - row count: `stock_prices=19`, `stock_indicators=4`, `stock_prices_weekly=5`
