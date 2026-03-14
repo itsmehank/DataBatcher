@@ -21,8 +21,8 @@
 ### 0단계: 의사결정 고정
 
 - ADR 문서 2개 확정
-  - `docs/monorepo/adr-001-repo-structure.md`
-  - `docs/monorepo/adr-002-db-governance.md`
+  - `docs/shared/monorepo/adr-001-repo-structure.md`
+  - `docs/shared/monorepo/adr-002-db-governance.md`
 - 확정 항목
   - 디렉토리 책임 경계
   - DB 변경 승인/리뷰 정책
@@ -92,6 +92,6 @@
 
 ## 6) 참고 문서
 
-- `docs/monorepo/adr-001-repo-structure.md`
-- `docs/monorepo/adr-002-db-governance.md`
-- `docs/monorepo/phase-execution-checklist.md`
+- `docs/shared/monorepo/adr-001-repo-structure.md`
+- `docs/shared/monorepo/adr-002-db-governance.md`
+- `docs/shared/monorepo/phase-execution-checklist.md`

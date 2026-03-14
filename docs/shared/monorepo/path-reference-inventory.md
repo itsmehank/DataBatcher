@@ -35,7 +35,7 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 - **코드 내 사용 예시/에러 메시지(권장 수정)**
   - `apps/ingest-databatcher/scripts/*.py`의 usage/help 문자열
 - **테스트/가이드 문서(순차 수정)**
-  - `apps/ingest-databatcher/tests/*.py`, `docs/*.md`, `guides/*.md`
+  - `apps/ingest-databatcher/tests/*.py`, `docs/*.md`, `apps/ingest-databatcher/docs/guides/*.md`
 - **기록성 문서(선택 수정)**
   - 과거 계획/회고 문서(실행 영향 없음)
 

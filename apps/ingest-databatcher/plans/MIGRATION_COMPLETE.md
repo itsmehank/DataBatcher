@@ -252,7 +252,7 @@ SQLAlchemy>=2.0.0
 3. `pykrx_migration_risks.md` - 리스크 분석 (v2.0)
 4. `pykrx_migration_plan.md` - 최종 실행 계획서
 5. `scripts/tests/pykrx_comparison_report.md` - 테스트 리포트
-6. `MIGRATION_COMPLETE.md` - 이 문서
+6. `apps/ingest-databatcher/plans/MIGRATION_COMPLETE.md` - 이 문서
 
 ### 외부 리소스
 - [pykrx GitHub](https://github.com/sharebook-kr/pykrx)

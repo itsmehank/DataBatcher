@@ -28,10 +28,10 @@
 
 ### A. 계획/정책 문서화 완료
 
-- `docs/make_mono_repo_plan.md`
-- `docs/monorepo/adr-001-repo-structure.md`
-- `docs/monorepo/adr-002-db-governance.md`
-- `docs/monorepo/phase-execution-checklist.md`
+- `docs/shared/make_mono_repo_plan.md`
+- `docs/shared/monorepo/adr-001-repo-structure.md`
+- `docs/shared/monorepo/adr-002-db-governance.md`
+- `docs/shared/monorepo/phase-execution-checklist.md`
 
 요약:
 
@@ -67,7 +67,7 @@
 
 ### D. 단계 테스트 및 보고 완료
 
-- 보고서: `docs/monorepo/stage-test-report-20260313.md`
+- 보고서: `docs/shared/monorepo/stage-test-report-20260313.md`
 - 3307 테스트에서 확인한 것:
   - `init_db.py` 성공
   - alembic upgrade head 성공
@@ -76,8 +76,8 @@
 
 ### E. 거버넌스 최소셋 초안 완료
 
-- `docs/monorepo/codeowners-proposal.md` (참고용)
-- `docs/monorepo/pr-checklist-template.md` (참고용)
+- `docs/shared/monorepo/codeowners-proposal.md` (참고용)
+- `docs/shared/monorepo/pr-checklist-template.md` (참고용)
 
 ---
 
@@ -110,7 +110,7 @@
 업데이트:
 
 - 개인 프로젝트 기준으로 `.github/CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`는 제거
-- `docs/monorepo/path-reference-inventory.md` 생성 완료
+- `docs/shared/monorepo/path-reference-inventory.md` 생성 완료
 
 실행 시작 전 확인 권장:
 
@@ -136,7 +136,7 @@
   - `apps/ingest-databatcher/scripts/`
   - `core/`, `collectors/`, `indicators/`, `savers/`, `config/`의 상대 경로 의존
 - 산출물
-  - `docs/monorepo/path-reference-inventory.md` (기존 파일 업데이트)
+  - `docs/shared/monorepo/path-reference-inventory.md` (기존 파일 업데이트)
 
 바로 실행용 명령 예시:
 
@@ -166,8 +166,8 @@ grep -RIn "apps/ingest-databatcher/scripts/\|core/\|collectors/\|indicators/\|sa
 
 - 개인 프로젝트면 문서 템플릿만 유지하고 `.github/*` 적용은 생략
 - 팀 프로젝트로 전환 시 아래를 재적용
-  - `docs/monorepo/codeowners-proposal.md` 기반 `.github/CODEOWNERS`
-  - `docs/monorepo/pr-checklist-template.md` 기반 `.github/PULL_REQUEST_TEMPLATE.md`
+  - `docs/shared/monorepo/codeowners-proposal.md` 기반 `.github/CODEOWNERS`
+  - `docs/shared/monorepo/pr-checklist-template.md` 기반 `.github/PULL_REQUEST_TEMPLATE.md`
 
 상태: 개인 프로젝트 기준 생략
 
@@ -243,13 +243,13 @@ docker ps --format "table {{.Names}}\t{{.Ports}}"
 
 ## 8) 참고 문서
 
-- `docs/make_mono_repo_plan.md`
-- `docs/monorepo/adr-001-repo-structure.md`
-- `docs/monorepo/adr-002-db-governance.md`
-- `docs/monorepo/phase-execution-checklist.md`
-- `docs/monorepo/stage-test-report-20260313.md`
-- `docs/monorepo/codeowners-proposal.md`
-- `docs/monorepo/pr-checklist-template.md`
+- `docs/shared/make_mono_repo_plan.md`
+- `docs/shared/monorepo/adr-001-repo-structure.md`
+- `docs/shared/monorepo/adr-002-db-governance.md`
+- `docs/shared/monorepo/phase-execution-checklist.md`
+- `docs/shared/monorepo/stage-test-report-20260313.md`
+- `docs/shared/monorepo/codeowners-proposal.md`
+- `docs/shared/monorepo/pr-checklist-template.md`
 
 ---
 

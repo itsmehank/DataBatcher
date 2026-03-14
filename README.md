@@ -12,8 +12,8 @@ KR/US/Crypto 데이터를 배치로 수집하고 지표를 계산해 MySQL에 �
 - `apps/ingest-databatcher/scripts/`: 시장별 수집/업데이트/초기화 엔트리포인트
 - `apps/ingest-databatcher/ops/shell/`: bulk/daily/weekly 통합 실행 스크립트
 - `apps/ingest-databatcher/core/`, `apps/ingest-databatcher/collectors/`, `apps/ingest-databatcher/indicators/`, `apps/ingest-databatcher/savers/`: 핵심 로직
-- `config/`: 런타임 설정(`settings.yaml`, `settings.dev.yaml`)
-- `docker/`: 로컬 MySQL 구성
+- `apps/ingest-databatcher/config/`: 런타임 설정(`settings.yaml`, `settings.dev.yaml`)
+- `db/`: 공통 DB 자산(Compose/Init/Migrations)
 - `apps/ingest-databatcher/tests/`: 테스트 코드 및 테스트 DB 가이드
 
 ## 빠른 시작
@@ -141,9 +141,9 @@ git check-ignore -v .env apps/ingest-databatcher/config/settings.dev.yaml logs/b
 - 공개 문서에는 반드시 플레이스홀더(`YOUR_DB_PASSWORD` 등) 사용
 
 ## 상세 문서
-- `guides/전체_Bulk_수집_가이드.md`
-- `guides/전체_Daily_Weekly_업데이트_가이드.md`
-- `guides/DB_데이터_가이드.md`
-- `docs/windows_scheduler_guide.md`
-- `docs/operations_validation_manual.md`
-- `docs/database_schema.md`
+- `apps/ingest-databatcher/docs/guides/전체_Bulk_수집_가이드.md`
+- `apps/ingest-databatcher/docs/guides/전체_Daily_Weekly_업데이트_가이드.md`
+- `apps/ingest-databatcher/docs/guides/DB_데이터_가이드.md`
+- `apps/ingest-databatcher/docs/windows_scheduler_guide.md`
+- `apps/ingest-databatcher/docs/operations_validation_manual.md`
+- `apps/ingest-databatcher/docs/database_schema.md`
