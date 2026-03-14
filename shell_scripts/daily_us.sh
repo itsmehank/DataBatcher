@@ -5,7 +5,7 @@
 # US 일일 업데이트 (US 지수/주식 + RS + Minervini)
 # ==============================================================================
 
-if [ ! -f "scripts/us_daily_update.py" ]; then
+if [ ! -f "apps/ingest-databatcher/scripts/us_daily_update.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     echo "  bash shell_scripts/daily_us.sh"
@@ -44,10 +44,10 @@ print_phase_header() {
 
 print_phase_header "US Daily: 지수/주식/RS/Minervini"
 
-run_step "US-1" "$PYTHON_BIN" scripts/us_index_daily_update.py --all
-run_step "US-2" "$PYTHON_BIN" scripts/us_daily_update.py --all --with-indicators
-run_step "US-3" "$PYTHON_BIN" scripts/us_rs_update.py --days 7
-run_step "US-4" "$PYTHON_BIN" scripts/us_minervini_update.py --days 7
+run_step "US-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_index_daily_update.py --all
+run_step "US-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators
+run_step "US-3" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_rs_update.py --days 7
+run_step "US-4" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_minervini_update.py --days 7
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START ))
 TOTAL_MIN=$(( TOTAL_ELAPSED / 60 ))

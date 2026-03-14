@@ -11,10 +11,16 @@
 아래 명령으로 참조 후보를 추출했다.
 
 ```bash
-rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts scheduler docs README.md tests scripts --glob '*.{md,sh,py,yml,yaml,bat,ps1}'
+rg -n "apps/ingest-databatcher/scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts scheduler docs README.md tests scripts --glob '*.{md,sh,py,yml,yaml,bat,ps1}'
 ```
 
-총 매치 수: **421**
+초기 매치 수: **421**
+
+업데이트(2026-03-14):
+
+- 런타임 코드(`core/collectors/indicators/savers/scripts/tests`)는 `apps/ingest-databatcher/`로 이관 완료
+- 운영 스크립트(`shell_scripts/*.sh`)의 실행 경로는 1차 교체 완료
+- 남은 항목은 문서/가이드의 예시 문자열 정리 중심
 
 ## 분류 요약
 
@@ -23,9 +29,9 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts sch
   - `scheduler/windows/*.ps1`
   - `README.md`, `mysql-standalone/README.md`
 - **코드 내 사용 예시/에러 메시지(권장 수정)**
-  - `scripts/*.py`의 usage/help 문자열
+  - `apps/ingest-databatcher/scripts/*.py`의 usage/help 문자열
 - **테스트/가이드 문서(순차 수정)**
-  - `tests/*.py`, `docs/*.md`, `guides/*.md`
+  - `apps/ingest-databatcher/tests/*.py`, `docs/*.md`, `guides/*.md`
 - **기록성 문서(선택 수정)**
   - 과거 계획/회고 문서(실행 영향 없음)
 
@@ -39,9 +45,9 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts sch
 
 ## 대표 참조 예시
 
-- `shell_scripts/weekly_all.sh`에서 `python scripts/...` 다수 호출
+- `shell_scripts/weekly_all.sh`에서 `python apps/ingest-databatcher/scripts/...` 다수 호출
 - `scheduler/windows/run_daily.ps1`, `scheduler/windows/run_weekly.ps1`에서 `shell_scripts/...` 호출
-- `README.md`의 실행 명령 대부분이 `scripts/...`, `shell_scripts/...` 기준
+- `README.md`의 실행 명령 대부분이 `apps/ingest-databatcher/scripts/...`, `shell_scripts/...` 기준
 
 ## 교체 원칙
 
@@ -52,7 +58,7 @@ rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts sch
 검증 명령:
 
 ```bash
-rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts scheduler docs README.md tests scripts --glob '*.{md,sh,py,yml,yaml,bat,ps1}'
+rg -n "apps/ingest-databatcher/scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts scheduler docs README.md tests scripts --glob '*.{md,sh,py,yml,yaml,bat,ps1}'
 ```
 
 주의:

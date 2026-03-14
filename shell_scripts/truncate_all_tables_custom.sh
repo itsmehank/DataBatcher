@@ -18,14 +18,14 @@
 set -e
 
 # 프로젝트 루트 확인
-if [ ! -f "scripts/table_manipulate/manage_table.py" ]; then
+if [ ! -f "apps/ingest-databatcher/scripts/table_manipulate/manage_table.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     echo "  bash shell_scripts/truncate_all_tables.sh"
     exit 1
 fi
 
-MANAGE="python scripts/table_manipulate/manage_table.py"
+MANAGE="python apps/ingest-databatcher/scripts/table_manipulate/manage_table.py"
 
 # init_db.py(01_schema.sql)에서 생성하는 전체 테이블 목록 (26개)
 TABLES=(

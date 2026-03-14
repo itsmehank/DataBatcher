@@ -10,7 +10,7 @@
 
 ## 2) 핵심 결정
 
-- 모노레포 구조는 `apps/`, `db/`, `packages/`, `scripts/`를 기준으로 설계한다.
+- 모노레포 구조는 `apps/`, `db/`, `packages/`, `apps/ingest-databatcher/scripts/`를 기준으로 설계한다.
 - DB는 특정 앱 소속이 아닌 공통 도메인으로 승격한다.
 - DB 변경은 migration-first로 운영한다.
 - 마이그레이션 도구는 Alembic으로 고정한다.

@@ -5,7 +5,7 @@
 # KR 일일 업데이트 (KR 지수/주식 + RS + Minervini)
 # ==============================================================================
 
-if [ ! -f "scripts/daily_update.py" ]; then
+if [ ! -f "apps/ingest-databatcher/scripts/daily_update.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     echo "  bash shell_scripts/daily_kr.sh"
@@ -44,10 +44,10 @@ print_phase_header() {
 
 print_phase_header "KR Daily: 지수/주식/RS/Minervini"
 
-run_step "KR-1" "$PYTHON_BIN" scripts/kr_index_daily_update.py --all
-run_step "KR-2" "$PYTHON_BIN" scripts/daily_update.py --all
-run_step "KR-3" "$PYTHON_BIN" scripts/kr_rs_update.py --days 7
-run_step "KR-4" "$PYTHON_BIN" scripts/kr_minervini_update.py --days 7
+run_step "KR-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_index_daily_update.py --all
+run_step "KR-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/daily_update.py --all
+run_step "KR-3" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_rs_update.py --days 7
+run_step "KR-4" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START ))
 TOTAL_MIN=$(( TOTAL_ELAPSED / 60 ))
