@@ -25,8 +25,19 @@ import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_FILE = ROOT / "docker" / "mysql" / "init" / "01_schema.sql"
+APP_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_schema_file() -> Path:
+    here = Path(__file__).resolve()
+    for p in [here.parent, *here.parents]:
+        cand = p / "docker" / "mysql" / "init" / "01_schema.sql"
+        if cand.exists():
+            return cand
+    raise SystemExit("01_schema.sql not found under docker/mysql/init")
+
+
+SCHEMA_FILE = _resolve_schema_file()
 
 
 def load_database_url() -> str:
@@ -37,7 +48,12 @@ def load_database_url() -> str:
     if env_url:
         return env_url
     # Fallback to YAML configs
-    cfg_paths = [ROOT / "config" / "settings.dev.yaml", ROOT / "config" / "settings.yaml"]
+    cfg_paths = [APP_ROOT / "config" / "settings.dev.yaml", APP_ROOT / "config" / "settings.yaml"]
+    repo_cfg_paths = [
+        Path(__file__).resolve().parents[3] / "config" / "settings.dev.yaml",
+        Path(__file__).resolve().parents[3] / "config" / "settings.yaml",
+    ]
+    cfg_paths.extend(repo_cfg_paths)
     for p in cfg_paths:
         if p.exists():
             with p.open("r", encoding="utf-8") as f:

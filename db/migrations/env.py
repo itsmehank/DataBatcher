@@ -9,6 +9,9 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 ROOT = Path(__file__).resolve().parents[2]
+APP_ROOT = ROOT / "apps" / "ingest-databatcher"
+if str(APP_ROOT) not in sys.path:
+    sys.path.insert(0, str(APP_ROOT))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

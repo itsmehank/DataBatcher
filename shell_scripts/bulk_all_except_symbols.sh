@@ -17,7 +17,7 @@
 # ==============================================================================
 
 # 프로젝트 루트 확인
-if [ ! -f "scripts/table_manipulate/manage_table.py" ]; then
+if [ ! -f "apps/ingest-databatcher/scripts/table_manipulate/manage_table.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     echo "  bash shell_scripts/bulk_all.sh"
@@ -71,53 +71,53 @@ print_phase_header() {
 # ==============================================================================
 #print_phase_header "Phase 0: 종목 마스터 동기화 (Sync)"
 #
-#run_step "0-1" python scripts/sync_symbol_master.py
-#run_step "0-2" python scripts/us_sync_symbol_master.py
-#run_step "0-3" python scripts/crypto_sync_symbol_master.py --all
-#run_step "0-4" python scripts/kr_index_sync_master.py
-#run_step "0-5" python scripts/us_index_sync_master.py
+#run_step "0-1" python apps/ingest-databatcher/scripts/sync_symbol_master.py
+#run_step "0-2" python apps/ingest-databatcher/scripts/us_sync_symbol_master.py
+#run_step "0-3" python apps/ingest-databatcher/scripts/crypto_sync_symbol_master.py --all
+#run_step "0-4" python apps/ingest-databatcher/scripts/kr_index_sync_master.py
+#run_step "0-5" python apps/ingest-databatcher/scripts/us_index_sync_master.py
 
 # ==============================================================================
 # Phase 1: 한국 지수 (KR Index) — RS 계산의 벤치마크 선행 수집
 # ==============================================================================
 #print_phase_header "Phase 1: 한국 지수 (KR Index)"
 #
-#run_step "1-1" python scripts/kr_index_bulk_update.py --start "$KR_START" --end "$YESTERDAY"
-#run_step "1-2" python scripts/kr_index_bulk_update_weekly.py
+#run_step "1-1" python apps/ingest-databatcher/scripts/kr_index_bulk_update.py --start "$KR_START" --end "$YESTERDAY"
+#run_step "1-2" python apps/ingest-databatcher/scripts/kr_index_bulk_update_weekly.py
 
 # ==============================================================================
 # Phase 2: 미국 지수 (US Index) — RS 계산의 벤치마크 선행 수집
 # ==============================================================================
 #print_phase_header "Phase 2: 미국 지수 (US Index)"
 #
-#run_step "2-1" python scripts/us_index_bulk_update.py --start "$US_START" --end "$YESTERDAY"
-#run_step "2-2" python scripts/us_index_bulk_update_weekly.py
+#run_step "2-1" python apps/ingest-databatcher/scripts/us_index_bulk_update.py --start "$US_START" --end "$YESTERDAY"
+#run_step "2-2" python apps/ingest-databatcher/scripts/us_index_bulk_update_weekly.py
 
 # ==============================================================================
 # Phase 3: 한국 주식 (KR Stock)
 # ==============================================================================
 print_phase_header "Phase 3: 한국 주식 (KR Stock)"
 
-run_step "3-1" python scripts/bulk_update.py --start "$KR_START" --end "$YESTERDAY" --workers "$WORKERS"
-run_step "3-2" python scripts/bulk_update_weekly.py
-run_step "3-3" python scripts/kr_rs_update.py --days 9999
+run_step "3-1" python apps/ingest-databatcher/scripts/bulk_update.py --start "$KR_START" --end "$YESTERDAY" --workers "$WORKERS"
+run_step "3-2" python apps/ingest-databatcher/scripts/bulk_update_weekly.py
+run_step "3-3" python apps/ingest-databatcher/scripts/kr_rs_update.py --days 9999
 
 # ==============================================================================
 # Phase 4: 미국 주식 (US Stock)
 # ==============================================================================
 print_phase_header "Phase 4: 미국 주식 (US Stock)"
 
-run_step "4-1" python scripts/us_bulk_update.py --start "$US_START" --end "$YESTERDAY" --workers "$WORKERS" --with-indicators
-run_step "4-2" python scripts/us_bulk_update_weekly.py
-run_step "4-3" python scripts/us_rs_update.py --days 9999
+run_step "4-1" python apps/ingest-databatcher/scripts/us_bulk_update.py --start "$US_START" --end "$YESTERDAY" --workers "$WORKERS" --with-indicators
+run_step "4-2" python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py
+run_step "4-3" python apps/ingest-databatcher/scripts/us_rs_update.py --days 9999
 
 # ==============================================================================
 # Phase 5: 크립토 (Crypto)
 # ==============================================================================
 #print_phase_header "Phase 5: 크립토 (Crypto)"
 #
-#run_step "5-1" python scripts/crypto_bulk_update_daily.py --start "$CRYPTO_START" --end "$YESTERDAY" --with-indicators
-#run_step "5-2" python scripts/crypto_bulk_update_weekly.py --start "$CRYPTO_START" --end "$YESTERDAY" --with-indicators
+#run_step "5-1" python apps/ingest-databatcher/scripts/crypto_bulk_update_daily.py --start "$CRYPTO_START" --end "$YESTERDAY" --with-indicators
+#run_step "5-2" python apps/ingest-databatcher/scripts/crypto_bulk_update_weekly.py --start "$CRYPTO_START" --end "$YESTERDAY" --with-indicators
 
 # ==============================================================================
 # 최종 결과

@@ -102,8 +102,8 @@
 
 - 코드/문서 변경: 위 커밋들로 반영 완료
 - 외부 프로젝트 병합: 아직 시작하지 않음(의도적 보류)
-- DataBatcher 실제 코드 이관(`apps/ingest-databatcher`로 파일 이동): 아직 미실행
-- 구경로 참조 전수 수정: 아직 미실행
+- DataBatcher 실제 코드 이관(`apps/ingest-databatcher`로 파일 이동): 완료
+- 운영 스크립트/핵심 문서 경로 교체: 1차 완료
 - `.github/CODEOWNERS` 실파일 반영: 완료(placeholder owner)
 - PR 템플릿 실파일 반영: 완료
 
@@ -124,9 +124,9 @@
 
 ## 5) 다음 세션에서 해야 할 작업 (우선순위)
 
-### P0. 3단계 본작업 착수 전 사전 인벤토리
+### P0. 경로 참조 인벤토리 갱신
 
-목표: 구경로 참조를 안전하게 일괄 수정하기 위한 참조 목록 확정
+목표: 남은 구경로 참조를 재분류해 잔여 수정 범위를 확정
 
 - 검색 대상
   - `shell_scripts/`
@@ -134,35 +134,34 @@
   - `README.md`, `docs/`
   - 테스트/CI 설정 파일
 - 찾을 패턴 예시
-  - `scripts/`
+  - `apps/ingest-databatcher/scripts/`
   - `core/`, `collectors/`, `indicators/`, `savers/`, `config/`의 상대 경로 의존
 - 산출물
-  - `docs/monorepo/path-reference-inventory.md` (새로 작성 권장)
+  - `docs/monorepo/path-reference-inventory.md` (기존 파일 업데이트)
 
 바로 실행용 명령 예시:
 
 ```bash
-grep -RIn "scripts/\|core/\|collectors/\|indicators/\|savers/\|config/" shell_scripts scheduler docs README.md .github tests
+grep -RIn "apps/ingest-databatcher/scripts/\|core/\|collectors/\|indicators/\|savers/\|config/" shell_scripts scheduler docs README.md .github tests
 ```
 
-### P1. DataBatcher 코드 이관 실행 (3단계 핵심)
+### P1. 잔여 호출 경로 정리
 
-- 실제 코드/스크립트/테스트를 `apps/ingest-databatcher/` 하위로 이동
-- import/ROOT 경로 계산 로직 깨짐 여부 보정
-- 레거시 래퍼는 만들지 않음(기존 합의)
+- 남아있는 `scripts/`/`tests/` 구경로를 문서/가이드 중심으로 정리
+- 운영에 영향을 주는 파일(스케줄러, 실행 스크립트, README)을 우선 처리
 
-### P2. 구경로 참조 전수 수정
+### P2. CI/테스트 명령 경로 동기화
 
-- 인벤토리 기준으로 문서/스크립트/스케줄러/테스트/CI 경로 일괄 교체
-- 완료 기준: 구경로 참조 0건
+- pytest/스크립트 테스트 명령을 `apps/ingest-databatcher/...` 기준으로 통일
+- `AGENTS.md`, `README.md`, 운영 가이드의 명령어 일치 여부 점검
 
 검증 명령 예시:
 
 ```bash
-grep -RIn "scripts/\|core/\|collectors/\|indicators/\|savers/\|config/" shell_scripts scheduler docs README.md .github tests
+grep -RIn "apps/ingest-databatcher/scripts/\|core/\|collectors/\|indicators/\|savers/\|config/" shell_scripts scheduler docs README.md .github tests
 ```
 
-주의: 0건 검증 시 false positive(설명 텍스트/예시 코드)는 별도 분류해서 인벤토리에 남길 것.
+주의: 과거 회고/분석 문서의 문자열은 false positive로 분리해 관리한다.
 
 ### P3. 거버넌스 초안 실반영
 

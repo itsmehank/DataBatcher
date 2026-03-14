@@ -6,15 +6,15 @@ KR/US/Crypto 데이터를 배치로 수집하고 지표를 계산해 MySQL에 �
 - KR 주식/ETF, US 주식/ETF, KR/US 지수, Crypto(Binance Spot) 데이터 수집
 - 일봉/주봉 가격 적재 + 지표 계산(SMA 등)
 - RS/Minervini 관련 후처리 스크립트 지원
-- `scripts/` 단위 실행과 `shell_scripts/` 통합 실행 래퍼 제공
+- `apps/ingest-databatcher/scripts/` 단위 실행과 `shell_scripts/` 통합 실행 래퍼 제공
 
 ## 프로젝트 구조
-- `scripts/`: 시장별 수집/업데이트/초기화 엔트리포인트
+- `apps/ingest-databatcher/scripts/`: 시장별 수집/업데이트/초기화 엔트리포인트
 - `shell_scripts/`: bulk/daily/weekly 통합 실행 스크립트
-- `core/`, `collectors/`, `indicators/`, `savers/`: 핵심 로직
+- `apps/ingest-databatcher/core/`, `apps/ingest-databatcher/collectors/`, `apps/ingest-databatcher/indicators/`, `apps/ingest-databatcher/savers/`: 핵심 로직
 - `config/`: 런타임 설정(`settings.yaml`, `settings.dev.yaml`)
 - `docker/`: 로컬 MySQL 구성
-- `tests/`: 테스트 코드 및 테스트 DB 가이드
+- `apps/ingest-databatcher/tests/`: 테스트 코드 및 테스트 DB 가이드
 
 ## 빠른 시작
 ### 1) 의존성 설치
@@ -37,7 +37,7 @@ MySQL 월간 백업/복구는 `shell_scripts/db_backup_monthly.sh`, `shell_scrip
 
 ### 3) 스키마 초기화
 ```bash
-python scripts/init_db.py
+python apps/ingest-databatcher/scripts/init_db.py
 ```
 
 ## DB 연결 설정 (중요)
@@ -116,22 +116,22 @@ bash shell_scripts/weekly_all.sh
 ## 테스트
 전체 pytest:
 ```bash
-pytest -q tests scripts/tests
+pytest -q apps/ingest-databatcher/tests apps/ingest-databatcher/scripts/tests
 ```
 
 단일 테스트 예시:
 ```bash
-pytest -q tests/test_pykrx_adapter.py::test_normalize_price_columns_basic
+pytest -q apps/ingest-databatcher/tests/test_pykrx_adapter.py::test_normalize_price_columns_basic
 ```
 
 테스트 DB 가이드:
-- `tests/README_TEST_DB.md`
+- `apps/ingest-databatcher/tests/README_TEST_DB.md`
 
 ## GitHub 업로드 전 보안 체크
 민감정보가 실수로 올라가지 않도록 아래 순서를 권장합니다.
 
 ```bash
-python scripts/preflight_repo_safety.py
+python apps/ingest-databatcher/scripts/preflight_repo_safety.py
 git add -n .
 git check-ignore -v .env config/settings.dev.yaml logs/bulk_update_failed.log
 ```

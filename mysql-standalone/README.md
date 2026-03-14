@@ -65,7 +65,7 @@ This directory is a standalone MySQL project extracted from the original Grafana
   - `01_schema.sql` creates DataBatcher tables/views.
   - `setup.sh` creates `${MYSQL_DATABASE}_test` and grants test DB privileges.
 - Auth still uses `MYSQL_*` credentials from root `.env` (password-based login).
-- If schema changes after first init, re-apply with `python scripts/init_db.py` (or reset volume).
+- If schema changes after first init, re-apply with `python apps/ingest-databatcher/scripts/init_db.py` (or reset volume).
 - To fully reset data, run:
 
   ```bash

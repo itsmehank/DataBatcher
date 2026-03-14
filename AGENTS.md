@@ -1,7 +1,7 @@
 # AGENTS.md
 
 이 문서는 이 저장소에서 작업하는 에이전트(예: OpenCode, Cursor Agent, Copilot Agent)를 위한 실행/코딩 규칙이다.
-아래 내용은 실제 코드 구조(`scripts/`, `core/`, `collectors/`, `indicators/`, `tests/`)를 기준으로 정리했다.
+아래 내용은 실제 코드 구조(`apps/ingest-databatcher/scripts/`, `apps/ingest-databatcher/core/`, `apps/ingest-databatcher/collectors/`, `apps/ingest-databatcher/indicators/`, `apps/ingest-databatcher/tests/`)를 기준으로 정리했다.
 
 ## 0) Language
 - 기본 사용자 응답 언어는 한국어로 한다.
@@ -11,7 +11,7 @@
 - 프로젝트 성격: 멀티 마켓 데이터 배치 수집기(KR/US/Crypto + 지표 계산 + MySQL 저장)
 - 주요 런타임: Python + pandas + SQLAlchemy + PyMySQL
 - 데이터 소스: pykrx, FinanceDataReader, yfinance, Binance API
-- 엔트리포인트: `scripts/*.py` (일반적으로 CLI 스크립트 중심)
+- 엔트리포인트: `apps/ingest-databatcher/scripts/*.py` (일반적으로 CLI 스크립트 중심)
 - 구성 로딩: `core/config_loader.py`의 `load_settings()`
 - DB 엔진 관리: `core/db_manager.py`의 `DBManager` 싱글턴 패턴
 
@@ -20,14 +20,14 @@
 - 의존성 설치: `pip install -r requirements.txt`
 - DB 연결 정보는 `DATABASE_URL` 또는 `config/settings*.yaml` 사용
 - 로컬 DB는 보통 Docker Compose 사용: `docker compose -f docker/docker-compose.yml up -d`
-- 스키마 초기화: `python scripts/init_db.py`
+- 스키마 초기화: `python apps/ingest-databatcher/scripts/init_db.py`
 
 ## 3) Build / Lint / Test 명령
 이 저장소는 전형적인 "패키지 빌드" 프로젝트가 아니라 배치 스크립트 실행형이다.
 
 ### 3.1 Build 성격의 검증
 - 엄밀한 build step은 없음
-- 최소 문법 검증(권장): `python -m compileall core collectors indicators savers scripts tests`
+- 최소 문법 검증(권장): `python -m compileall apps/ingest-databatcher/core apps/ingest-databatcher/collectors apps/ingest-databatcher/indicators apps/ingest-databatcher/savers apps/ingest-databatcher/scripts apps/ingest-databatcher/tests`
 
 ### 3.2 Lint/Format
 - 고정된 lint 도구 설정 파일(`pyproject.toml`, `setup.cfg`, `tox.ini`, `.flake8`, `ruff`)은 현재 없음
@@ -38,29 +38,29 @@
 - pytest 기반 테스트 + 스크립트 기반 테스트가 혼합되어 있음
 
 - 전체 pytest 실행:
-  - `pytest -q tests scripts/tests`
+  - `pytest -q apps/ingest-databatcher/tests apps/ingest-databatcher/scripts/tests`
 
 - 단일 파일 실행(가장 자주 사용):
-  - `pytest -q tests/test_pykrx_adapter.py`
+  - `pytest -q apps/ingest-databatcher/tests/test_pykrx_adapter.py`
 
 - 단일 테스트 함수 실행(특히 중요):
-  - `pytest -q tests/test_pykrx_adapter.py::test_normalize_price_columns_basic`
+  - `pytest -q apps/ingest-databatcher/tests/test_pykrx_adapter.py::test_normalize_price_columns_basic`
 
 - 마커 기반 실행(integration만):
-  - `pytest -q -m integration tests/test_pykrx_adapter.py`
+  - `pytest -q -m integration apps/ingest-databatcher/tests/test_pykrx_adapter.py`
 
 - integration 제외 실행:
-  - `pytest -q -m "not integration" tests`
+  - `pytest -q -m "not integration" apps/ingest-databatcher/tests`
 
 - 스크립트형 테스트 실행 예:
-  - `python tests/test_db_setup.py --create`
-  - `python tests/run_all_tests.py`
-  - `python tests/test_phase1_sync_symbol_master.py`
+  - `python apps/ingest-databatcher/tests/test_db_setup.py --create`
+  - `python apps/ingest-databatcher/tests/run_all_tests.py`
+  - `python apps/ingest-databatcher/tests/test_phase1_sync_symbol_master.py`
 
 ## 4) 단일 테스트 실행 가이드
 - 빠른 단위 확인은 `pytest <file>::<test_name>` 우선
 - DB 의존 테스트는 먼저 테스트 DB 준비:
-  - `python tests/test_db_setup.py --create`
+  - `python apps/ingest-databatcher/tests/test_db_setup.py --create`
 - DB/네트워크 의존 테스트는 느리고 flaky 가능성이 있으므로 범위를 최소화
 - 새 기능 수정 시, 관련 테스트 파일 1개 + 관련 함수 1개를 먼저 핀포인트로 실행
 
@@ -115,7 +115,7 @@
 - 사용자에게 필요한 요약(성공/실패 건수, 소요시간)을 마지막에 출력
 
 ## 6) 테스트 작성/수정 규칙
-- pytest 테스트는 `tests/test_*.py`, `scripts/tests/test_*.py` 패턴 준수
+- pytest 테스트는 `apps/ingest-databatcher/tests/test_*.py`, `apps/ingest-databatcher/scripts/tests/test_*.py` 패턴 준수
 - 네트워크 의존 테스트는 `@pytest.mark.integration`로 분리
 - 테스트는 가능하면 독립/반복 실행 가능(idempotent)해야 함
 - DB 테스트는 프로덕션 DB가 아닌 `trade_test` 사용(필수)
@@ -142,7 +142,7 @@
 - 변경 전: 영향 받는 스크립트/테이블/설정 키 확인
 - 변경 중: 기존 upsert/insert_only 의미를 깨지 않는지 확인
 - 변경 후: 최소 1개 단일 테스트 + 관련 스크립트 dry run/샘플 실행
-- GitHub 업로드 전: `python scripts/preflight_repo_safety.py`로 민감정보/로컬 아티팩트 점검
+- GitHub 업로드 전: `python apps/ingest-databatcher/scripts/preflight_repo_safety.py`로 민감정보/로컬 아티팩트 점검
 - 문서화: 새 CLI 옵션/동작 변경 시 `AGENTS.md` 또는 관련 가이드 업데이트
 
 ## 11) 금지/주의

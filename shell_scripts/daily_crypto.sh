@@ -5,7 +5,7 @@
 # Crypto 일일 업데이트 (가격 + 지표)
 # ==============================================================================
 
-if [ ! -f "scripts/crypto_daily_update.py" ]; then
+if [ ! -f "apps/ingest-databatcher/scripts/crypto_daily_update.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     echo "  bash shell_scripts/daily_crypto.sh"
@@ -43,7 +43,7 @@ print_phase_header() {
 
 print_phase_header "Crypto Daily: 가격 + 지표"
 
-run_step "CRYPTO-1" python scripts/crypto_daily_update.py --all --with-indicators
+run_step "CRYPTO-1" python apps/ingest-databatcher/scripts/crypto_daily_update.py --all --with-indicators
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START ))
 TOTAL_MIN=$(( TOTAL_ELAPSED / 60 ))

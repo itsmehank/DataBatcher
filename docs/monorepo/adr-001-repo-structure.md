@@ -11,7 +11,7 @@
 - `apps/`: 실행 애플리케이션
 - `db/`: 공통 DB 자산(compose/init/migrations/docs)
 - `packages/`: 공통 코드
-- `scripts/`: 운영/개발 스크립트
+- `apps/ingest-databatcher/scripts/`: 운영/개발 스크립트
 
 초기 전환 범위는 `apps/ingest-databatcher` 중심이며, 외부 프로젝트 병합은 후속 단계로 분리한다.
 

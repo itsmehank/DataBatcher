@@ -24,7 +24,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 
 # 프로젝트 루트 확인
-if [ ! -f "scripts/kr_minervini_update.py" ]; then
+if [ ! -f "apps/ingest-databatcher/scripts/kr_minervini_update.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     usage
