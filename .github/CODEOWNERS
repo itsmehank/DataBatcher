@@ -1,0 +1,15 @@
+# Global default owner
+* @platform-owner
+
+# DB domain
+db/** @db-owner
+
+# DataBatcher app
+apps/ingest-databatcher/** @ingest-owner
+
+# Shared packages
+packages/** @platform-owner
+
+# Operational scripts
+shell_scripts/** @ops-owner
+scheduler/** @ops-owner
