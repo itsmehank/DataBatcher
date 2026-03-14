@@ -12,7 +12,7 @@
 ## 사전 요구사항
 
 1. **Docker MySQL 실행 중**: `cd docker && docker compose up -d`
-2. **DB 스키마 초기화**: `python scripts/init_db.py`
+2. **DB 스키마 초기화**: `python apps/ingest-databatcher/scripts/init_db.py`
 3. **Python 가상환경 활성화**: `source .venv/bin/activate`
 4. **의존성 설치**: `pip install -r requirements.txt`
 
@@ -137,16 +137,16 @@ Phase 순서와 로직은 본 실행(`bulk_all.sh`)과 **완전히 동일**합�
 
 ```bash
 # 예시: US 주식만 수집 (yfinance sector 포함)
-python scripts/us_sync_symbol_master.py
-python scripts/us_bulk_update.py --start 2020-01-01 --end 2025-12-31 --workers 4 --with-indicators
-python scripts/us_bulk_update_weekly.py
-python scripts/us_rs_update.py --days 9999 --force
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py
+python apps/ingest-databatcher/scripts/us_bulk_update.py --start 2020-01-01 --end 2025-12-31 --workers 4 --with-indicators
+python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py
+python apps/ingest-databatcher/scripts/us_rs_update.py --days 9999 --force
 
 # 예시: US 주식만 수집 (yfinance sector 스킵, 빠른 실행)
-python scripts/us_sync_symbol_master.py --skip-yfinance
-python scripts/us_bulk_update.py --start 2020-01-01 --end 2025-12-31 --workers 4 --with-indicators
-python scripts/us_bulk_update_weekly.py
-python scripts/us_rs_update.py --days 9999 --force
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --skip-yfinance
+python apps/ingest-databatcher/scripts/us_bulk_update.py --start 2020-01-01 --end 2025-12-31 --workers 4 --with-indicators
+python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py
+python apps/ingest-databatcher/scripts/us_rs_update.py --days 9999 --force
 ```
 
 ---
@@ -193,5 +193,5 @@ SELECT COUNT(DISTINCT symbol) as symbols, COUNT(*) as rows, MIN(date) as oldest,
 
 ### Rate Limiting
 - KR/US 주식 수집 시 FDR API rate limit에 의해 속도가 제한됩니다.
-- `config/settings.yaml`의 `runtime.rate_limit_per_sec` 값으로 조절 가능합니다.
+- `apps/ingest-databatcher/config/settings.yaml`의 `runtime.rate_limit_per_sec` 값으로 조절 가능합니다.
 - workers 수가 많을수록 빠르지만, rate limit 초과 위험이 있습니다 (기본값 4 권장).

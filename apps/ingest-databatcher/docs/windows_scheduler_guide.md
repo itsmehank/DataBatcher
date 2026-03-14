@@ -61,11 +61,11 @@ docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
 ## 4) DB 연결 설정 (초기화 단계에서 반드시 필요)
 프로젝트는 아래 우선순위로 DB 타겟을 결정합니다.
 1. `DATABASE_URL` 환경변수
-2. `config/settings.dev.yaml`
-3. `config/settings.yaml`
+2. `apps/ingest-databatcher/config/settings.dev.yaml`
+3. `apps/ingest-databatcher/config/settings.yaml`
 
-### 권장(초기 사용자): `config/settings.dev.yaml` 작성
-`config/settings.dev.yaml` 파일을 만들고 아래처럼 입력:
+### 권장(초기 사용자): `apps/ingest-databatcher/config/settings.dev.yaml` 작성
+`apps/ingest-databatcher/config/settings.dev.yaml` 파일을 만들고 아래처럼 입력:
 
 ```yaml
 database:
@@ -73,7 +73,7 @@ database:
 ```
 
 ### 대안: 현재 PowerShell 세션에만 `DATABASE_URL` 지정
-`config/settings.dev.yaml`을 만들지 않으려면, `init_db.py` 실행 전에 아래를 설정하세요.
+`apps/ingest-databatcher/config/settings.dev.yaml`을 만들지 않으려면, `init_db.py` 실행 전에 아래를 설정하세요.
 
 ```powershell
 $env:DATABASE_URL="mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4"
@@ -85,7 +85,7 @@ $env:DATABASE_URL="mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/
 
 ## 5) 스키마 초기화 (최초 1회)
 ```powershell
-.\.venv\Scripts\python.exe scripts/init_db.py
+.\.venv\Scripts\python.exe apps/ingest-databatcher/scripts/init_db.py
 ```
 
 ## 6) scheduler.env 작성
@@ -123,7 +123,7 @@ copy .\apps\ingest-databatcher\ops\scheduler\windows\scheduler.env.example .\app
 - Apprise 공식 URL 포맷 문서: `https://github.com/caronc/apprise/wiki`
 
 주의:
-- 스케줄러는 실행 전 `scripts/healthcheck_db.py`로 실제 DB 연결(`SELECT 1`)을 검사합니다.
+- 스케줄러는 실행 전 `apps/ingest-databatcher/scripts/healthcheck_db.py`로 실제 DB 연결(`SELECT 1`)을 검사합니다.
 - 컨테이너 실행 여부 자체를 체크하지 않습니다.
 
 ## 7) Task Scheduler 등록
@@ -187,9 +187,9 @@ powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler
 업로드 전 점검:
 
 ```powershell
-python scripts/preflight_repo_safety.py
+python apps/ingest-databatcher/scripts/preflight_repo_safety.py
 git add -n .
-git check-ignore -v .env .\apps\ingest-databatcher\ops\scheduler\windows\scheduler.env config\settings.dev.yaml
+git check-ignore -v .env .\apps\ingest-databatcher\ops\scheduler\windows\scheduler.env apps\ingest-databatcher\config\settings.dev.yaml
 ```
 
 ## 12) 추가 참고

@@ -89,16 +89,16 @@ bash apps/ingest-databatcher/ops/shell/daily_all.sh
 
 | 단계 | 명령어 | 설명 | 기본 수집 기간 |
 |------|--------|------|----------------|
-| 0-1 | `python scripts/kr_index_daily_update.py --all --force` | KR 지수 일봉 업데이트 | 최근 50일 |
-| 0-2 | `python scripts/us_index_daily_update.py --all --force` | US 지수 일봉 업데이트 | 최근 50일 |
+| 0-1 | `python apps/ingest-databatcher/scripts/kr_index_daily_update.py --all --force` | KR 지수 일봉 업데이트 | 최근 50일 |
+| 0-2 | `python apps/ingest-databatcher/scripts/us_index_daily_update.py --all --force` | US 지수 일봉 업데이트 | 최근 50일 |
 
 #### Phase 1: 주식 + Crypto 일봉 (Stock/Crypto Daily)
 
 | 단계 | 명령어 | 설명 | 기본 수집 기간 |
 |------|--------|------|----------------|
-| 1-1 | `python scripts/daily_update.py --all --force` | KR 주식 일봉 업데이트 | 최근 30일 |
-| 1-2 | `python scripts/us_daily_update.py --all --with-indicators --force` | US 주식 일봉 + 지표 업데이트 | 최근 50일 |
-| 1-3 | `python scripts/crypto_daily_update.py --all --with-indicators` | Crypto 일봉 + 지표 업데이트 | 최근 30일 |
+| 1-1 | `python apps/ingest-databatcher/scripts/daily_update.py --all --force` | KR 주식 일봉 업데이트 | 최근 30일 |
+| 1-2 | `python apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators --force` | US 주식 일봉 + 지표 업데이트 | 최근 50일 |
+| 1-3 | `python apps/ingest-databatcher/scripts/crypto_daily_update.py --all --with-indicators` | Crypto 일봉 + 지표 업데이트 | 최근 30일 |
 
 **참고**: `crypto_daily_update.py`는 `--force` 옵션이 없으므로 생략.
 
@@ -106,8 +106,8 @@ bash apps/ingest-databatcher/ops/shell/daily_all.sh
 
 | 단계 | 명령어 | 설명 | 기본 계산 일수 |
 |------|--------|------|----------------|
-| 2-1 | `python scripts/kr_rs_update.py --days 7 --force` | KR RS Rating/Line/Blue Dot 계산 | 최근 7일 |
-| 2-2 | `python scripts/us_rs_update.py --days 7 --force` | US RS Rating/Line/Blue Dot 계산 | 최근 7일 |
+| 2-1 | `python apps/ingest-databatcher/scripts/kr_rs_update.py --days 7 --force` | KR RS Rating/Line/Blue Dot 계산 | 최근 7일 |
+| 2-2 | `python apps/ingest-databatcher/scripts/us_rs_update.py --days 7 --force` | US RS Rating/Line/Blue Dot 계산 | 최근 7일 |
 
 **참고**: RS 지표는 주식+지수 데이터가 모두 필요하므로 Phase 1 이후 실행.
 
@@ -115,8 +115,8 @@ bash apps/ingest-databatcher/ops/shell/daily_all.sh
 
 | 단계 | 명령어 | 설명 | 기본 계산 일수 |
 |------|--------|------|----------------|
-| 3-1 | `python scripts/kr_minervini_update.py --days 7 --force` | KR 미너비니 트렌드 템플릿 스크리닝 | 최근 7일 |
-| 3-2 | `python scripts/us_minervini_update.py --days 7 --force` | US 미너비니 트렌드 템플릿 스크리닝 | 최근 7일 |
+| 3-1 | `python apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7 --force` | KR 미너비니 트렌드 템플릿 스크리닝 | 최근 7일 |
+| 3-2 | `python apps/ingest-databatcher/scripts/us_minervini_update.py --days 7 --force` | US 미너비니 트렌드 템플릿 스크리닝 | 최근 7일 |
 
 **참고**: 미너비니 스크리닝은 RS 지표를 사용하므로 Phase 2 이후 실행.
 
@@ -162,11 +162,11 @@ bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 
 | 단계 | 명령어 | 설명 | 비고 |
 |------|--------|------|------|
-| 0-1 | `python scripts/sync_symbol_master.py` | KR 주식 종목 마스터 동기화 | 신규/폐지 종목 감지 |
-| 0-2 | `python scripts/us_sync_symbol_master.py` | US 주식 종목 마스터 동기화 | yfinance sector 수집 포함 (~1시간) |
-| 0-3 | `python scripts/crypto_sync_symbol_master.py --all` | Crypto 심볼 마스터 동기화 | 신규 거래쌍 감지 |
-| 0-4 | `python scripts/kr_index_sync_master.py` | KR 지수 마스터 동기화 | KOSPI, KOSDAQ |
-| 0-5 | `python scripts/us_index_sync_master.py` | US 지수 마스터 동기화 | S&P 500, DJI, IXIC |
+| 0-1 | `python apps/ingest-databatcher/scripts/sync_symbol_master.py` | KR 주식 종목 마스터 동기화 | 신규/폐지 종목 감지 |
+| 0-2 | `python apps/ingest-databatcher/scripts/us_sync_symbol_master.py` | US 주식 종목 마스터 동기화 | yfinance sector 수집 포함 (~1시간) |
+| 0-3 | `python apps/ingest-databatcher/scripts/crypto_sync_symbol_master.py --all` | Crypto 심볼 마스터 동기화 | 신규 거래쌍 감지 |
+| 0-4 | `python apps/ingest-databatcher/scripts/kr_index_sync_master.py` | KR 지수 마스터 동기화 | KOSPI, KOSDAQ |
+| 0-5 | `python apps/ingest-databatcher/scripts/us_index_sync_master.py` | US 지수 마스터 동기화 | S&P 500, DJI, IXIC |
 
 **참고**: 0-2 단계(US 종목 마스터)에서 신규 종목의 sector/industry를 yfinance API로 수집합니다.
 이미 sector가 채워진 종목은 건너뛰므로 재실행 시 시간이 단축됩니다.
@@ -175,8 +175,8 @@ bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 
 | 단계 | 명령어 | 설명 | 데이터 소스 |
 |------|--------|------|-------------|
-| 1-1 | `python scripts/kr_index_weekly_update.py --all` | KR 지수 주봉 업데이트 | kr_index_prices 일봉 → 주봉 집계 |
-| 1-2 | `python scripts/us_index_weekly_update.py --all` | US 지수 주봉 업데이트 | us_index_prices 일봉 → 주봉 집계 |
+| 1-1 | `python apps/ingest-databatcher/scripts/kr_index_weekly_update.py --all` | KR 지수 주봉 업데이트 | kr_index_prices 일봉 → 주봉 집계 |
+| 1-2 | `python apps/ingest-databatcher/scripts/us_index_weekly_update.py --all` | US 지수 주봉 업데이트 | us_index_prices 일봉 → 주봉 집계 |
 
 **참고**: `kr_index_weekly_update.py`는 실행 요일 기준으로 최신 주 포함 여부(`skip_latest_week`)를 자동 판단합니다.
 
@@ -184,14 +184,14 @@ bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 
 | 단계 | 명령어 | 설명 | 데이터 소스 |
 |------|--------|------|-------------|
-| 2-1 | `python scripts/weekly_update.py --all` | KR 주식 주봉 업데이트 | stock_prices 일봉 → 주봉 집계 |
-| 2-2 | `python scripts/us_weekly_update.py --all` | US 주식 주봉 업데이트 | us_stock_prices 일봉 → 주봉 집계 |
+| 2-1 | `python apps/ingest-databatcher/scripts/weekly_update.py --all` | KR 주식 주봉 업데이트 | stock_prices 일봉 → 주봉 집계 |
+| 2-2 | `python apps/ingest-databatcher/scripts/us_weekly_update.py --all` | US 주식 주봉 업데이트 | us_stock_prices 일봉 → 주봉 집계 |
 
 #### Phase 3: Crypto 주봉 (Crypto Weekly)
 
 | 단계 | 명령어 | 설명 | 데이터 소스 |
 |------|--------|------|-------------|
-| 3-1 | `python scripts/crypto_weekly_update.py --all --with-indicators` | Crypto 주봉 + 지표 업데이트 | crypto_prices_daily → 주봉 집계 |
+| 3-1 | `python apps/ingest-databatcher/scripts/crypto_weekly_update.py --all --with-indicators` | Crypto 주봉 + 지표 업데이트 | crypto_prices_daily → 주봉 집계 |
 
 ### 주말/평일 실행 차이
 
@@ -215,10 +215,10 @@ crontab -e
 30 7 * * 2-6 cd /path/to/DataBatcher && source .venv/bin/activate && bash apps/ingest-databatcher/ops/shell/daily_all.sh >> logs/daily_all.log 2>&1
 
 # --- KR만 Daily 업데이트 (평일 17:00 KST) ---
-# 0 17 * * 1-5 cd /path/to/DataBatcher && source .venv/bin/activate && python scripts/kr_index_daily_update.py --all --force && python scripts/daily_update.py --all --force && python scripts/kr_rs_update.py --days 7 --force && python scripts/kr_minervini_update.py --days 7 --force >> logs/daily_kr.log 2>&1
+# 0 17 * * 1-5 cd /path/to/DataBatcher && source .venv/bin/activate && python apps/ingest-databatcher/scripts/kr_index_daily_update.py --all --force && python apps/ingest-databatcher/scripts/daily_update.py --all --force && python apps/ingest-databatcher/scripts/kr_rs_update.py --days 7 --force && python apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7 --force >> logs/daily_kr.log 2>&1
 
 # --- US만 Daily 업데이트 (다음날 오전 07:00 KST) ---
-# 0 7 * * 2-6 cd /path/to/DataBatcher && source .venv/bin/activate && python scripts/us_index_daily_update.py --all --force && python scripts/us_daily_update.py --all --with-indicators --force && python scripts/us_rs_update.py --days 7 --force && python scripts/us_minervini_update.py --days 7 --force >> logs/daily_us.log 2>&1
+# 0 7 * * 2-6 cd /path/to/DataBatcher && source .venv/bin/activate && python apps/ingest-databatcher/scripts/us_index_daily_update.py --all --force && python apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators --force && python apps/ingest-databatcher/scripts/us_rs_update.py --days 7 --force && python apps/ingest-databatcher/scripts/us_minervini_update.py --days 7 --force >> logs/daily_us.log 2>&1
 
 # --- Weekly 업데이트 (토요일 오전 10:00 KST) ---
 0 10 * * 6 cd /path/to/DataBatcher && source .venv/bin/activate && bash apps/ingest-databatcher/ops/shell/weekly_all.sh >> logs/weekly_all.log 2>&1
@@ -246,35 +246,35 @@ Windows 스케줄링 운영 절차는 전용 문서에서 관리합니다.
 ### KR만 Daily 업데이트
 
 ```bash
-python scripts/kr_index_daily_update.py --all --force
-python scripts/daily_update.py --all --force
-python scripts/kr_rs_update.py --days 7 --force
-python scripts/kr_minervini_update.py --days 7 --force
+python apps/ingest-databatcher/scripts/kr_index_daily_update.py --all --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --force
+python apps/ingest-databatcher/scripts/kr_rs_update.py --days 7 --force
+python apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7 --force
 ```
 
 ### US만 Daily 업데이트
 
 ```bash
-python scripts/us_index_daily_update.py --all --force
-python scripts/us_daily_update.py --all --with-indicators --force
-python scripts/us_rs_update.py --days 7 --force
-python scripts/us_minervini_update.py --days 7 --force
+python apps/ingest-databatcher/scripts/us_index_daily_update.py --all --force
+python apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators --force
+python apps/ingest-databatcher/scripts/us_rs_update.py --days 7 --force
+python apps/ingest-databatcher/scripts/us_minervini_update.py --days 7 --force
 ```
 
 ### Crypto만 Daily 업데이트
 
 ```bash
-python scripts/crypto_daily_update.py --all --with-indicators
+python apps/ingest-databatcher/scripts/crypto_daily_update.py --all --with-indicators
 ```
 
 ### 특정 마켓만 업데이트
 
 ```bash
 # KOSPI만
-python scripts/daily_update.py --all --market KOSPI --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --market KOSPI --force
 
 # NASDAQ만
-python scripts/us_daily_update.py --all --market NASDAQ --with-indicators --force
+python apps/ingest-databatcher/scripts/us_daily_update.py --all --market NASDAQ --with-indicators --force
 ```
 
 ---
@@ -369,17 +369,17 @@ SELECT 'Crypto', status, COUNT(*) FROM crypto_symbol_master GROUP BY status;
 - 신규 종목이 많으면 ~1시간 소요될 수 있습니다.
 - **빠른 실행**: `--skip-yfinance` 옵션으로 sector 수집 건너뛰기
   ```bash
-  python scripts/us_sync_symbol_master.py --skip-yfinance
+  python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --skip-yfinance
   ```
 - **부분 실행**: `--yfinance-limit 100` 옵션으로 상위 100개만 수집
   ```bash
-  python scripts/us_sync_symbol_master.py --yfinance-limit 100
+  python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --yfinance-limit 100
   ```
 
 ### Rate Limiting
 
 - KR/US 주식 수집 시 FDR API rate limit에 의해 속도가 제한됩니다.
-- `config/settings.yaml`의 `runtime.rate_limit_per_sec` 값으로 조절 가능합니다.
+- `apps/ingest-databatcher/config/settings.yaml`의 `runtime.rate_limit_per_sec` 값으로 조절 가능합니다.
 - Daily 업데이트는 최근 30-50일만 수집하므로 bulk 수집보다 빠릅니다.
 
 ### Cron 로그 확인
