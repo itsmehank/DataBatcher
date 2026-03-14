@@ -256,7 +256,7 @@ def main(argv=None):
     cfg = load_settings()
     db_cfg = DBConfig(**cfg["database"]) if cfg.get("database") else None
     if not db_cfg:
-        print("database 설정이 필요합니다(config/settings*.yaml 또는 DATABASE_URL).", file=sys.stderr)
+        print("database 설정이 필요합니다(apps/ingest-databatcher/config/settings*.yaml 또는 DATABASE_URL).", file=sys.stderr)
         sys.exit(2)
 
     engine = DBManager.get_engine(db_cfg)

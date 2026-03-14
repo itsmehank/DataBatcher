@@ -6,7 +6,7 @@
 - 대상 심볼 결정 우선순위:
   1) --all 지정 시: crypto_symbol_master의 ACTIVE 전체
   2) --symbols 지정 시: 해당 심볼만
-  3) 둘 다 없으면: config/settings.yaml의 crypto.targets.symbols
+  3) 둘 다 없으면: apps/ingest-databatcher/config/settings.yaml의 crypto.targets.symbols
 
 - 최근 50일만 업데이트(고정)
 - 기본 end date: 실행 시점 UTC 날짜 기준 "어제" (완결된 일봉만 적재)
@@ -92,7 +92,7 @@ def main(argv=None) -> int:
 
     if not symbols:
         print(
-            "Error: 처리할 crypto 심볼이 없습니다. --all 또는 --symbols를 지정하거나, config/settings.yaml의 crypto.targets.symbols를 채워주세요.",
+            "Error: 처리할 crypto 심볼이 없습니다. --all 또는 --symbols를 지정하거나, apps/ingest-databatcher/config/settings.yaml의 crypto.targets.symbols를 채워주세요.",
             file=sys.stderr,
         )
         return 2

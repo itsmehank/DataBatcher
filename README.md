@@ -44,8 +44,8 @@ python apps/ingest-databatcher/scripts/init_db.py
 이 프로젝트는 실행 시점에 어떤 DB로 적재할지 다음 우선순위로 결정합니다.
 
 1. `DATABASE_URL` 환경변수 (최우선)
-2. `config/settings.dev.yaml`의 `database.url`
-3. `config/settings.yaml`의 `database.url`
+2. `apps/ingest-databatcher/config/settings.dev.yaml`의 `database.url`
+3. `apps/ingest-databatcher/config/settings.yaml`의 `database.url`
 
 즉, **bulk/daily/weekly 모두 현재 프로세스의 `DATABASE_URL` 값이 적재 대상 DB를 결정**합니다.
 
@@ -66,7 +66,7 @@ DATABASE_URL=mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market
 - `password`: `YOUR_DB_PASSWORD` 위치
 - `url` 전체 형식: `mysql+pymysql://<user>:<password>@<host>:<port>/<db>?charset=utf8mb4`
 
-### 대안 방식: `config/settings.dev.yaml` 사용
+### 대안 방식: `apps/ingest-databatcher/config/settings.dev.yaml` 사용
 실행 환경에서 환경변수 주입이 어렵다면 다음 키를 사용합니다.
 
 ```yaml
@@ -133,7 +133,7 @@ pytest -q apps/ingest-databatcher/tests/test_pykrx_adapter.py::test_normalize_pr
 ```bash
 python apps/ingest-databatcher/scripts/preflight_repo_safety.py
 git add -n .
-git check-ignore -v .env config/settings.dev.yaml logs/bulk_update_failed.log
+git check-ignore -v .env apps/ingest-databatcher/config/settings.dev.yaml logs/bulk_update_failed.log
 ```
 
 추가 원칙:

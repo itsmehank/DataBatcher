@@ -34,8 +34,8 @@ def _candidate_config_paths() -> tuple[list[Path], list[Path]]:
     """Return candidate config paths for base/dev in priority order.
 
     Supports both:
-    - repo root style: config/settings*.yaml
-    - app-contained style: apps/ingest-databatcher/config/settings*.yaml
+    - repo root style: apps/ingest-databatcher/config/settings*.yaml
+    - app-contained style: apps/ingest-databatcher/apps/ingest-databatcher/config/settings*.yaml
     """
     here = Path(__file__).resolve()
     app_root = here.parents[1]
@@ -44,12 +44,12 @@ def _candidate_config_paths() -> tuple[list[Path], list[Path]]:
     base_candidates = [
         repo_root / "config" / "settings.yaml",
         app_root / "config" / "settings.yaml",
-        Path("config/settings.yaml"),
+        Path("apps/ingest-databatcher/config/settings.yaml"),
     ]
     dev_candidates = [
         repo_root / "config" / "settings.dev.yaml",
         app_root / "config" / "settings.dev.yaml",
-        Path("config/settings.dev.yaml"),
+        Path("apps/ingest-databatcher/config/settings.dev.yaml"),
     ]
     return base_candidates, dev_candidates
 
@@ -64,8 +64,8 @@ def _first_existing(paths: list[Path]) -> Optional[Path]:
 def load_settings() -> Dict[str, Any]:
     """Load configuration with the following precedence:
     1) Environment variable DATABASE_URL (overrides database.url)
-    2) config/settings.dev.yaml if exists and has include: settings.yaml
-    3) config/settings.yaml (base)
+    2) apps/ingest-databatcher/config/settings.dev.yaml if exists and has include: settings.yaml
+    3) apps/ingest-databatcher/config/settings.yaml (base)
     Returns a merged dictionary.
     """
     # Load .env into os.environ if available.
