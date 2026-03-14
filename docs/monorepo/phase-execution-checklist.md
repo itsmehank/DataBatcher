@@ -57,10 +57,10 @@ DATABASE_URL="$TEST_DB_URL" python apps/ingest-databatcher/scripts/daily_update.
 DATABASE_URL="$TEST_DB_URL" python apps/ingest-databatcher/scripts/weekly_update.py --all --market KOSPI --top 1
 ```
 
-## 5단계 최소셋
+## 5단계 최소셋 (옵션)
 
-- [ ] CODEOWNERS 정책 반영
-- [ ] PR 체크리스트 반영
+- [ ] 팀 프로젝트라면 CODEOWNERS 정책 반영
+- [ ] 팀 프로젝트라면 PR 체크리스트 반영
 - [ ] DB 변경 정책 문서화
 
 ## 종료 절차(항상)
