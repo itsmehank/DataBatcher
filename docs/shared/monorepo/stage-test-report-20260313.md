@@ -66,3 +66,15 @@
   - `init_db -> init_test_db -> alembic -> sync -> bulk(top1,1일) -> daily(top1) -> weekly(top1)` 성공
   - row count: `stock_prices=19`, `stock_indicators=4`, `stock_prices_weekly=5`
   - 종료 후 `MYSQL_PORT=3307 ... down -v` 수행 및 3306 기존 DB 유지 확인
+
+## 추가 검증 (2026-03-14, 가이드 명령 정합화)
+
+- 문서 경로 정합화
+  - 대상: `apps/ingest-databatcher/docs/windows_scheduler_guide.md`, `apps/ingest-databatcher/docs/guides/*.md`
+  - `python scripts/...` -> `python apps/ingest-databatcher/scripts/...`로 교체
+  - `config/settings*.yaml` -> `apps/ingest-databatcher/config/settings*.yaml`로 교체
+- 3307 스모크 테스트
+  - `init_db -> sync_symbol_master -> bulk(top1,1일) -> daily(top1) -> weekly(top1)` 성공
+  - row count: `stock_prices=19`, `stock_indicators=4`, `stock_prices_weekly=5`
+  - latest sample: `(000020, 2026-03-13)`
+  - 종료 후 `MYSQL_PORT=3307 ... down -v` 및 3306 기존 DB 유지 확인

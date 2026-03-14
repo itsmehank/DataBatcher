@@ -62,7 +62,7 @@ Each asset class has: **master table** + **daily price table** + **daily indicat
 | last_date | DATE | Latest data date | NULL (not populated) |
 
 **Approximate counts**: KOSPI ~950, KOSDAQ ~1,700, KONEX ~100, ETF ~700. Total ~3,500 symbols.
-**Sync script**: `scripts/sync_symbol_master.py` (weekly) — pykrx 대분류 + FDR KRX-DESC 세분류 자동 수집
+**Sync script**: `apps/ingest-databatcher/scripts/sync_symbol_master.py` (weekly) — pykrx 대분류 + FDR KRX-DESC 세분류 자동 수집
 
 ---
 
@@ -81,7 +81,7 @@ Each asset class has: **master table** + **daily price table** + **daily indicat
 | sector_updated_at | TIMESTAMP | Sector info updated at | `2026-02-08 12:00:00` |
 
 **Approximate counts**: NYSE ~3,500, NASDAQ ~4,500, ETF ~2,500. Total ~10,000+ symbols.
-**Sync script**: `scripts/us_sync_symbol_master.py` (weekly) — FDR Industry + yfinance Sector 자동 수집
+**Sync script**: `apps/ingest-databatcher/scripts/us_sync_symbol_master.py` (weekly) — FDR Industry + yfinance Sector 자동 수집
 
 ---
 
@@ -95,7 +95,7 @@ Each asset class has: **master table** + **daily price table** + **daily indicat
 | status | VARCHAR(16) | Status | `ACTIVE` |
 
 **Symbols**: 2 indices (KOSPI 1001, KOSDAQ 2001).
-**Sync script**: `scripts/kr_index_sync_master.py`
+**Sync script**: `apps/ingest-databatcher/scripts/kr_index_sync_master.py`
 
 ---
 
@@ -109,7 +109,7 @@ Each asset class has: **master table** + **daily price table** + **daily indicat
 | status | VARCHAR(16) | Status | `ACTIVE` |
 
 **Symbols**: 3 indices (hardcoded).
-**Sync script**: `scripts/us_index_sync_master.py`
+**Sync script**: `apps/ingest-databatcher/scripts/us_index_sync_master.py`
 
 ---
 
@@ -124,7 +124,7 @@ Each asset class has: **master table** + **daily price table** + **daily indicat
 | exchange | VARCHAR(16) | Exchange name | `BINANCE` |
 
 **Approximate counts**: ~500+ USDT pairs on Binance.
-**Sync script**: `scripts/crypto_sync_symbol_master.py`
+**Sync script**: `apps/ingest-databatcher/scripts/crypto_sync_symbol_master.py`
 
 ---
 
@@ -319,7 +319,7 @@ IBD (Investor's Business Daily) indicators are **cross-sectional** — they requ
 - **Weights**: 40% x 3-month + 20% x 6-month + 20% x 9-month + 20% x 12-month return
 - **strict_12m**: When `true`, excludes stocks with less than 12 months of price history
 - **Tables**: `stock_indicators` (benchmark: KOSPI), `us_stock_indicators` (benchmark: S&P 500)
-- **Update scripts**: `scripts/kr_rs_update.py`, `scripts/us_rs_update.py`
+- **Update scripts**: `apps/ingest-databatcher/scripts/kr_rs_update.py`, `apps/ingest-databatcher/scripts/us_rs_update.py`
 
 #### RS Line (`rs_line`)
 
@@ -356,8 +356,8 @@ Mark Minervini의 트렌드 템플릿 8가지 조건을 사전 배치로 계산�
 
 **Primary Key**: `(symbol, date, screen_config_hash)`
 **Storage**: 통과 종목만 저장 (INSERT ONLY)
-**Config**: `minervini_kr` in `config/settings.yaml`
-**Script**: `scripts/kr_minervini_update.py --days 7 --force`
+**Config**: `minervini_kr` in `apps/ingest-databatcher/config/settings.yaml`
+**Script**: `apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7 --force`
 
 **스크리닝 조건**:
 - MA 정배열 (price > sma50 > sma150 > sma200)
@@ -373,8 +373,8 @@ Mark Minervini의 트렌드 템플릿 8가지 조건을 사전 배치로 계산�
 
 동일한 구조 (market: NYSE/NASDAQ/ETF).
 
-**Config**: `minervini_us` in `config/settings.yaml`
-**Script**: `scripts/us_minervini_update.py --days 7 --force`
+**Config**: `minervini_us` in `apps/ingest-databatcher/config/settings.yaml`
+**Script**: `apps/ingest-databatcher/scripts/us_minervini_update.py --days 7 --force`
 
 ---
 
