@@ -19,7 +19,7 @@
 - 가상환경 활성화 후 실행 권장
 - 의존성 설치: `pip install -r requirements.txt`
 - DB 연결 정보는 `DATABASE_URL` 또는 `apps/ingest-databatcher/config/settings*.yaml` 사용
-- 로컬 DB는 보통 Docker Compose 사용: `docker compose -f docker/docker-compose.yml up -d`
+- 로컬 DB는 보통 Docker Compose 사용: `docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d`
 - 스키마 초기화: `python apps/ingest-databatcher/scripts/init_db.py`
 
 ## 3) Build / Lint / Test 명령

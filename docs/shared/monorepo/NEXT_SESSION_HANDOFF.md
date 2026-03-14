@@ -184,7 +184,7 @@ grep -RIn "apps/ingest-databatcher/scripts/\|core/\|collectors/\|indicators/\|sa
 - DB 필요 테스트는 아래 방식으로만 수행
 
 ```bash
-MYSQL_PORT=3307 docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
+MYSQL_PORT=3307 docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
 DATABASE_URL="mysql+pymysql://hank:1234!@127.0.0.1:3307/trade?charset=utf8mb4" <테스트 명령>
 ```
 
@@ -203,7 +203,7 @@ DATABASE_URL="mysql+pymysql://hank:1234!@127.0.0.1:3307/trade?charset=utf8mb4" <
 ### 종료 절차
 
 ```bash
-MYSQL_PORT=3307 docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
+MYSQL_PORT=3307 docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
 docker ps --format "table {{.Names}}\t{{.Ports}}"
 ```
 

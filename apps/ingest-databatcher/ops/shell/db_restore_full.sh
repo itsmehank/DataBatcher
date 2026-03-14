@@ -18,7 +18,7 @@ usage() {
     echo "Usage: bash apps/ingest-databatcher/ops/shell/db_restore_full.sh --file <backup_file> [--target-db <db>] [--recreate-db] [--yes]"
 }
 
-if [ ! -f "mysql-standalone/docker-compose-mysql.yaml" ]; then
+if [ ! -f "db/compose/mysql-standalone/docker-compose-mysql.yaml" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
     usage
@@ -26,7 +26,7 @@ if [ ! -f "mysql-standalone/docker-compose-mysql.yaml" ]; then
 fi
 
 ENV_FILE=".env"
-COMPOSE_FILE="mysql-standalone/docker-compose-mysql.yaml"
+COMPOSE_FILE="db/compose/mysql-standalone/docker-compose-mysql.yaml"
 
 if [ ! -f "${ENV_FILE}" ]; then
     echo "Error: ${ENV_FILE} 파일이 없습니다."
@@ -97,7 +97,7 @@ if ! docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql 
     sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin -uroot -h 127.0.0.1 ping --silent' >/dev/null 2>&1; then
     echo "Error: MySQL 컨테이너에 접속할 수 없습니다."
     echo "먼저 아래 명령으로 MySQL을 기동하세요:"
-    echo "  docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d"
+    echo "  docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d"
     exit 1
 fi
 

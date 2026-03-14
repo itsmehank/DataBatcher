@@ -26,7 +26,7 @@ TEST_DB_URL="mysql+pymysql://hank:1234!@127.0.0.1:3307/trade?charset=utf8mb4"
 DB 테스트(3307)
 
 ```bash
-MYSQL_PORT=3307 docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
+MYSQL_PORT=3307 docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
 DATABASE_URL="$TEST_DB_URL" python apps/ingest-databatcher/scripts/init_db.py
 DATABASE_URL="$TEST_DB_URL" bash apps/ingest-databatcher/ops/shell/db_backup_monthly.sh
 ```
@@ -66,7 +66,7 @@ DATABASE_URL="$TEST_DB_URL" python apps/ingest-databatcher/scripts/weekly_update
 ## 종료 절차(항상)
 
 ```bash
-MYSQL_PORT=3307 docker compose -f mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
+MYSQL_PORT=3307 docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env down -v
 docker ps --format "table {{.Names}}\t{{.Ports}}"
 ```
 

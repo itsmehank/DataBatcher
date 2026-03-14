@@ -29,11 +29,7 @@ def _resolve_schema_file() -> Path:
         cand = p / "db" / "init" / "01_schema.sql"
         if cand.exists():
             return cand
-    for p in [here.parent, *here.parents]:
-        cand = p / "docker" / "mysql" / "init" / "01_schema.sql"
-        if cand.exists():
-            return cand
-    raise SystemExit("01_schema.sql not found under db/init or docker/mysql/init")
+    raise SystemExit("01_schema.sql not found under db/init")
 
 
 SCHEMA_FILE = _resolve_schema_file()
