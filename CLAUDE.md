@@ -27,7 +27,7 @@ docker ps
 # mysql의 계정 정보는 .env 파일에 작성되어 있다. 이를 참고한다.
 
 # Initialize database schema
-python scripts/init_db.py
+python apps/ingest-databatcher/scripts/init_db.py
 ```
 
 ### Initial Setup Guide (처음 시작하기)
@@ -46,20 +46,18 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # 1-3. Docker로 MySQL 실행 (로컬 개발 환경)
-cd docker
-docker compose up -d
-cd ..
+docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
 
 # 1-4. 데이터베이스 초기화 (테이블 생성)
-python scripts/init_db.py
+python apps/ingest-databatcher/scripts/init_db.py
 
 # 1-5. 설정 파일 확인
-# config/settings.yaml 파일이 존재하는지 확인
+# apps/ingest-databatcher/config/settings.yaml 파일이 존재하는지 확인
 # DATABASE_URL 환경변수 또는 database.url 설정 확인
-cat config/settings.yaml
+cat apps/ingest-databatcher/config/settings.yaml
 
 # 1-6. 데이터베이스 연결 테스트
-python -c "from core.config_loader import load_settings; from core.db_manager import DBManager, DBConfig; cfg = load_settings(); db_cfg = DBConfig(**cfg['database']); engine = DBManager.get_engine(db_cfg); print('✓ DB 연결 성공')"
+PYTHONPATH=apps/ingest-databatcher python -c "from core.config_loader import load_settings; from core.db_manager import DBManager, DBConfig; cfg = load_settings(); db_cfg = DBConfig(**cfg['database']); engine = DBManager.get_engine(db_cfg); print('✓ DB 연결 성공')"
 ```
 
 **예상 소요 시간**: 5-10분
@@ -72,7 +70,7 @@ python -c "from core.config_loader import load_settings; from core.db_manager im
 
 ```bash
 # 2-1. 종목 마스터 동기화 실행
-python scripts/sync_symbol_master.py
+python apps/ingest-databatcher/scripts/sync_symbol_master.py
 
 # 예상 결과:
 # - KOSPI: ~950개 종목
@@ -89,7 +87,7 @@ python scripts/sync_symbol_master.py
 mysql -h 127.0.0.1 -u YOUR_DB_USER -p market -e "SELECT COUNT(*) as total, market, status FROM symbol_master GROUP BY market, status;"
 
 # 또는 Python으로 확인
-python -c "from core.config_loader import load_settings; from core.db_manager import DBManager, DBConfig; from sqlalchemy import text; cfg = load_settings(); db_cfg = DBConfig(**cfg['database']); engine = DBManager.get_engine(db_cfg); with engine.connect() as conn: result = conn.execute(text('SELECT COUNT(*) FROM symbol_master WHERE status=\"ACTIVE\"')); print(f'ACTIVE 종목 수: {result.scalar()}')"
+PYTHONPATH=apps/ingest-databatcher python -c "from core.config_loader import load_settings; from core.db_manager import DBManager, DBConfig; from sqlalchemy import text; cfg = load_settings(); db_cfg = DBConfig(**cfg['database']); engine = DBManager.get_engine(db_cfg); with engine.connect() as conn: result = conn.execute(text('SELECT COUNT(*) FROM symbol_master WHERE status=\"ACTIVE\"')); print(f'ACTIVE 종목 수: {result.scalar()}')"
 ```
 
 ---
@@ -107,27 +105,27 @@ python -c "from core.config_loader import load_settings; from core.db_manager im
 
 ```bash
 # 3-1. 전체 종목, 최근 1년 수집 (추천)
-python scripts/bulk_update.py \
+python apps/ingest-databatcher/scripts/bulk_update.py \
   --start 2024-01-01 \
   --end 2024-12-31 \
   --workers 4
 
 # 3-2. KOSPI만 수집 (빠른 테스트용)
-python scripts/bulk_update.py \
+python apps/ingest-databatcher/scripts/bulk_update.py \
   --start 2024-01-01 \
   --end 2024-12-31 \
   --market KOSPI \
   --workers 4
 
 # 3-3. 시가총액 상위 100개만 수집 (프로토타입용)
-python scripts/bulk_update.py \
+python apps/ingest-databatcher/scripts/bulk_update.py \
   --start 2024-01-01 \
   --end 2024-12-31 \
   --top 100 \
   --workers 4
 
 # 3-4. 전체 종목, 5년치 수집 (프로덕션 권장)
-python scripts/bulk_update.py \
+python apps/ingest-databatcher/scripts/bulk_update.py \
   --start 2020-01-01 \
   --end 2024-12-31 \
   --workers 8
@@ -178,7 +176,7 @@ cat logs/bulk_update_failed.log
 
 # 실패한 종목만 재시도 (수동)
 # failed.log에서 심볼 리스트 추출 후
-python scripts/daily_update.py --symbols 005930 000660 ... --force
+python apps/ingest-databatcher/scripts/daily_update.py --symbols 005930 000660 ... --force
 ```
 
 ---
@@ -189,13 +187,13 @@ python scripts/daily_update.py --symbols 005930 000660 ... --force
 
 ```bash
 # 4-1. 전체 종목 업데이트 테스트 (강제 실행)
-python scripts/daily_update.py --all --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --force
 
 # 4-2. 특정 마켓만 업데이트 테스트
-python scripts/daily_update.py --all --market KOSPI --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --market KOSPI --force
 
 # 4-3. 소수 종목만 테스트
-python scripts/daily_update.py --all --top 10 --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --top 10 --force
 ```
 
 **예상 소요 시간**:
@@ -220,10 +218,10 @@ crontab -e
 
 # 추가할 내용:
 # 주간: 일요일 새벽 2시에 종목 마스터 동기화
-0 2 * * 0 cd /path/to/DataBatcher && source .venv/bin/activate && python scripts/sync_symbol_master.py >> logs/sync_symbol_master.log 2>&1
+0 2 * * 0 cd /path/to/DataBatcher && source .venv/bin/activate && python apps/ingest-databatcher/scripts/sync_symbol_master.py >> logs/sync_symbol_master.log 2>&1
 
 # 일일: 평일 오후 5시(장마감 30분 후)에 전체 업데이트
-0 17 * * 1-5 cd /path/to/DataBatcher && source .venv/bin/activate && python scripts/daily_update.py --all --force >> logs/daily_update.log 2>&1
+0 17 * * 1-5 cd /path/to/DataBatcher && source .venv/bin/activate && python apps/ingest-databatcher/scripts/daily_update.py --all --force >> logs/daily_update.log 2>&1
 ```
 
 **Windows Task Scheduler**:
@@ -232,7 +230,7 @@ crontab -e
 3. 트리거: 매일 또는 매주
 4. 동작: 프로그램 시작
    - 프로그램: `python.exe`
-   - 인수: `scripts/daily_update.py --all --force`
+   - 인수: `apps/ingest-databatcher/scripts/daily_update.py --all --force`
    - 시작 위치: `C:\path\to\DataBatcher`
 
 ---
@@ -243,17 +241,17 @@ crontab -e
 
 ```bash
 # 1. DB 초기화
-docker compose -f docker/docker-compose.yml up -d
-python scripts/init_db.py
+docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
+python apps/ingest-databatcher/scripts/init_db.py
 
 # 2. 종목 동기화
-python scripts/sync_symbol_master.py
+python apps/ingest-databatcher/scripts/sync_symbol_master.py
 
 # 3. 상위 100개 종목만 최근 1년 데이터 수집 (테스트)
-python scripts/bulk_update.py --start 2024-01-01 --end 2024-12-31 --top 100 --workers 4
+python apps/ingest-databatcher/scripts/bulk_update.py --start 2024-01-01 --end 2024-12-31 --top 100 --workers 4
 
 # 4. 일일 업데이트 테스트
-python scripts/daily_update.py --all --top 10 --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --top 10 --force
 ```
 
 **예상 소요 시간**: 5-10분
@@ -265,40 +263,40 @@ python scripts/daily_update.py --all --top 10 --force
 #### Sync Symbol Master (Weekly)
 ```bash
 # Sync all KRX symbols from FDR to symbol_master table
-python scripts/sync_symbol_master.py
+python apps/ingest-databatcher/scripts/sync_symbol_master.py
 ```
 
 #### Bulk Collection (Initial Setup or Backfill)
 ```bash
 # Collect all symbols for past 5 years
-python scripts/bulk_update.py --start 2020-01-01 --end 2024-12-31 --workers 8
+python apps/ingest-databatcher/scripts/bulk_update.py --start 2020-01-01 --end 2024-12-31 --workers 8
 
 # Or collect only KOSPI symbols
-python scripts/bulk_update.py --start 2023-01-01 --end 2024-12-31 --market KOSPI
+python apps/ingest-databatcher/scripts/bulk_update.py --start 2023-01-01 --end 2024-12-31 --market KOSPI
 
 # Or top 100 symbols by market cap
-python scripts/bulk_update.py --start 2024-01-01 --end 2024-12-31 --top 100
+python apps/ingest-databatcher/scripts/bulk_update.py --start 2024-01-01 --end 2024-12-31 --top 100
 ```
 
 #### Daily Updates
 ```bash
 # Update all ACTIVE symbols (recommended)
-python scripts/daily_update.py --all --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --force
 
 # Or specific market only
-python scripts/daily_update.py --all --market KOSPI --force
+python apps/ingest-databatcher/scripts/daily_update.py --all --market KOSPI --force
 
 # Or specific symbols (legacy mode)
-python scripts/daily_update.py --symbols 005930 000660 --force
+python apps/ingest-databatcher/scripts/daily_update.py --symbols 005930 000660 --force
 ```
 
 #### Development/Testing
 ```bash
 # Probe FDR data source (Korean)
-python scripts/probes/fdr_stock_probe.py --symbol 005930 --start 2020-01-01 --end 2020-12-31
+python apps/ingest-databatcher/scripts/probes/fdr_stock_probe.py --symbol 005930 --start 2020-01-01 --end 2020-12-31
 
 # Probe FDR US stock data source
-python scripts/probes/fdr_us_stock_probe.py --symbol AAPL --start 2024-01-01 --end 2024-01-31
+python apps/ingest-databatcher/scripts/probes/fdr_us_stock_probe.py --symbol AAPL --start 2024-01-01 --end 2024-01-31
 ```
 
 ### US Stock Commands
@@ -306,67 +304,67 @@ python scripts/probes/fdr_us_stock_probe.py --symbol AAPL --start 2024-01-01 --e
 #### Sync US Symbol Master (Weekly)
 ```bash
 # Sync all NYSE/NASDAQ/ETF symbols to us_symbol_master table (with yfinance sector enrichment)
-python scripts/us_sync_symbol_master.py
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py
 
 # Sync specific market only
-python scripts/us_sync_symbol_master.py --market NASDAQ
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --market NASDAQ
 
 # Skip yfinance sector enrichment (faster)
-python scripts/us_sync_symbol_master.py --skip-yfinance
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --skip-yfinance
 
 # Limit yfinance calls (e.g., first 100 symbols only)
-python scripts/us_sync_symbol_master.py --yfinance-limit 100
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --yfinance-limit 100
 
 # Adjust yfinance rate limit (default 2.0 req/sec)
-python scripts/us_sync_symbol_master.py --yfinance-rate 3.0
+python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --yfinance-rate 3.0
 ```
 
 #### US Bulk Collection (Initial Setup)
 ```bash
 # Collect all US symbols for past 1 year
-python scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --workers 4
+python apps/ingest-databatcher/scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --workers 4
 
 # NASDAQ only with indicators
-python scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --market NASDAQ --with-indicators
+python apps/ingest-databatcher/scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --market NASDAQ --with-indicators
 
 # Top 100 US symbols
-python scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --top 100 --with-indicators
+python apps/ingest-databatcher/scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --top 100 --with-indicators
 ```
 
 #### US Daily Updates
 ```bash
 # Update all ACTIVE US symbols
-python scripts/us_daily_update.py --all --with-indicators
+python apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators
 
 # Specific market only
-python scripts/us_daily_update.py --all --market NASDAQ --with-indicators
+python apps/ingest-databatcher/scripts/us_daily_update.py --all --market NASDAQ --with-indicators
 
 # Specific symbols
-python scripts/us_daily_update.py --symbols AAPL MSFT GOOGL --with-indicators
+python apps/ingest-databatcher/scripts/us_daily_update.py --symbols AAPL MSFT GOOGL --with-indicators
 ```
 
 #### US Weekly Bulk Collection (Initial Setup)
 ```bash
 # Collect all US symbols weekly data (DB full period)
-python scripts/us_bulk_update_weekly.py
+python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py
 
 # NASDAQ only
-python scripts/us_bulk_update_weekly.py --market NASDAQ
+python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py --market NASDAQ
 
 # Top 100 US symbols, specific period
-python scripts/us_bulk_update_weekly.py --start 2020-01-01 --end 2024-12-31 --top 100
+python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py --start 2020-01-01 --end 2024-12-31 --top 100
 ```
 
 #### US Weekly Updates
 ```bash
 # Update all ACTIVE US symbols weekly data
-python scripts/us_weekly_update.py --all
+python apps/ingest-databatcher/scripts/us_weekly_update.py --all
 
 # Specific market only
-python scripts/us_weekly_update.py --all --market NASDAQ
+python apps/ingest-databatcher/scripts/us_weekly_update.py --all --market NASDAQ
 
 # Specific symbols
-python scripts/us_weekly_update.py --symbols AAPL MSFT GOOGL
+python apps/ingest-databatcher/scripts/us_weekly_update.py --symbols AAPL MSFT GOOGL
 ```
 
 ### US Index Commands
@@ -374,52 +372,52 @@ python scripts/us_weekly_update.py --symbols AAPL MSFT GOOGL
 #### Sync US Index Master (Weekly)
 ```bash
 # Sync S&P 500, Dow Jones, NASDAQ Composite to us_index_master table
-python scripts/us_index_sync_master.py
+python apps/ingest-databatcher/scripts/us_index_sync_master.py
 ```
 
 #### US Index Bulk Collection (Initial Setup)
 ```bash
 # Collect all US indices for past 5 years
-python scripts/us_index_bulk_update.py --start 2020-01-01 --end 2024-12-31
+python apps/ingest-databatcher/scripts/us_index_bulk_update.py --start 2020-01-01 --end 2024-12-31
 
 # S&P 500 only
-python scripts/us_index_bulk_update.py --start 2024-01-01 --end 2024-12-31 --market SP500
+python apps/ingest-databatcher/scripts/us_index_bulk_update.py --start 2024-01-01 --end 2024-12-31 --market SP500
 ```
 
 #### US Index Daily Updates
 ```bash
 # Update all ACTIVE US indices
-python scripts/us_index_daily_update.py --all --force
+python apps/ingest-databatcher/scripts/us_index_daily_update.py --all --force
 
 # Specific market only
-python scripts/us_index_daily_update.py --all --market SP500 --force
+python apps/ingest-databatcher/scripts/us_index_daily_update.py --all --market SP500 --force
 
 # Specific indices
-python scripts/us_index_daily_update.py --symbols US500 DJI --force
+python apps/ingest-databatcher/scripts/us_index_daily_update.py --symbols US500 DJI --force
 ```
 
 #### US Index Weekly Bulk Collection (Initial Setup)
 ```bash
 # Collect all US indices weekly data (DB full period)
-python scripts/us_index_bulk_update_weekly.py
+python apps/ingest-databatcher/scripts/us_index_bulk_update_weekly.py
 
 # Specific period
-python scripts/us_index_bulk_update_weekly.py --start 2020-01-01 --end 2024-12-31
+python apps/ingest-databatcher/scripts/us_index_bulk_update_weekly.py --start 2020-01-01 --end 2024-12-31
 
 # S&P 500 only
-python scripts/us_index_bulk_update_weekly.py --market SP500
+python apps/ingest-databatcher/scripts/us_index_bulk_update_weekly.py --market SP500
 ```
 
 #### US Index Weekly Updates
 ```bash
 # Update all ACTIVE US indices weekly data
-python scripts/us_index_weekly_update.py --all
+python apps/ingest-databatcher/scripts/us_index_weekly_update.py --all
 
 # Specific market only
-python scripts/us_index_weekly_update.py --all --market SP500
+python apps/ingest-databatcher/scripts/us_index_weekly_update.py --all --market SP500
 
 # Specific indices
-python scripts/us_index_weekly_update.py --symbols US500 DJI
+python apps/ingest-databatcher/scripts/us_index_weekly_update.py --symbols US500 DJI
 ```
 
 ### IBD RS / RS Line / Blue Dot Commands
@@ -427,89 +425,89 @@ python scripts/us_index_weekly_update.py --symbols US500 DJI
 #### KR Stock RS Indicators
 ```bash
 # Calculate RS indicators for all KR stocks (after daily_update)
-python scripts/kr_rs_update.py --force
+python apps/ingest-databatcher/scripts/kr_rs_update.py --force
 
 # Specific market, last 5 days
-python scripts/kr_rs_update.py --market KOSPI --days 5 --force
+python apps/ingest-databatcher/scripts/kr_rs_update.py --market KOSPI --days 5 --force
 
 # Include stocks with less than 12 months data
-python scripts/kr_rs_update.py --no-strict-12m --force
+python apps/ingest-databatcher/scripts/kr_rs_update.py --no-strict-12m --force
 ```
 
 #### US Stock RS Indicators
 ```bash
 # Calculate RS indicators for all US stocks (after us_daily_update)
-python scripts/us_rs_update.py --force
+python apps/ingest-databatcher/scripts/us_rs_update.py --force
 
 # Specific market, last 5 days
-python scripts/us_rs_update.py --market NASDAQ --days 5 --force
+python apps/ingest-databatcher/scripts/us_rs_update.py --market NASDAQ --days 5 --force
 
 # Include stocks with less than 12 months data
-python scripts/us_rs_update.py --no-strict-12m --force
+python apps/ingest-databatcher/scripts/us_rs_update.py --no-strict-12m --force
 ```
 
 ### Minervini Trend Template Screening
 
 ```bash
 # 한국 주식 - 전체 백필
-python scripts/kr_minervini_update.py --days 9999 --force
+python apps/ingest-databatcher/scripts/kr_minervini_update.py --days 9999 --force
 
 # 한국 주식 - 최근 7일
-python scripts/kr_minervini_update.py --days 7 --force
+python apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7 --force
 
 # 특정 마켓만 (KOSPI/KOSDAQ/ETF)
-python scripts/kr_minervini_update.py --market KOSPI --days 30 --force
+python apps/ingest-databatcher/scripts/kr_minervini_update.py --market KOSPI --days 30 --force
 
 # 미국 주식 - 전체 백필
-python scripts/us_minervini_update.py --days 9999 --force
+python apps/ingest-databatcher/scripts/us_minervini_update.py --days 9999 --force
 
 # 미국 주식 - 최근 7일
-python scripts/us_minervini_update.py --days 7 --force
+python apps/ingest-databatcher/scripts/us_minervini_update.py --days 7 --force
 
 # 특정 마켓만 (NYSE/NASDAQ/ETF)
-python scripts/us_minervini_update.py --market NASDAQ --days 30 --force
+python apps/ingest-databatcher/scripts/us_minervini_update.py --market NASDAQ --days 30 --force
 ```
 
 ### Indicator Backfill (Independent Indicator Calculation)
 
 ```bash
 # 한국 주식 전체 백필 (DB 가격 데이터 → 지표 계산)
-python scripts/backfill_indicators.py --source stock_prices
+python apps/ingest-databatcher/scripts/backfill_indicators.py --source stock_prices
 
 # 미국 주식, NASDAQ만
-python scripts/backfill_indicators.py --source us_stock_prices --market NASDAQ
+python apps/ingest-databatcher/scripts/backfill_indicators.py --source us_stock_prices --market NASDAQ
 
 # 특정 종목만
-python scripts/backfill_indicators.py --source stock_prices --symbols 005930 000660
+python apps/ingest-databatcher/scripts/backfill_indicators.py --source stock_prices --symbols 005930 000660
 
 # 병렬 워커 수 지정
-python scripts/backfill_indicators.py --source us_stock_prices --workers 8
+python apps/ingest-databatcher/scripts/backfill_indicators.py --source us_stock_prices --workers 8
 
 # 기존 지표 덮어쓰기 (재계산)
-python scripts/backfill_indicators.py --source stock_prices --mode upsert
+python apps/ingest-databatcher/scripts/backfill_indicators.py --source stock_prices --mode upsert
 ```
 
 ### Test Environment
 
 ```bash
 # 테스트 DB (trade_test) 초기화
-python scripts/init_test_db.py
+python apps/ingest-databatcher/scripts/init_test_db.py
 ```
 
 ### Testing
-There is currently no formal test suite. Testing is done via probe scripts in `scripts/probes/`.
+There is currently no formal test suite. Testing is done via probe scripts in `apps/ingest-databatcher/scripts/probes/`.
 
 ## High-Level Architecture
 
-### Configuration System (core/config_loader.py)
+### Configuration System (apps/ingest-databatcher/core/config_loader.py)
 Loads settings with the following precedence:
 1. Environment variable `DATABASE_URL` (highest priority, overrides database.url)
-2. `config/settings.dev.yaml` (development overlay)
-3. `config/settings.yaml` (base configuration)
+2. `apps/ingest-databatcher/config/settings.dev.yaml` (development overlay)
+3. `apps/ingest-databatcher/config/settings.yaml` (base configuration)
 
 Configuration is merged hierarchically using `merge_dict()`. All scripts use `load_settings()` to access configuration.
 
-### Database Layer (core/db_manager.py)
+### Database Layer (apps/ingest-databatcher/core/db_manager.py)
 - **DBManager**: Singleton-style SQLAlchemy engine manager
 - **Key Methods**:
   - `get_engine()`: Returns shared engine instance (creates on first call)
@@ -517,17 +515,17 @@ Configuration is merged hierarchically using `merge_dict()`. All scripts use `lo
   - `upsert_dataframe()`: Bulk upsert using MySQL's `ON DUPLICATE KEY UPDATE`
 - Connection pool configured via `DBConfig` dataclass (pool_size, max_overflow, pool_recycle, pool_pre_ping)
 
-### Collector Pattern (core/base_collector.py + collectors/)
+### Collector Pattern (apps/ingest-databatcher/core/base_collector.py + apps/ingest-databatcher/collectors/)
 - **BaseCollector**: Abstract base for all data collectors
-- **KRStockCollector** (collectors/kr_stock.py): Fetches Korean stock data via pykrx
+- **KRStockCollector** (apps/ingest-databatcher/collectors/kr_stock.py): Fetches Korean stock data via pykrx
   - `fetch()`: Returns DataFrame with columns: symbol, date, open, high, low, close, adj_close, volume, market, source
   - `validate()`: Validates data (inherited from BaseCollector)
   - `save()`: Upserts data to `stock_prices` table via DBManager
-- **USStockCollector** (collectors/us_stock.py): Fetches US stock data via FinanceDataReader
+- **USStockCollector** (apps/ingest-databatcher/collectors/us_stock.py): Fetches US stock data via FinanceDataReader
   - `fetch()`: Returns DataFrame with same columns as KRStockCollector
   - `save()`: Upserts data to `us_stock_prices` table
 
-### Indicator System (indicators/)
+### Indicator System (apps/ingest-databatcher/indicators/)
 **Registry Pattern**: All indicators register themselves via `@IndicatorRegistry.register` decorator
 
 - **BaseIndicator**: Abstract base requiring:
@@ -535,15 +533,15 @@ Configuration is merged hierarchically using `merge_dict()`. All scripts use `lo
   - `warmup()`: Number of historical days required (e.g., SMA(20) needs 20 days warmup)
   - `compute()`: Returns pd.Series or dict[str, pd.Series] with calculated values
 
-- **IndicatorPipeline** (indicators/pipeline.py):
+- **IndicatorPipeline** (apps/ingest-databatcher/indicators/pipeline.py):
   - Orchestrates multiple indicators from config (`indicators.pipeline` in YAML)
   - `warmup_days()`: Calculates max warmup across all indicators
   - `run()`: Executes all indicators and returns dict of Series
   - `to_long_dataframe()`: Transforms results to long-form table schema (symbol, date, indicator, params_hash, value)
 
 - **Existing Indicators**:
-  - `SMA` (indicators/common/sma.py): Simple Moving Average
-  - `EMA` (indicators/common/ema.py): Exponential Moving Average
+  - `SMA` (apps/ingest-databatcher/indicators/common/sma.py): Simple Moving Average
+  - `EMA` (apps/ingest-databatcher/indicators/common/ema.py): Exponential Moving Average
 
 ### Symbol Master System (NEW)
 **Purpose**: Centralized symbol management for automated collection
@@ -554,7 +552,7 @@ Configuration is merged hierarchically using `merge_dict()`. All scripts use `lo
   - Updates metadata (name, market cap)
   - Run weekly to keep symbol list current
 
-- **core/symbol_loader.py**: Common utilities for loading symbols
+- **apps/ingest-databatcher/core/symbol_loader.py**: Common utilities for loading symbols
   - `load_symbols_from_master()`: Load ACTIVE symbols by criteria
   - Supports filtering by market (KOSPI/KOSDAQ)
   - Supports top N by market cap
@@ -562,19 +560,19 @@ Configuration is merged hierarchically using `merge_dict()`. All scripts use `lo
 ### IBD RS / RS Line / Blue Dot System
 **Cross-sectional indicators** that require all-symbol data, implemented as separate batch scripts rather than per-symbol pipeline.
 
-- **indicators/ibd/rs_rating.py**: IBD RS Rating calculation (1~99 percentile)
+- **apps/ingest-databatcher/indicators/ibd/rs_rating.py**: IBD RS Rating calculation (1~99 percentile)
   - `calculate_ibd_rs_rating()`: 3/6/9/12 month return weighted sum → cross-sectional rank
   - Weights: 40% 3m + 20% 6m + 20% 9m + 20% 12m (configurable)
   - strict_12m option: exclude stocks with < 12 months data
 
-- **indicators/ibd/rs_line.py**: RS Line calculation
+- **apps/ingest-databatcher/indicators/ibd/rs_line.py**: RS Line calculation
   - `calculate_rs_line_bulk()`: stock_close / index_close ratio (vectorized)
   - Benchmark: KOSPI(1001) for KR, S&P 500(US500) for US
 
-- **indicators/ibd/blue_dot.py**: Blue Dot Signal
+- **apps/ingest-databatcher/indicators/ibd/blue_dot.py**: Blue Dot Signal
   - `calculate_blue_dot_bulk()`: RS Line 52-week high AND price NOT 52-week high → 1/0
 
-- **core/bulk_price_loader.py**: Utilities for loading all-symbol data in wide format
+- **apps/ingest-databatcher/core/bulk_price_loader.py**: Utilities for loading all-symbol data in wide format
   - `load_all_prices_wide()`: Pivot table (dates x symbols) for cross-sectional computation
   - `load_index_close()`: Benchmark index close prices
 
@@ -595,7 +593,7 @@ Configuration is merged hierarchically using `merge_dict()`. All scripts use `lo
   - Failed symbols logged to `logs/bulk_update_failed.log`
   - Configurable workers and market filters
 
-- **Rate Limiting**: Uses `core/rate_limiter.py` to prevent FDR API blocking
+- **Rate Limiting**: Uses `apps/ingest-databatcher/core/rate_limiter.py` to prevent FDR API blocking
   - Thread-safe token bucket algorithm
   - Configurable via `runtime.rate_limit_per_sec` in settings
 
@@ -745,7 +743,7 @@ Indicators need historical data to produce valid values (e.g., SMA(20) needs 20 
 ### Incremental Updates
 `DBManager.get_latest_date()` finds the most recent stored date for a symbol. Daily updates fetch from (latest_date - warmup) to ensure indicators recalculate correctly with overlapping data.
 
-### Indicator Parameter Hashing (core/params.py)
+### Indicator Parameter Hashing (apps/ingest-databatcher/core/params.py)
 Each indicator configuration is hashed (params_hash) so multiple variants can coexist:
 - `sma(window=5, column=close)` → hash1
 - `sma(window=20, column=close)` → hash2
@@ -762,7 +760,7 @@ The `@IndicatorRegistry.register` decorator adds them to the global registry.
 
 ## Configuration Structure
 
-### indicators.pipeline (config/settings.yaml)
+### indicators.pipeline (apps/ingest-databatcher/config/settings.yaml)
 Defines which indicators to calculate and their parameters:
 ```yaml
 indicators:
@@ -785,7 +783,7 @@ markets:
   safe_delay_minutes: 30  # Buffer after close
 ```
 
-### indicators_us (config/settings.yaml)
+### indicators_us (apps/ingest-databatcher/config/settings.yaml)
 US stock-specific indicator pipeline (same structure as `indicators`):
 ```yaml
 indicators_us:
@@ -809,10 +807,10 @@ indicators_us:
 
 ## Adding New Indicators
 
-1. Create new file in `indicators/common/` (e.g., `rsi.py`)
+1. Create new file in `apps/ingest-databatcher/indicators/common/` (e.g., `rsi.py`)
 2. Inherit from `BaseIndicator` and implement required methods
 3. Add `@IndicatorRegistry.register` decorator
-4. Import in `scripts/daily_update.py` to register
+4. Import in `apps/ingest-databatcher/scripts/daily_update.py` to register
 5. Add to `indicators.pipeline` in config YAML
 
 Example skeleton:
@@ -842,7 +840,7 @@ class RSI(BaseIndicator):
   - Both modes available in `DBManager.upsert_dataframe()`, `KRStockCollector.save()`, `IndicatorSaver.save_long()`
 - **FinanceDataReader Rate Limits**:
   - External service with strict rate limits
-  - Use `core/rate_limiter.py` for thread-safe rate limiting
+  - Use `apps/ingest-databatcher/core/rate_limiter.py` for thread-safe rate limiting
   - Current config: `rate_limit_per_sec: 5` (adjust in settings.yaml)
   - Excessive requests may result in temporary blocking
 - **Market Close Check**: `--force` flag bypasses timing checks for testing/backfills
@@ -859,21 +857,21 @@ class RSI(BaseIndicator):
 - ✅ **Two Tables**: `minervini_screen_results_kr` / `minervini_screen_results_us`
 - ✅ **8 Screening Conditions**: MA ordering, SMA200 uptrend, 52-week price levels, RS Rating, Blue Dot (optional)
 - ✅ **Batch Scripts**: `kr_minervini_update.py`, `us_minervini_update.py`
-- ✅ **Config**: `minervini_kr`, `minervini_us` sections in `config/settings.yaml`
+- ✅ **Config**: `minervini_kr`, `minervini_us` sections in `apps/ingest-databatcher/config/settings.yaml`
 - ✅ **Insert Only**: Passing symbols only, safe re-runs
 
 **New Files**:
-- `scripts/migrations/add_minervini_tables.sql`: DB migration
-- `indicators/minervini/__init__.py`, `trend_template.py`: Screening logic
-- `scripts/kr_minervini_update.py`: KR stock screening batch
-- `scripts/us_minervini_update.py`: US stock screening batch
+- `apps/ingest-databatcher/scripts/migrations/add_minervini_tables.sql`: DB migration
+- `apps/ingest-databatcher/indicators/minervini/__init__.py`, `trend_template.py`: Screening logic
+- `apps/ingest-databatcher/scripts/kr_minervini_update.py`: KR stock screening batch
+- `apps/ingest-databatcher/scripts/us_minervini_update.py`: US stock screening batch
 - `guides/미너비니_트렌드_템플릿_가이드.md`: User guide
 
 **Modified Files**:
 - `docker/mysql/init/01_schema.sql`: Added minervini screening tables
-- `core/bulk_price_loader.py`: Added `load_indicators_wide()` function
-- `config/settings.yaml`: Added `minervini_kr`, `minervini_us` sections
-- `shell_scripts/bulk_all.sh`: Added minervini update steps
+- `apps/ingest-databatcher/core/bulk_price_loader.py`: Added `load_indicators_wide()` function
+- `apps/ingest-databatcher/config/settings.yaml`: Added `minervini_kr`, `minervini_us` sections
+- `apps/ingest-databatcher/ops/shell/bulk_all.sh`: Added minervini update steps
 - `docs/database_schema.md`: Documented minervini tables
 - `guides/DB_데이터_가이드.md`: Added screening tables section
 - `CLAUDE.md`: Added minervini commands
@@ -886,12 +884,12 @@ class RSI(BaseIndicator):
 - ✅ **Dual Mode**: insert_only (기본, 기존 보존) / upsert (덮어쓰기)
 
 **New Files**:
-- `scripts/backfill_indicators.py`: 메인 백필 스크립트
-- `scripts/init_test_db.py`: 테스트 DB 초기화
+- `apps/ingest-databatcher/scripts/backfill_indicators.py`: 메인 백필 스크립트
+- `apps/ingest-databatcher/scripts/init_test_db.py`: 테스트 DB 초기화
 - `guides/지표_백필_가이드.md`: 사용자 가이드
 
 **Modified Files**:
-- `config/settings.yaml`: `indicators_backfill`, `indicators_us_backfill` 섹션 추가
+- `apps/ingest-databatcher/config/settings.yaml`: `indicators_backfill`, `indicators_us_backfill` 섹션 추가
 - `CLAUDE.md`: 백필 명령어 섹션 추가
 
 ### 2026-02-08: Sector/Industry Information
@@ -902,13 +900,13 @@ class RSI(BaseIndicator):
 - ✅ **COALESCE 패턴**: US UPDATE 시 기존 sector/industry 값 보존
 
 **New Files**:
-- `core/fdr_sector_loader.py`: FDR KRX-DESC 세분류 섹터 fetch
-- `scripts/migrations/add_sector_columns.sql`: 마이그레이션 SQL
+- `apps/ingest-databatcher/core/fdr_sector_loader.py`: FDR KRX-DESC 세분류 섹터 fetch
+- `apps/ingest-databatcher/scripts/migrations/add_sector_columns.sql`: 마이그레이션 SQL
 
 **Modified Files**:
-- `core/pykrx_adapter.py`: `fetch_sector_classifications()` 추가
-- `scripts/sync_symbol_master.py`: 섹터 enrichment + upsert 확장
-- `scripts/us_sync_symbol_master.py`: Industry 보존 + yfinance + CLI 옵션 추가
+- `apps/ingest-databatcher/core/pykrx_adapter.py`: `fetch_sector_classifications()` 추가
+- `apps/ingest-databatcher/scripts/sync_symbol_master.py`: 섹터 enrichment + upsert 확장
+- `apps/ingest-databatcher/scripts/us_sync_symbol_master.py`: Industry 보존 + yfinance + CLI 옵션 추가
 - `docker/mysql/init/01_schema.sql`: symbol_master, us_symbol_master 컬럼 추가
 - `requirements.txt`: yfinance 추가
 
@@ -924,8 +922,8 @@ class RSI(BaseIndicator):
 - ✅ **Simplified Logic**: Explicit, sequential processing instead of complex gap detection
 
 **New Utilities**:
-- `core/indicator_checker.py`: Check if all indicators are calculated for a date
-- `core/price_loader.py`: Load historical price data from DB
+- `apps/ingest-databatcher/core/indicator_checker.py`: Check if all indicators are calculated for a date
+- `apps/ingest-databatcher/core/price_loader.py`: Load historical price data from DB
 
 ### 2026-01-17: Foundation Features
 - ✅ **Symbol Master Management**: Automated sync of all KRX symbols
@@ -943,17 +941,17 @@ class RSI(BaseIndicator):
 - ✅ **Parameterized Core Modules**: `IndicatorChecker` and `price_loader` now support multiple tables via parameters
 
 **New Files**:
-- `collectors/us_stock.py`: US stock data collector
-- `core/us_symbol_loader.py`: US symbol loading utilities
-- `scripts/us_sync_symbol_master.py`: US symbol master sync
-- `scripts/us_bulk_update.py`: US bulk data collection
-- `scripts/us_daily_update.py`: US daily updates
-- `scripts/probes/fdr_us_stock_probe.py`: FDR US API probe
+- `apps/ingest-databatcher/collectors/us_stock.py`: US stock data collector
+- `apps/ingest-databatcher/core/us_symbol_loader.py`: US symbol loading utilities
+- `apps/ingest-databatcher/scripts/us_sync_symbol_master.py`: US symbol master sync
+- `apps/ingest-databatcher/scripts/us_bulk_update.py`: US bulk data collection
+- `apps/ingest-databatcher/scripts/us_daily_update.py`: US daily updates
+- `apps/ingest-databatcher/scripts/probes/fdr_us_stock_probe.py`: FDR US API probe
 
 **Modified Files**:
-- `core/indicator_checker.py`: Added `table`, `config_key` parameters
-- `core/price_loader.py`: Added `table` parameter
-- `config/settings.yaml`: Added `indicators_us` section
+- `apps/ingest-databatcher/core/indicator_checker.py`: Added `table`, `config_key` parameters
+- `apps/ingest-databatcher/core/price_loader.py`: Added `table` parameter
+- `apps/ingest-databatcher/config/settings.yaml`: Added `indicators_us` section
 - `docker/mysql/init/01_schema.sql`: Added US stock tables
 
 ### 2026-02-06: US Index Support
@@ -964,15 +962,15 @@ class RSI(BaseIndicator):
 - ✅ **US Index Indicator Pipeline**: `indicators_us_index` config section (SMA 5/20/40)
 
 **New Files**:
-- `collectors/us_index.py`: US index data collector
-- `core/us_index_symbol_loader.py`: US index symbol loading utilities
-- `scripts/us_index_sync_master.py`: US index master sync (3 hardcoded indices)
-- `scripts/us_index_bulk_update.py`: US index bulk data collection
-- `scripts/us_index_daily_update.py`: US index daily updates
-- `scripts/probes/fdr_us_index_probe.py`: FDR US index API probe
+- `apps/ingest-databatcher/collectors/us_index.py`: US index data collector
+- `apps/ingest-databatcher/core/us_index_symbol_loader.py`: US index symbol loading utilities
+- `apps/ingest-databatcher/scripts/us_index_sync_master.py`: US index master sync (3 hardcoded indices)
+- `apps/ingest-databatcher/scripts/us_index_bulk_update.py`: US index bulk data collection
+- `apps/ingest-databatcher/scripts/us_index_daily_update.py`: US index daily updates
+- `apps/ingest-databatcher/scripts/probes/fdr_us_index_probe.py`: FDR US index API probe
 
 **Modified Files**:
-- `config/settings.yaml`: Added `indicators_us_index` section
+- `apps/ingest-databatcher/config/settings.yaml`: Added `indicators_us_index` section
 - `docker/mysql/init/01_schema.sql`: Added US index tables (3 tables + 1 view)
 
 ### 2026-02-07: US Index Weekly Support
@@ -983,12 +981,12 @@ class RSI(BaseIndicator):
 - ✅ **Weekly View**: `v_us_index_price_weekly_with_ma` (SMA 5/20/40 pivot)
 
 **New Files**:
-- `scripts/us_index_bulk_update_weekly.py`: US index weekly bulk data generation
-- `scripts/us_index_weekly_update.py`: US index weekly incremental updates
-- `scripts/migrations/add_us_index_weekly_tables.sql`: Migration for weekly tables
+- `apps/ingest-databatcher/scripts/us_index_bulk_update_weekly.py`: US index weekly bulk data generation
+- `apps/ingest-databatcher/scripts/us_index_weekly_update.py`: US index weekly incremental updates
+- `apps/ingest-databatcher/scripts/migrations/add_us_index_weekly_tables.sql`: Migration for weekly tables
 
 **Modified Files**:
-- `config/settings.yaml`: Added `indicators_us_index_weekly` section
+- `apps/ingest-databatcher/config/settings.yaml`: Added `indicators_us_index_weekly` section
 - `docker/mysql/init/01_schema.sql`: Added US index weekly tables (2 tables + 1 view)
 
 ### 2026-02-07: IBD RS Rating / RS Line / Blue Dot
@@ -999,16 +997,16 @@ class RSI(BaseIndicator):
 - ✅ **Config**: `ibd_rs` settings section (weights, benchmarks, strict_12m)
 
 **New Files**:
-- `indicators/ibd/__init__.py`: IBD indicators package
-- `indicators/ibd/rs_rating.py`: IBD RS Rating calculation
-- `indicators/ibd/rs_line.py`: RS Line calculation
-- `indicators/ibd/blue_dot.py`: Blue Dot Signal calculation
-- `core/bulk_price_loader.py`: All-symbol wide-format price loader
-- `scripts/kr_rs_update.py`: KR stock RS indicators batch
-- `scripts/us_rs_update.py`: US stock RS indicators batch
+- `apps/ingest-databatcher/indicators/ibd/__init__.py`: IBD indicators package
+- `apps/ingest-databatcher/indicators/ibd/rs_rating.py`: IBD RS Rating calculation
+- `apps/ingest-databatcher/indicators/ibd/rs_line.py`: RS Line calculation
+- `apps/ingest-databatcher/indicators/ibd/blue_dot.py`: Blue Dot Signal calculation
+- `apps/ingest-databatcher/core/bulk_price_loader.py`: All-symbol wide-format price loader
+- `apps/ingest-databatcher/scripts/kr_rs_update.py`: KR stock RS indicators batch
+- `apps/ingest-databatcher/scripts/us_rs_update.py`: US stock RS indicators batch
 
 **Modified Files**:
-- `config/settings.yaml`: Added `ibd_rs` settings section
+- `apps/ingest-databatcher/config/settings.yaml`: Added `ibd_rs` settings section
 - `guides/한국주식_일봉_가이드.md`: Added RS indicators section
 - `guides/미국주식_일봉_가이드.md`: Added RS indicators section
 
@@ -1017,46 +1015,46 @@ class RSI(BaseIndicator):
 **Korean Stocks**:
 ```bash
 # 1. Weekly: Sync symbol master
-0 2 * * 0 python scripts/sync_symbol_master.py
+0 2 * * 0 python apps/ingest-databatcher/scripts/sync_symbol_master.py
 
 # 2. Daily: Update all symbols (optimized)
-0 17 * * 1-5 python scripts/daily_update.py --all --force
+0 17 * * 1-5 python apps/ingest-databatcher/scripts/daily_update.py --all --force
 
 # 3. Daily: RS indicators (after daily_update, ~17:05)
-5 17 * * 1-5 python scripts/kr_rs_update.py --force
+5 17 * * 1-5 python apps/ingest-databatcher/scripts/kr_rs_update.py --force
 
 # 4. Daily: Minervini screening (after RS update, ~17:10)
-10 17 * * 1-5 python scripts/kr_minervini_update.py --days 7 --force
+10 17 * * 1-5 python apps/ingest-databatcher/scripts/kr_minervini_update.py --days 7 --force
 ```
 
 **US Stocks**:
 ```bash
 # 1. Weekly: Sync US symbol master
-0 2 * * 0 python scripts/us_sync_symbol_master.py
+0 2 * * 0 python apps/ingest-databatcher/scripts/us_sync_symbol_master.py
 
 # 2. Daily: Update US symbols (after market close, 16:00 ET + 30min = ~21:30 KST)
-0 22 * * 1-5 python scripts/us_daily_update.py --all --with-indicators
+0 22 * * 1-5 python apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators
 
 # 3. Daily: RS indicators (after us_daily_update, ~07:05 KST)
-5 7 * * 1-5 python scripts/us_rs_update.py --force
+5 7 * * 1-5 python apps/ingest-databatcher/scripts/us_rs_update.py --force
 
 # 4. Daily: Minervini screening (after RS update, ~07:10 KST)
-10 7 * * 1-5 python scripts/us_minervini_update.py --days 7 --force
+10 7 * * 1-5 python apps/ingest-databatcher/scripts/us_minervini_update.py --days 7 --force
 
 # 5. Weekly: Update US weekly data (Saturday morning ET / Saturday afternoon KST)
-0 10 * * 6 python scripts/us_weekly_update.py --all
+0 10 * * 6 python apps/ingest-databatcher/scripts/us_weekly_update.py --all
 ```
 
 **US Indices**:
 ```bash
 # 1. Weekly: Sync US index master (rarely changes, but safe to run)
-0 2 * * 0 python scripts/us_index_sync_master.py
+0 2 * * 0 python apps/ingest-databatcher/scripts/us_index_sync_master.py
 
 # 2. Daily: Update US indices (after US market close, ~07:00 KST)
-0 7 * * 1-5 python scripts/us_index_daily_update.py --all --force
+0 7 * * 1-5 python apps/ingest-databatcher/scripts/us_index_daily_update.py --all --force
 
 # 3. Weekly: Update US index weekly data (Saturday morning ET / Saturday afternoon KST)
-0 10 * * 6 python scripts/us_index_weekly_update.py --all
+0 10 * * 6 python apps/ingest-databatcher/scripts/us_index_weekly_update.py --all
 ```
 
 ## Future Enhancements (per 진행상황.md)
