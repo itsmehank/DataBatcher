@@ -76,8 +76,8 @@
 
 ### E. 거버넌스 최소셋 초안 완료
 
-- `docs/monorepo/codeowners-proposal.md`
-- `docs/monorepo/pr-checklist-template.md`
+- `docs/monorepo/codeowners-proposal.md` (참고용)
+- `docs/monorepo/pr-checklist-template.md` (참고용)
 
 ---
 
@@ -104,13 +104,12 @@
 - 외부 프로젝트 병합: 아직 시작하지 않음(의도적 보류)
 - DataBatcher 실제 코드 이관(`apps/ingest-databatcher`로 파일 이동): 완료
 - 운영 스크립트/핵심 문서 경로 교체: 1차 완료
-- `.github/CODEOWNERS` 실파일 반영: 완료(placeholder owner)
-- PR 템플릿 실파일 반영: 완료
+- `.github/CODEOWNERS` 실파일 반영: 개인 프로젝트 기준 미사용(삭제)
+- PR 템플릿 실파일 반영: 개인 프로젝트 기준 미사용(삭제)
 
-업데이트(2026-03-13):
+업데이트:
 
-- `.github/CODEOWNERS` 생성 완료(placeholder owner 사용)
-- `.github/PULL_REQUEST_TEMPLATE.md` 생성 완료
+- 개인 프로젝트 기준으로 `.github/CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`는 제거
 - `docs/monorepo/path-reference-inventory.md` 생성 완료
 
 실행 시작 전 확인 권장:
@@ -163,16 +162,18 @@ grep -RIn "apps/ingest-databatcher/scripts/\|core/\|collectors/\|indicators/\|sa
 
 주의: 과거 회고/분석 문서의 문자열은 false positive로 분리해 관리한다.
 
-### P3. 거버넌스 초안 실반영
+### P3. 거버넌스 적용 방식 결정
 
-- `docs/monorepo/codeowners-proposal.md`를 기반으로 `.github/CODEOWNERS` 생성
-- `docs/monorepo/pr-checklist-template.md`를 기반으로 `.github/PULL_REQUEST_TEMPLATE.md` 반영
+- 개인 프로젝트면 문서 템플릿만 유지하고 `.github/*` 적용은 생략
+- 팀 프로젝트로 전환 시 아래를 재적용
+  - `docs/monorepo/codeowners-proposal.md` 기반 `.github/CODEOWNERS`
+  - `docs/monorepo/pr-checklist-template.md` 기반 `.github/PULL_REQUEST_TEMPLATE.md`
 
-상태: 완료
+상태: 개인 프로젝트 기준 생략
 
-추가 후속:
+추가 후속(팀 전환 시):
 
-- placeholder owner(`@platform-owner` 등)를 실제 GitHub 사용자/팀으로 치환
+- CODEOWNERS owner를 실제 GitHub 사용자/팀으로 치환
 
 ---
 
