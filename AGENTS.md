@@ -12,8 +12,8 @@
 - 주요 런타임: Python + pandas + SQLAlchemy + PyMySQL
 - 데이터 소스: pykrx, FinanceDataReader, yfinance, Binance API
 - 엔트리포인트: `apps/ingest-databatcher/scripts/*.py` (일반적으로 CLI 스크립트 중심)
-- 구성 로딩: `core/config_loader.py`의 `load_settings()`
-- DB 엔진 관리: `core/db_manager.py`의 `DBManager` 싱글턴 패턴
+- 구성 로딩: `apps/ingest-databatcher/core/config_loader.py`의 `load_settings()`
+- DB 엔진 관리: `apps/ingest-databatcher/core/db_manager.py`의 `DBManager` 싱글턴 패턴
 
 ## 2) 환경/실행 전제
 - 가상환경 활성화 후 실행 권장
@@ -71,7 +71,7 @@
 - import 순서 권장:
   1) 표준 라이브러리
   2) 서드파티
-  3) 로컬 모듈(`core`, `collectors`, `indicators`, `savers`, `scripts`)
+  3) 로컬 모듈(`apps/ingest-databatcher/core`, `apps/ingest-databatcher/collectors`, `apps/ingest-databatcher/indicators`, `apps/ingest-databatcher/savers`, `apps/ingest-databatcher/scripts`)
 - 필요 시 스크립트에서 `ROOT` + `sys.path.insert(0, str(ROOT))` 패턴 사용 가능(기존 관례)
 - 부수효과 등록 import(예: 지표 registry) 허용:
   - `from indicators.common import sma as _reg_sma  # noqa: F401`
