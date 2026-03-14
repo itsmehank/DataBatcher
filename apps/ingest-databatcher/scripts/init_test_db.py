@@ -4,11 +4,11 @@ Initialize test database (trade_test) for DataBatcher.
 
 - Reads DATABASE_URL from environment or config, then replaces the DB name with 'trade_test'.
 - Creates the database if it doesn't exist.
-- Applies the same schema as init_db.py (docker/mysql/init/01_schema.sql).
+- Applies the same schema as init_db.py (db/init/01_schema.sql).
 - Safe to run multiple times (DDL uses IF NOT EXISTS).
 
 Usage:
-    python scripts/init_test_db.py
+    python apps/ingest-databatcher/scripts/init_test_db.py
 """
 from __future__ import annotations
 import re
@@ -21,7 +21,22 @@ sys.path.insert(0, str(ROOT))
 from scripts.init_db import load_database_url, read_sql_statements, apply_schema  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 
-SCHEMA_FILE = ROOT / "docker" / "mysql" / "init" / "01_schema.sql"
+
+
+def _resolve_schema_file() -> Path:
+    here = Path(__file__).resolve()
+    for p in [here.parent, *here.parents]:
+        cand = p / "db" / "init" / "01_schema.sql"
+        if cand.exists():
+            return cand
+    for p in [here.parent, *here.parents]:
+        cand = p / "docker" / "mysql" / "init" / "01_schema.sql"
+        if cand.exists():
+            return cand
+    raise SystemExit("01_schema.sql not found under db/init or docker/mysql/init")
+
+
+SCHEMA_FILE = _resolve_schema_file()
 TEST_DB_NAME = "trade_test"
 
 

@@ -1,6 +1,7 @@
 # core/config_loader.py
 from __future__ import annotations
 import os
+from pathlib import Path
 import yaml
 from typing import Any, Dict, Optional, Callable
 
@@ -29,6 +30,37 @@ def merge_dict(base: dict, override: dict) -> dict:
     return out
 
 
+def _candidate_config_paths() -> tuple[list[Path], list[Path]]:
+    """Return candidate config paths for base/dev in priority order.
+
+    Supports both:
+    - repo root style: config/settings*.yaml
+    - app-contained style: apps/ingest-databatcher/config/settings*.yaml
+    """
+    here = Path(__file__).resolve()
+    app_root = here.parents[1]
+    repo_root = here.parents[3]
+
+    base_candidates = [
+        repo_root / "config" / "settings.yaml",
+        app_root / "config" / "settings.yaml",
+        Path("config/settings.yaml"),
+    ]
+    dev_candidates = [
+        repo_root / "config" / "settings.dev.yaml",
+        app_root / "config" / "settings.dev.yaml",
+        Path("config/settings.dev.yaml"),
+    ]
+    return base_candidates, dev_candidates
+
+
+def _first_existing(paths: list[Path]) -> Optional[Path]:
+    for p in paths:
+        if p.exists():
+            return p
+    return None
+
+
 def load_settings() -> Dict[str, Any]:
     """Load configuration with the following precedence:
     1) Environment variable DATABASE_URL (overrides database.url)
@@ -41,15 +73,16 @@ def load_settings() -> Dict[str, Any]:
     if callable(load_dotenv):
         load_dotenv(override=False)
 
-    base_path = os.path.join("config", "settings.yaml")
-    dev_path = os.path.join("config", "settings.dev.yaml")
+    base_candidates, dev_candidates = _candidate_config_paths()
+    base_path = _first_existing(base_candidates)
+    dev_path = _first_existing(dev_candidates)
 
     cfg: Dict[str, Any] = {}
-    if os.path.exists(base_path):
-        cfg = _load_yaml(base_path)
+    if base_path is not None:
+        cfg = _load_yaml(str(base_path))
 
-    if os.path.exists(dev_path):
-        dev = _load_yaml(dev_path)
+    if dev_path is not None:
+        dev = _load_yaml(str(dev_path))
         # Optional include mechanism
         cfg = merge_dict(cfg, dev)
 
