@@ -1,21 +1,27 @@
 #!/bin/bash
 # ==============================================================================
-# daily_us.sh
+# daily_all.sh
 #
-# US 일일 업데이트 (US 지수/주식 + RS + Minervini)
+# 통합 Daily 실행용 래퍼(호환용)
+# - daily_kr.sh
+# - daily_us.sh
+# - daily_crypto.sh
+#
+# 사용법:
+#   cd /path/to/DataBatcher
+#   bash apps/ingest-databatcher/ops/shell/daily_all.sh
 # ==============================================================================
 
-if [ ! -f "apps/ingest-databatcher/scripts/us_daily_update.py" ]; then
+if [ ! -f "apps/ingest-databatcher/ops/shell/daily_kr.sh" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
-    echo "  bash shell_scripts/daily_us.sh"
+    echo "  bash apps/ingest-databatcher/ops/shell/daily_all.sh"
     exit 1
 fi
 
 TOTAL_SUCCESS=0
 TOTAL_FAIL=0
 SCRIPT_START=$(date +%s)
-PYTHON_BIN="${PYTHON_BIN:-python}"
 
 run_step() {
     local step_label="$1"
@@ -42,12 +48,14 @@ print_phase_header() {
     echo "============================================"
 }
 
-print_phase_header "US Daily: 지수/주식/RS/Minervini"
+print_phase_header "Phase 0: KR Daily"
+run_step "0-1" bash apps/ingest-databatcher/ops/shell/daily_kr.sh
 
-run_step "US-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_index_daily_update.py --all
-run_step "US-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators
-run_step "US-3" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_rs_update.py --days 7
-run_step "US-4" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_minervini_update.py --days 7
+print_phase_header "Phase 1: US Daily"
+run_step "1-1" bash apps/ingest-databatcher/ops/shell/daily_us.sh
+
+print_phase_header "Phase 2: Crypto Daily"
+run_step "2-1" bash apps/ingest-databatcher/ops/shell/daily_crypto.sh
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START ))
 TOTAL_MIN=$(( TOTAL_ELAPSED / 60 ))
@@ -55,7 +63,7 @@ TOTAL_SEC=$(( TOTAL_ELAPSED % 60 ))
 
 echo ""
 echo "============================================"
-echo " US Daily 업데이트 완료"
+echo " 전체 Daily 업데이트 완료 (통합 래퍼)"
 echo "============================================"
 echo "  성공: ${TOTAL_SUCCESS}"
 echo "  실패: ${TOTAL_FAIL}"

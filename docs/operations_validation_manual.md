@@ -8,7 +8,7 @@
 - 장애 복구 후 정상화 확인이 필요할 때
 
 ## 2) 사전 확인
-1. `scheduler/windows/scheduler.env`에 아래 키가 있는지 확인
+1. `apps/ingest-databatcher/ops/scheduler/windows/scheduler.env`에 아래 키가 있는지 확인
    - `BATCH_PYTHON_EXE`
    - `SCHEDULER_PYTHON_EXE` (선택)
    - `GIT_BASH_EXE`
@@ -22,10 +22,10 @@
 아래 명령은 프로젝트 루트에서 실행합니다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\run_daily.ps1 -Target KR
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\run_daily.ps1 -Target US
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\run_weekly.ps1
-powershell -ExecutionPolicy Bypass -File .\scheduler\windows\cleanup_logs.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\run_daily.ps1 -Target KR
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\run_daily.ps1 -Target US
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\run_weekly.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\ingest-databatcher\ops\scheduler\windows\cleanup_logs.ps1
 ```
 
 ## 4) 로그/알림 확인

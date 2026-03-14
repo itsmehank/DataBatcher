@@ -6,11 +6,11 @@ KR/US/Crypto 데이터를 배치로 수집하고 지표를 계산해 MySQL에 �
 - KR 주식/ETF, US 주식/ETF, KR/US 지수, Crypto(Binance Spot) 데이터 수집
 - 일봉/주봉 가격 적재 + 지표 계산(SMA 등)
 - RS/Minervini 관련 후처리 스크립트 지원
-- `apps/ingest-databatcher/scripts/` 단위 실행과 `shell_scripts/` 통합 실행 래퍼 제공
+- `apps/ingest-databatcher/scripts/` 단위 실행과 `apps/ingest-databatcher/ops/shell/` 통합 실행 래퍼 제공
 
 ## 프로젝트 구조
 - `apps/ingest-databatcher/scripts/`: 시장별 수집/업데이트/초기화 엔트리포인트
-- `shell_scripts/`: bulk/daily/weekly 통합 실행 스크립트
+- `apps/ingest-databatcher/ops/shell/`: bulk/daily/weekly 통합 실행 스크립트
 - `apps/ingest-databatcher/core/`, `apps/ingest-databatcher/collectors/`, `apps/ingest-databatcher/indicators/`, `apps/ingest-databatcher/savers/`: 핵심 로직
 - `config/`: 런타임 설정(`settings.yaml`, `settings.dev.yaml`)
 - `docker/`: 로컬 MySQL 구성
@@ -33,7 +33,7 @@ docker compose -f docker/docker-compose.yml up -d
 
 `mysql-standalone/docker-compose-mysql.yaml`을 사용할 때도 동일하게 **루트 `.env`만** 사용합니다.
 
-MySQL 월간 백업/복구는 `shell_scripts/db_backup_monthly.sh`, `shell_scripts/db_restore_full.sh`를 사용하세요.
+MySQL 월간 백업/복구는 `apps/ingest-databatcher/ops/shell/db_backup_monthly.sh`, `apps/ingest-databatcher/ops/shell/db_restore_full.sh`를 사용하세요.
 
 ### 3) 스키마 초기화
 ```bash
@@ -80,36 +80,36 @@ database:
 - 운영 DB로 실행:
   ```bash
   export DATABASE_URL="mysql+pymysql://user:pass@127.0.0.1:3306/market?charset=utf8mb4"
-  bash shell_scripts/daily_all.sh
+  bash apps/ingest-databatcher/ops/shell/daily_all.sh
   ```
 - 테스트 DB로 실행:
   ```bash
   export DATABASE_URL="mysql+pymysql://user:pass@127.0.0.1:3306/trade_test?charset=utf8mb4"
-  bash shell_scripts/daily_all.sh
+  bash apps/ingest-databatcher/ops/shell/daily_all.sh
   ```
 
 ## 실행 가이드
 ### Bulk (초기 대량 적재)
 ```bash
-bash shell_scripts/bulk_all.sh
+bash apps/ingest-databatcher/ops/shell/bulk_all.sh
 ```
 - 전체 시장을 순차 실행
 - 재실행 안전성 확보를 위해 insert-only 정책 사용
 
 경량 점검용:
 ```bash
-bash shell_scripts/bulk_all_test.sh
+bash apps/ingest-databatcher/ops/shell/bulk_all_test.sh
 ```
 
 ### Daily (일일 증분)
 ```bash
-bash shell_scripts/daily_all.sh
+bash apps/ingest-databatcher/ops/shell/daily_all.sh
 ```
 - 내부적으로 KR/US/Crypto 일일 업데이트를 순서대로 수행
 
 ### Weekly (주간 증분)
 ```bash
-bash shell_scripts/weekly_all.sh
+bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 ```
 - 종목 마스터 동기화 + 지수/주식/Crypto 주봉 업데이트 수행
 

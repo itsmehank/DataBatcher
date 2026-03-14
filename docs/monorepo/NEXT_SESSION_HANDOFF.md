@@ -128,7 +128,7 @@
 목표: 남은 구경로 참조를 재분류해 잔여 수정 범위를 확정
 
 - 검색 대상
-  - `shell_scripts/`
+  - `apps/ingest-databatcher/ops/shell/`
   - `scheduler/`
   - `README.md`, `docs/`
   - 테스트/CI 설정 파일

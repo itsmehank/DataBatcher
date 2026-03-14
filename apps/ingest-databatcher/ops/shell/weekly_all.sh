@@ -7,7 +7,7 @@
 #
 # 사용법:
 #   cd /path/to/DataBatcher
-#   bash shell_scripts/weekly_all.sh
+#   bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 #
 # 주의:
 #   - 주 1회 실행 권장 (토요일 또는 일요일)
@@ -22,7 +22,7 @@
 if [ ! -f "apps/ingest-databatcher/scripts/weekly_update.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
-    echo "  bash shell_scripts/weekly_all.sh"
+    echo "  bash apps/ingest-databatcher/ops/shell/weekly_all.sh"
     exit 1
 fi
 

@@ -8,7 +8,7 @@
 if [ ! -f "apps/ingest-databatcher/scripts/crypto_daily_update.py" ]; then
     echo "Error: 프로젝트 루트 디렉토리에서 실행해주세요."
     echo "  cd /path/to/DataBatcher"
-    echo "  bash shell_scripts/daily_crypto.sh"
+    echo "  bash apps/ingest-databatcher/ops/shell/daily_crypto.sh"
     exit 1
 fi
 

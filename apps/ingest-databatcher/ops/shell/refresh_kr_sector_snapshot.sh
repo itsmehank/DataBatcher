@@ -7,7 +7,7 @@
 #
 # 사용법:
 #   cd /path/to/DataBatcher
-#   bash shell_scripts/refresh_kr_sector_snapshot.sh --days 30
+#   bash apps/ingest-databatcher/ops/shell/refresh_kr_sector_snapshot.sh --days 30
 #
 # 인자:
 #   --days <N>   처리할 최근 거래일 개수 (양의 정수, 필수)
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: bash shell_scripts/refresh_kr_sector_snapshot.sh --days <N>"
+    echo "Usage: bash apps/ingest-databatcher/ops/shell/refresh_kr_sector_snapshot.sh --days <N>"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

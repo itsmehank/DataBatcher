@@ -28,8 +28,8 @@ ENV/
 .env.*
 !.env.example
 apps/ingest-databatcher/config/settings.dev.yaml
-scheduler/windows/scheduler.env
-!scheduler/windows/scheduler.env.example
+apps/ingest-databatcher/ops/scheduler/windows/scheduler.env
+!apps/ingest-databatcher/ops/scheduler/windows/scheduler.env.example
 
 # Logs
 logs/

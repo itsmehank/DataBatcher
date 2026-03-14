@@ -2,7 +2,7 @@
 
 ## 개요
 
-`shell_scripts/bulk_all.sh`는 DataBatcher의 **모든 시장 데이터를 한 번에 수집**하는 셸 스크립트입니다.
+`apps/ingest-databatcher/ops/shell/bulk_all.sh`는 DataBatcher의 **모든 시장 데이터를 한 번에 수집**하는 셸 스크립트입니다.
 
 **대상 시장**: KR 주식, US 주식, Crypto, KR 지수, US 지수
 **수집 기간**: KR/US = 2020-01-01 ~ 어제, Crypto = 2017-01-01 ~ 어제
@@ -22,7 +22,7 @@
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/bulk_all.sh
+bash apps/ingest-databatcher/ops/shell/bulk_all.sh
 ```
 
 ---
@@ -92,7 +92,7 @@ bash shell_scripts/bulk_all.sh
 
 ```bash
 cd /path/to/DataBatcher
-bash shell_scripts/bulk_all_test.sh
+bash apps/ingest-databatcher/ops/shell/bulk_all_test.sh
 ```
 
 ### 본 실행과 비교
