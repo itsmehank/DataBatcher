@@ -11,7 +11,11 @@
 아래 명령으로 참조 후보를 추출했다.
 
 ```bash
-rg -n "apps/ingest-databatcher/scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts scheduler docs README.md tests scripts --glob '*.{md,sh,py,yml,yaml,bat,ps1}'
+# 운영 영향 파일(실행 경로 영향)
+rg -n "python scripts/|python apps/ingest-databatcher/scripts/|shell_scripts/|scheduler/" README.md AGENTS.md shell_scripts scheduler mysql-standalone/README.md
+
+# 문서/가이드(운영 영향 낮음)
+rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 ```
 
 초기 매치 수: **421**
@@ -55,10 +59,14 @@ rg -n "apps/ingest-databatcher/scripts/|core/|collectors/|indicators/|savers/|co
 - 레거시 래퍼를 두지 않으므로 호출부를 직접 수정
 - 교체 후 재검색으로 잔여 참조를 확인
 
-검증 명령:
+검증 명령(범위 분리):
 
 ```bash
-rg -n "apps/ingest-databatcher/scripts/|core/|collectors/|indicators/|savers/|config/" shell_scripts scheduler docs README.md tests scripts --glob '*.{md,sh,py,yml,yaml,bat,ps1}'
+# 1) 운영 영향 파일은 구경로 0건을 목표로 한다.
+rg -n "python scripts/|\"scripts/|`scripts/" README.md AGENTS.md shell_scripts scheduler mysql-standalone/README.md
+
+# 2) docs/guides는 실행 영향 여부에 따라 순차 정리한다.
+rg -n "scripts/|core/|collectors/|indicators/|savers/|config/" docs guides
 ```
 
 주의:
