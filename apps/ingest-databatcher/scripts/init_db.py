@@ -2,7 +2,7 @@
 """
 Initialize database schema for DataBatcher.
 
-- Loads DATABASE_URL from environment first. If not set, tries config/settings.dev.yaml then config/settings.yaml.
+- Loads DATABASE_URL from environment first. If not set, tries apps/ingest-databatcher/config/settings.dev.yaml then apps/ingest-databatcher/config/settings.yaml.
 - Applies SQL statements from db/init/01_schema.sql (legacy docker/mysql/init fallback).
 - Safe to run multiple times (DDL uses IF NOT EXISTS).
 

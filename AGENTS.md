@@ -18,7 +18,7 @@
 ## 2) 환경/실행 전제
 - 가상환경 활성화 후 실행 권장
 - 의존성 설치: `pip install -r requirements.txt`
-- DB 연결 정보는 `DATABASE_URL` 또는 `config/settings*.yaml` 사용
+- DB 연결 정보는 `DATABASE_URL` 또는 `apps/ingest-databatcher/config/settings*.yaml` 사용
 - 로컬 DB는 보통 Docker Compose 사용: `docker compose -f docker/docker-compose.yml up -d`
 - 스키마 초기화: `python apps/ingest-databatcher/scripts/init_db.py`
 
@@ -126,8 +126,8 @@
 - 마켓/심볼 필터 옵션(`--all`, `--symbols`, `--market`, `--top`) 패턴 재사용
 
 ## 8) 설정 파일 규칙
-- 기본 설정: `config/settings.yaml`
-- 개발 오버레이: `config/settings.dev.yaml` (존재 시 merge)
+- 기본 설정: `apps/ingest-databatcher/config/settings.yaml`
+- 개발 오버레이: `apps/ingest-databatcher/config/settings.dev.yaml` (존재 시 merge)
 - 환경 변수 `DATABASE_URL`이 DB URL 우선순위 최상위
 - 민감정보는 코드 하드코딩 금지, `.env` 또는 환경변수 사용
 

@@ -32,7 +32,7 @@ EXCLUDED_DIRS = {
 SAFE_LOCAL_FILES = {
     ".env",
     ".env.example",
-    "config/settings.dev.yaml",
+    "apps/ingest-databatcher/config/settings.dev.yaml",
 }
 
 SENSITIVE_FILE_RULES = [

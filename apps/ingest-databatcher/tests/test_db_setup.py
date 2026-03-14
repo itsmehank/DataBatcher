@@ -33,8 +33,8 @@ def load_base_database_url() -> str:
 
     Precedence:
       1) Environment variable DATABASE_URL (after optional .env load)
-      2) config/settings.dev.yaml
-      3) config/settings.yaml
+      2) apps/ingest-databatcher/config/settings.dev.yaml
+      3) apps/ingest-databatcher/config/settings.yaml
     """
     if load_dotenv is not None:
         load_dotenv(override=False)

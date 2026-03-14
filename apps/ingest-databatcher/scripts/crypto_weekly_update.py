@@ -14,7 +14,7 @@
 대상 심볼 결정 우선순위
 1) --all 지정: crypto_symbol_master ACTIVE 전체
 2) --symbols 지정: 해당 심볼만
-3) 둘 다 없으면: config/settings.yaml 의 crypto.targets.symbols
+3) 둘 다 없으면: apps/ingest-databatcher/config/settings.yaml 의 crypto.targets.symbols
 
 저장 정책
 - 가격: crypto_prices_weekly insert_only
@@ -127,7 +127,7 @@ def main(argv=None) -> int:
 
     if not symbols:
         print(
-            "Error: 처리할 crypto 심볼이 없습니다. --all 또는 --symbols를 지정하거나, config/settings.yaml의 crypto.targets.symbols를 채워주세요.",
+            "Error: 처리할 crypto 심볼이 없습니다. --all 또는 --symbols를 지정하거나, apps/ingest-databatcher/config/settings.yaml의 crypto.targets.symbols를 채워주세요.",
             file=sys.stderr,
         )
         return 2

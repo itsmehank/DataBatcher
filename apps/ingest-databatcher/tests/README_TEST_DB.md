@@ -95,7 +95,7 @@ All test files have been updated to use the test database:
 ### Production Database (Unchanged)
 
 - Database: `market`
-- Configured in: `config/settings.dev.yaml` or `config/settings.yaml`
+- Configured in: `apps/ingest-databatcher/config/settings.dev.yaml` or `apps/ingest-databatcher/config/settings.yaml`
 - Used by: Production scripts (`bulk_update.py`, `daily_update.py`, etc.)
 
 ### Test Database (New)

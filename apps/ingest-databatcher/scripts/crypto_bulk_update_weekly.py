@@ -97,7 +97,7 @@ def main(argv=None) -> int:
 
     if not symbols:
         print(
-            "Error: 처리할 crypto 심볼이 없습니다. --all 또는 --symbols를 지정하거나, config/settings.yaml의 crypto.targets.symbols를 채워주세요.",
+            "Error: 처리할 crypto 심볼이 없습니다. --all 또는 --symbols를 지정하거나, apps/ingest-databatcher/config/settings.yaml의 crypto.targets.symbols를 채워주세요.",
             file=sys.stderr,
         )
         return 2

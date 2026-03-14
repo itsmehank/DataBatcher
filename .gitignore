@@ -27,7 +27,7 @@ ENV/
 .env
 .env.*
 !.env.example
-config/settings.dev.yaml
+apps/ingest-databatcher/config/settings.dev.yaml
 scheduler/windows/scheduler.env
 !scheduler/windows/scheduler.env.example
 
