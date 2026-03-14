@@ -8,7 +8,7 @@ This directory is a standalone MySQL project extracted from the original Grafana
 - `../.env.example`: Root environment template (single source of truth)
 - `mysql/my.cnf`: MySQL server configuration
 - `mysql/init/setup.sh`: Extra bootstrap for `${MYSQL_DATABASE}_test` grants
-- `../docker/mysql/init/01_schema.sql`: DataBatcher main schema (mounted into init dir)
+- `../db/init/01_schema.sql`: DataBatcher main schema (mounted into init dir)
 
 ## Quick Start
 

@@ -3,7 +3,7 @@
 Initialize database schema for DataBatcher.
 
 - Loads DATABASE_URL from environment first. If not set, tries config/settings.dev.yaml then config/settings.yaml.
-- Applies SQL statements from docker/mysql/init/01_schema.sql.
+- Applies SQL statements from db/init/01_schema.sql (legacy docker/mysql/init fallback).
 - Safe to run multiple times (DDL uses IF NOT EXISTS).
 
 Note:
@@ -31,10 +31,14 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 def _resolve_schema_file() -> Path:
     here = Path(__file__).resolve()
     for p in [here.parent, *here.parents]:
+        cand = p / "db" / "init" / "01_schema.sql"
+        if cand.exists():
+            return cand
+    for p in [here.parent, *here.parents]:
         cand = p / "docker" / "mysql" / "init" / "01_schema.sql"
         if cand.exists():
             return cand
-    raise SystemExit("01_schema.sql not found under docker/mysql/init")
+    raise SystemExit("01_schema.sql not found under db/init or docker/mysql/init")
 
 
 SCHEMA_FILE = _resolve_schema_file()
