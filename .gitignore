@@ -1,0 +1,32 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Backup exports
+backups/
+*.archive.gz
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local temp files
+tmp/
+*.tmp
