@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import logging
 
 from fastapi import FastAPI
@@ -8,9 +9,17 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from .config import settings
+from .db import verify_db_connection
 from .routers import chart_router, minervini_router, options_router
 
-app = FastAPI(title="Minervini LWC API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if settings.startup_db_check:
+        verify_db_connection()
+    yield
+
+app = FastAPI(title="Minervini LWC API", version="0.1.0", lifespan=lifespan)
 logger = logging.getLogger(__name__)
 
 app.add_middleware(

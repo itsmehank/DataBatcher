@@ -13,6 +13,7 @@ os.environ.setdefault(
     "mysql+pymysql://test_user:test_password@127.0.0.1:3306/test_db?charset=utf8mb4",
 )
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
+os.environ.setdefault("STARTUP_DB_CHECK", "false")
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
