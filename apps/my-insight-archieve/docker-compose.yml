@@ -1,7 +1,7 @@
 services:
   mongodb:
     image: mongo:7
-    container_name: insight-archive-mongodb
+    container_name: ${INSIGHT_ARCHIVE_STACK:-insight-archive}-mongodb
     restart: unless-stopped
     env_file:
       - .env
@@ -10,14 +10,14 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB}
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongo_data:/data/db
 
   backend:
     build:
       context: ./backend
-    container_name: insight-archive-backend
+    container_name: ${INSIGHT_ARCHIVE_STACK:-insight-archive}-backend
     restart: unless-stopped
     depends_on:
       - mongodb
@@ -40,7 +40,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: insight-archive-frontend
+    container_name: ${INSIGHT_ARCHIVE_STACK:-insight-archive}-frontend
     restart: unless-stopped
     depends_on:
       - backend
