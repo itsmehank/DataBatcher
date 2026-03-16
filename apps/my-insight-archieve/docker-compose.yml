@@ -1,0 +1,55 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: insight-archive-mongodb
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+    container_name: insight-archive-backend
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    env_file:
+      - .env
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT}
+      MONGODB_URI: ${MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      BACKUP_DIR: ${BACKUP_DIR}
+      BACKUP_FILE_NAME: ${BACKUP_FILE_NAME}
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    volumes:
+      - ./backups:/app/backups
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: insight-archive-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  mongo_data:
