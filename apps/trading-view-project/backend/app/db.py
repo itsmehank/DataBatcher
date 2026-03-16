@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import SQLAlchemyError
 
 from .config import settings
 
@@ -32,6 +33,14 @@ def execute_write(sql: str, params: dict[str, Any] | None = None) -> int:
     with engine.begin() as conn:
         result = conn.execute(text(sql), params or {})
         return result.rowcount or 0
+
+
+def verify_db_connection() -> None:
+    try:
+        with get_conn() as conn:
+            conn.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        raise RuntimeError("Database connection failed. Check DATABASE_URL and DB reachability.") from exc
 
 
 def normalize_row(value: Any) -> Any:

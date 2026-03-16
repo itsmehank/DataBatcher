@@ -9,10 +9,14 @@ from dotenv import load_dotenv
 def _load_env_files() -> None:
     here = Path(__file__).resolve()
     backend_root = here.parents[1]
-    repo_root = here.parents[3]
 
     load_dotenv(backend_root / ".env", override=False)
-    load_dotenv(repo_root / ".env", override=False)
+
+    for parent in here.parents:
+        candidate = parent / ".env"
+        if candidate.exists():
+            load_dotenv(candidate, override=False)
+            break
 
 
 _load_env_files()
@@ -26,6 +30,12 @@ class Settings:
             for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
             if origin.strip()
         ]
+        self.startup_db_check = os.getenv("STARTUP_DB_CHECK", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
         if not self.database_url:
             raise ValueError("DATABASE_URL is required")
