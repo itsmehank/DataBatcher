@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { api, getToken } from '../../../lib/api';
+import { api } from '../../../lib/api';
 import { isUnauthorizedError } from '../../../lib/errors';
 import type { Template } from '../../../types/template';
 
@@ -33,7 +33,7 @@ type UseTemplatesDataResult = {
   setIsDrawerOpen: Dispatch<SetStateAction<boolean>>;
 };
 
-export function useTemplatesData(): UseTemplatesDataResult {
+export function useTemplatesData(isAuthenticated: boolean): UseTemplatesDataResult {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [feedback, setFeedback] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -83,7 +83,7 @@ export function useTemplatesData(): UseTemplatesDataResult {
   }, []);
 
   function onRequestCreate() {
-    if (!getToken()) {
+    if (!isAuthenticated) {
       setNeedsLoginHint(true);
       setFeedback('새 문장 템플릿은 로그인 후 남길 수 있습니다.');
       return;

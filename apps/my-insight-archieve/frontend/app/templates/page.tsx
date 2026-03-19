@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '../../lib/use-auth';
 import TemplateListSection from '../../features/templates/components/template-list-section';
 import TemplateSkeleton from '../../features/templates/components/template-skeleton';
 import TemplatesComposerDrawer from '../../features/templates/components/templates-composer-drawer';
@@ -10,6 +11,8 @@ import { useTemplatesData } from '../../features/templates/hooks/use-templates-d
 import { useTemplatesFilters } from '../../features/templates/hooks/use-templates-filters';
 
 export default function TemplatesPage() {
+  const { isAuthenticated } = useAuth();
+
   const {
     templates,
     feedback,
@@ -26,7 +29,7 @@ export default function TemplatesPage() {
     onCopy,
     onCancelCreate,
     setIsDrawerOpen,
-  } = useTemplatesData();
+  } = useTemplatesData(isAuthenticated);
 
   const { query, setQuery, useCaseFilter, setUseCaseFilter, useCaseOptions, filteredTemplates, resetFilters } =
     useTemplatesFilters(templates);

@@ -1,6 +1,6 @@
 'use client';
 
-import { api, getToken } from '../lib/api';
+import { api } from '../lib/api';
 import { isUnauthorizedError } from '../lib/errors';
 import { useAuth } from '../lib/use-auth';
 import ArchiveComposerDrawer from '../features/archive/components/archive-composer-drawer';
@@ -14,6 +14,8 @@ import { useArchiveFilters } from '../features/archive/hooks/use-archive-filters
 import { useCardDeleteMode } from '../features/archive/hooks/use-card-delete-mode';
 
 export default function HomePage() {
+  const { isAuthenticated, username } = useAuth();
+
   const {
     categories,
     entries,
@@ -35,7 +37,7 @@ export default function HomePage() {
     setErrorMessage,
     setFeedback,
     setNeedsLoginHint,
-  } = useArchiveData();
+  } = useArchiveData(isAuthenticated);
 
   const {
     searchQuery,
@@ -53,8 +55,6 @@ export default function HomePage() {
     resetFilters,
   } = useArchiveFilters(entries);
 
-  const { username } = useAuth();
-
   const {
     deleteModeEntryId,
     deletingEntryId,
@@ -67,7 +67,7 @@ export default function HomePage() {
   } = useCardDeleteMode();
 
   async function onDeleteEntry(entryId: string) {
-    if (!getToken()) {
+    if (!isAuthenticated) {
       setNeedsLoginHint(true);
       setFeedback('삭제는 로그인 후 사용할 수 있습니다.');
       return;

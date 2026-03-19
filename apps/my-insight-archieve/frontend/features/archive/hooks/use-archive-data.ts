@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { api, getToken } from '../../../lib/api';
+import { api } from '../../../lib/api';
 import { isUnauthorizedError } from '../../../lib/errors';
 import type { Category } from '../../../types/category';
 import type { Entry } from '../../../types/entry';
@@ -40,7 +40,7 @@ type UseArchiveDataResult = {
   setNeedsLoginHint: Dispatch<SetStateAction<boolean>>;
 };
 
-export function useArchiveData(): UseArchiveDataResult {
+export function useArchiveData(isAuthenticated: boolean): UseArchiveDataResult {
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [feedback, setFeedback] = useState('');
@@ -107,7 +107,7 @@ export function useArchiveData(): UseArchiveDataResult {
   }, []);
 
   function onRequestCreate() {
-    if (!getToken()) {
+    if (!isAuthenticated) {
       setNeedsLoginHint(true);
       setFeedback('기록 남기기는 관리자 로그인 후 사용할 수 있습니다.');
       return;
