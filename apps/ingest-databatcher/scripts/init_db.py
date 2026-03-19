@@ -28,16 +28,19 @@ from sqlalchemy.engine import Engine
 APP_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _resolve_schema_file() -> Path:
+def _resolve_schema_files() -> List[Path]:
+    """Find all numbered SQL files in db/init/ (01_schema.sql, 02_auth_schema.sql, ...)."""
     here = Path(__file__).resolve()
     for p in [here.parent, *here.parents]:
-        cand = p / "db" / "init" / "01_schema.sql"
-        if cand.exists():
-            return cand
-    raise SystemExit("01_schema.sql not found under db/init")
+        init_dir = p / "db" / "init"
+        if init_dir.is_dir():
+            files = sorted(init_dir.glob("[0-9][0-9]_*.sql"))
+            if files:
+                return files
+    raise SystemExit("No schema SQL files found under db/init/")
 
 
-SCHEMA_FILE = _resolve_schema_file()
+SCHEMA_FILES = _resolve_schema_files()
 
 
 def load_database_url() -> str:
@@ -93,9 +96,6 @@ def apply_schema(engine: Engine, sql_stmts: List[str]) -> None:
 
 def main():
     print("[init_db] starting...")
-    if not SCHEMA_FILE.exists():
-        print(f"Schema file not found: {SCHEMA_FILE}", file=sys.stderr)
-        sys.exit(1)
     db_url = load_database_url()
     safe_url = db_url
     if "@" in safe_url and "://" in safe_url:
@@ -109,10 +109,14 @@ def main():
             pass
     print(f"[init_db] using DATABASE_URL: {safe_url}")
     engine = get_engine(db_url)
-    stmts = read_sql_statements(SCHEMA_FILE)
-    print(f"[init_db] applying {len(stmts)} statements from {SCHEMA_FILE.name}...")
-    apply_schema(engine, stmts)
-    print("[init_db] done.")
+    for sql_file in SCHEMA_FILES:
+        if not sql_file.exists():
+            print(f"Schema file not found: {sql_file}", file=sys.stderr)
+            sys.exit(1)
+        stmts = read_sql_statements(sql_file)
+        print(f"[init_db] applying {len(stmts)} statements from {sql_file.name}...")
+        apply_schema(engine, stmts)
+    print(f"[init_db] done. Applied {len(SCHEMA_FILES)} schema file(s).")
 
 
 if __name__ == "__main__":

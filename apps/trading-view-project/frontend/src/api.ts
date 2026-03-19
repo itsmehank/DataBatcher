@@ -42,6 +42,7 @@ async function requestJson<T>(
     headers: options?.body ? { "Content-Type": "application/json" } : undefined,
     body: options?.body ? JSON.stringify(options.body) : undefined,
     signal: options?.signal,
+    credentials: "include",
   });
   if (!res.ok) {
     throw new Error(await parseErrorMessage(res));
@@ -96,4 +97,14 @@ export const api = {
     requestJson<ChartPayload>("/api/chart/benchmark-daily", { params: { region, from, to }, signal }),
   getWeekly: (region: Region, symbol: string, from: string, to: string, signal?: AbortSignal) =>
     requestJson<ChartPayload>("/api/chart/weekly", { params: { region, symbol, from, to }, signal }),
+};
+
+export const authApi = {
+  login: (username: string, password: string) =>
+    requestJson<{ ok: boolean; username: string; role: string }>("/api/auth/login", {
+      method: "POST",
+      body: { username, password },
+    }),
+  logout: () => requestJson<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
+  me: () => requestJson<{ authenticated: boolean; username?: string; role?: string }>("/api/auth/me"),
 };

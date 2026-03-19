@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from ..auth.dependencies import require_editor
 from ..common import category_expr, parse_date, parse_region_key
 from ..db import execute_write, fetch_all, normalize_row
 from ..query_maps import get_region_tables
@@ -87,7 +88,10 @@ def get_minervini(
 
 
 @router.post("/api/minervini/list-type")
-def update_minervini_list_type(payload: ListTypeUpdateRequest) -> dict[str, Any]:
+def update_minervini_list_type(
+    payload: ListTypeUpdateRequest,
+    _user: dict[str, Any] = Depends(require_editor),
+) -> dict[str, Any]:
     region_key = parse_region_key(payload.region)
     parsed_date = parse_date(payload.date, datetime.now(UTC).date())
     _ensure_minervini_exists(region_key, parsed_date, payload.market, payload.symbol)
@@ -190,7 +194,10 @@ def get_list_view_items(
 
 
 @router.patch("/api/list-view/item")
-def update_list_view_item(payload: ListViewItemUpdateRequest) -> dict[str, Any]:
+def update_list_view_item(
+    payload: ListViewItemUpdateRequest,
+    _user: dict[str, Any] = Depends(require_editor),
+) -> dict[str, Any]:
     region_key = parse_region_key(payload.region)
     parsed_date = parse_date(payload.date, datetime.now(UTC).date())
 

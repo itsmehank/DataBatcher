@@ -36,6 +36,16 @@ class Settings:
             "yes",
             "on",
         }
+        self.secret_key = os.getenv("SECRET_KEY", "")
+        self.access_token_expire_minutes = int(
+            os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+        )
+        self.cookie_secure = os.getenv("COOKIE_SECURE", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
         if not self.database_url:
             raise ValueError("DATABASE_URL is required")

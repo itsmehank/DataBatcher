@@ -67,6 +67,25 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
+### 1.5) 인증 설정 (선택)
+
+인증 기능을 사용하려면:
+
+```bash
+# 1. users 테이블 생성 (DB에 직접 실행하거나 init 스크립트 사용)
+mysql -u root -p < db/init/02_auth_schema.sql
+
+# 2. .env에 SECRET_KEY 설정
+echo 'SECRET_KEY=your-random-secret-key-at-least-32-chars' >> apps/trading-view-project/backend/.env
+
+# 3. 사용자 생성
+cd apps/trading-view-project/backend
+source .venv/bin/activate
+python -m scripts.create_user --username admin --password yourpassword --role editor
+```
+
+인증 미설정 시에도 모든 읽기 API는 정상 동작합니다. 쓰기 API만 401을 반환합니다.
+
 ### 2) 프론트엔드 실행
 
 ```bash

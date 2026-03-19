@@ -1,3 +1,4 @@
+import { useAuth } from "../auth/AuthContext";
 import type { ListType, MinerviniRow } from "../types";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export default function MinerviniTable({ rows, selectedSymbol, onSelectTicker, onChangeListType, savingKeys }: Props) {
+  const { isEditor } = useAuth();
   return (
     <section className="panel table-panel">
       <div className="panel-header">
@@ -45,7 +47,7 @@ export default function MinerviniTable({ rows, selectedSymbol, onSelectTicker, o
                   <select
                     value={row.list_type ?? ""}
                     onChange={(e) => onChangeListType(row, (e.target.value || null) as ListType | null)}
-                    disabled={savingKeys[`${row.ticker}:${row.market}`]}
+                    disabled={!isEditor || savingKeys[`${row.ticker}:${row.market}`]}
                   >
                     <option value="">(none)</option>
                     <option value="focus">focus</option>
