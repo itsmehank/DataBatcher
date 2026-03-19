@@ -9,10 +9,11 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB}
-    ports:
-      - "${MONGO_PORT:-27017}:27017"
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
     volumes:
       - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
 
   backend:
     build:
@@ -24,6 +25,7 @@ services:
     env_file:
       - .env
     environment:
+      NODE_ENV: ${NODE_ENV:-development}
       BACKEND_PORT: ${BACKEND_PORT}
       MONGODB_URI: ${MONGODB_URI}
       JWT_SECRET: ${JWT_SECRET}
@@ -32,6 +34,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       BACKUP_DIR: ${BACKUP_DIR}
       BACKUP_FILE_NAME: ${BACKUP_FILE_NAME}
+      CORS_ORIGIN: ${CORS_ORIGIN}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:
