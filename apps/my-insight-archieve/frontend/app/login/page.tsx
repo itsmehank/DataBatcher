@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
-import { setAuthToken, useAuth } from '../../lib/use-auth';
+import { useAuth } from '../../lib/use-auth';
 import type { LoginResponse } from '../../types/auth';
 
 export default function LoginPage() {
@@ -31,7 +31,6 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       });
-      setAuthToken(result.accessToken);
       await refreshAuth();
       setMessage(`로그인 완료: ${result.admin.username}`);
       router.replace('/');
@@ -41,8 +40,8 @@ export default function LoginPage() {
     }
   }
 
-  function onLogout() {
-    logout();
+  async function onLogout() {
+    await logout();
     setMessage('로그아웃되었습니다.');
   }
 
@@ -70,7 +69,7 @@ export default function LoginPage() {
             <button type="button" onClick={() => router.replace('/')}>
               아카이브로 이동
             </button>
-            <button type="button" className="secondary" onClick={onLogout} style={{ maxWidth: 140 }}>
+            <button type="button" className="secondary" onClick={() => onLogout().catch(() => undefined)} style={{ maxWidth: 140 }}>
               로그아웃
             </button>
           </div>
@@ -107,7 +106,7 @@ export default function LoginPage() {
           />
           <div className="actions">
             <button type="submit">로그인하고 이어쓰기</button>
-            <button type="button" className="secondary" onClick={onLogout} style={{ maxWidth: 140 }}>
+            <button type="button" className="secondary" onClick={() => onLogout().catch(() => undefined)} style={{ maxWidth: 140 }}>
               로그아웃
             </button>
           </div>

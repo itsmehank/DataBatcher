@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { EntriesModule } from './entries/entries.module';
@@ -19,6 +20,7 @@ import { Category, CategorySchema } from './categories/category.schema';
       { name: Admin.name, schema: AdminSchema },
       { name: Category.name, schema: CategorySchema },
     ]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
     AuthModule,
     CategoriesModule,
     EntriesModule,
