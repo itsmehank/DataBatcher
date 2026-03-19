@@ -10,13 +10,18 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .config import settings
 from .db import verify_db_connection
-from .routers import chart_router, minervini_router, options_router
+from .routers import auth_router, chart_router, minervini_router, options_router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if settings.startup_db_check:
         verify_db_connection()
+    if settings.cookie_secure and any("localhost" in o or "127.0.0.1" in o for o in settings.allowed_origins):
+        logging.getLogger(__name__).warning(
+            "COOKIE_SECURE=true but ALLOWED_ORIGINS contains localhost. "
+            "Set ALLOWED_ORIGINS to your production domain."
+        )
     yield
 
 app = FastAPI(title="Minervini LWC API", version="0.1.0", lifespan=lifespan)
@@ -33,6 +38,7 @@ app.add_middleware(
 app.include_router(options_router)
 app.include_router(minervini_router)
 app.include_router(chart_router)
+app.include_router(auth_router)
 
 
 @app.exception_handler(ValueError)

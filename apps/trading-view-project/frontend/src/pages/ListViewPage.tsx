@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../auth/AuthContext";
 import { getInitialListViewState } from "../lib/queryState";
 import type { ListType, ListViewItem, Region } from "../types";
 
 const REGIONS: Region[] = ["US", "KR"];
 
 export default function ListViewPage() {
+  const { isEditor } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [initial] = useState(() => getInitialListViewState(searchParams));
@@ -244,6 +246,7 @@ export default function ListViewPage() {
                         type="number"
                         step="0.0001"
                         value={item.trigger_price ?? ""}
+                        disabled={!isEditor}
                         onChange={(e) =>
                           updateItemField(
                             "trigger_price",
@@ -258,6 +261,7 @@ export default function ListViewPage() {
                         type="number"
                         step="0.0001"
                         value={item.stop_price ?? ""}
+                        disabled={!isEditor}
                         onChange={(e) =>
                           updateItemField(
                             "stop_price",
@@ -270,6 +274,7 @@ export default function ListViewPage() {
                     <td>
                       <select
                         value={item.status_tag ?? ""}
+                        disabled={!isEditor}
                         onChange={(e) =>
                           updateItemField(
                             "status_tag",
@@ -290,6 +295,7 @@ export default function ListViewPage() {
                       <input
                         type="text"
                         value={item.memo ?? ""}
+                        disabled={!isEditor}
                         onChange={(e) => updateItemField("memo", `${item.symbol}:${item.market}`, e.target.value)}
                       />
                     </td>
@@ -297,7 +303,7 @@ export default function ListViewPage() {
                       <button
                         className="link-button"
                         onClick={() => onSaveRow(item)}
-                        disabled={savingKeys[`${item.symbol}:${item.market}`]}
+                        disabled={!isEditor || savingKeys[`${item.symbol}:${item.market}`]}
                       >
                         {savingKeys[`${item.symbol}:${item.market}`] ? "Saving..." : "Save"}
                       </button>

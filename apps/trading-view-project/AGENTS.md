@@ -160,3 +160,51 @@ Follow these conventions to keep changes safe, testable, and consistent.
 - External DB only; do not add local DB assumptions to compose/deploy docs.
 - Keep `docker-compose.yml` focused on app services (backend/frontend).
 - Validate DB readiness through `/api/health/db?region=US` (and KR when needed).
+
+## 10) Authentication
+
+### Overview
+
+- Cookie-based JWT authentication via HttpOnly Secure SameSite=Lax cookies.
+- Roles: `viewer` (read-only), `editor` (read + write APIs).
+- Auth module: `backend/app/auth/` (password, token, cookie, dependencies).
+- Auth router: `backend/app/routers/auth.py` — `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`.
+
+### Environment variables
+
+- `SECRET_KEY` (required for auth): JWT signing key, minimum 32 characters.
+- `ACCESS_TOKEN_EXPIRE_MINUTES` (default: 1440 = 24h): Token lifetime.
+- `COOKIE_SECURE` (default: false): Set to `true` in production (HTTPS).
+
+### Protecting endpoints
+
+- Use `Depends(require_editor)` on write endpoints (POST/PATCH/PUT/DELETE).
+- GET endpoints remain public (no auth required).
+- Error responses: `401 {"detail": "Not authenticated"}`, `403 {"detail": "Insufficient permissions"}`.
+
+### User management
+
+- Create users via CLI: `python -m scripts.create_user --username <name> --password <pw> --role editor`
+- No registration UI — admin creates accounts manually.
+- Account lockout: 5 consecutive failures → 15 minute lock.
+
+### Rate limiting
+
+- Login endpoint (`POST /api/auth/login`): 5 requests per minute per IP.
+- Implemented via `Depends(check_login_rate_limit)` in `app/rate_limit.py`.
+- Returns `429 {"detail": "Too many login attempts. Try again later."}` when exceeded.
+- Memory-based (resets on server restart). For multi-server, switch to Redis.
+
+### CORS (production)
+
+- Set `ALLOWED_ORIGINS` to your production domain(s) before deploying.
+- Example: `ALLOWED_ORIGINS=https://trading.yourdomain.com`
+- Startup warning is logged if `COOKIE_SECURE=true` with localhost origins.
+- Never use `*` — `allow_credentials=True` requires explicit origins.
+
+### Frontend
+
+- `AuthContext` (React Context) manages auth state via `/api/auth/me` on mount.
+- Write UI (select, input, save buttons) is disabled for non-editor users.
+- All fetch calls use `credentials: "include"` for cookie transmission.
+- Login page: `/login` route.

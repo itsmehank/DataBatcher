@@ -24,8 +24,8 @@ def test_invalid_region_returns_400(client: TestClient) -> None:
     assert response.json()["detail"] == "Invalid region"
 
 
-def test_update_list_view_item_rejects_empty_patch(client: TestClient) -> None:
-    response = client.patch(
+def test_update_list_view_item_rejects_empty_patch(editor_cookie: TestClient) -> None:
+    response = editor_cookie.patch(
         "/api/list-view/item",
         json={
             "region": "US",
@@ -39,7 +39,7 @@ def test_update_list_view_item_rejects_empty_patch(client: TestClient) -> None:
     assert response.json()["detail"] == "No editable fields provided"
 
 
-def test_update_minervini_list_type_delete_path(client: TestClient, monkeypatch) -> None:
+def test_update_minervini_list_type_delete_path(editor_cookie: TestClient, monkeypatch) -> None:
     called: dict[str, object] = {}
 
     monkeypatch.setattr(minervini, "_ensure_minervini_exists", lambda *args, **kwargs: None)
@@ -50,7 +50,7 @@ def test_update_minervini_list_type_delete_path(client: TestClient, monkeypatch)
 
     monkeypatch.setattr(minervini, "execute_write", fake_execute_write)
 
-    response = client.post(
+    response = editor_cookie.post(
         "/api/minervini/list-type",
         json={
             "region": "us",
