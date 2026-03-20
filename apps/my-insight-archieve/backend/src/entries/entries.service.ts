@@ -128,4 +128,24 @@ export class EntriesService {
 
     return entry.toObject();
   }
+
+  async deleteComment(id: string, commentId: string, author: string) {
+    const entry = await this.entryModel.findById(id);
+    if (!entry) {
+      throw new NotFoundException('항목을 찾을 수 없습니다.');
+    }
+
+    const target = entry.comments.find((comment) => comment.id === commentId);
+    if (!target) {
+      throw new NotFoundException('댓글을 찾을 수 없습니다.');
+    }
+    if (target.author !== author) {
+      throw new ForbiddenException('본인이 작성한 댓글만 삭제할 수 있습니다.');
+    }
+
+    entry.comments = entry.comments.filter((comment) => comment.id !== commentId);
+    await entry.save();
+
+    return entry.toObject();
+  }
 }

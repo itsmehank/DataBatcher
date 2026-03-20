@@ -1,118 +1,114 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState, type FormEvent } from 'react';
 import { api } from '../../lib/api';
-import { useAuth } from '../../lib/use-auth';
+import { notifyAuthChanged, useAuth } from '../../lib/use-auth';
 import type { LoginResponse } from '../../types/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, username: authenticatedUser, logout, refreshAuth } = useAuth();
-  const [username, setUsername] = useState('');
+  const { isAuthenticated, isLoading, username, logout, refreshAuth } = useAuth();
+  const [id, setId] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      const timer = window.setTimeout(() => {
-        router.replace('/');
-        router.refresh();
-      }, 500);
-      return () => window.clearTimeout(timer);
-    }
-  }, [isAuthenticated, router]);
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
     setMessage('');
+
     try {
       const result = await api<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: id, password }),
       });
       await refreshAuth();
-      setMessage(`로그인 완료: ${result.admin.username}`);
+      notifyAuthChanged();
+      setMessage(`${result.admin.username}님, 로그인되었습니다.`);
       router.replace('/');
       router.refresh();
     } catch (err) {
-      setMessage((err as Error).message);
+      setError((err as Error).message || '로그인에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
     }
-  }
+  };
 
-  async function onLogout() {
+  const handleLogout = async () => {
     await logout();
     setMessage('로그아웃되었습니다.');
-  }
+    setError('');
+  };
 
   if (isLoading) {
-    return (
-      <div className="page-center">
-        <section className="panel grid center-card">
-          <p className="muted">인증 상태를 확인 중입니다.</p>
-        </section>
-      </div>
-    );
+    return <div className="v2-loading">인증 상태를 확인 중입니다...</div>;
   }
 
   if (isAuthenticated) {
     return (
-      <div className="page-center">
-        <section className="panel grid center-card">
-          <div>
-            <h1 className="section-title" style={{ fontSize: '32px' }}>
-              이미 로그인 상태입니다
-            </h1>
-            <p className="section-subtitle">{authenticatedUser} 계정으로 접속 중입니다.</p>
-          </div>
-          <div className="actions">
-            <button type="button" onClick={() => router.replace('/')}>
+      <section className="v2-login-page">
+        <div className="v2-login-card">
+          <h1 className="v2-page-title">이미 로그인 상태입니다</h1>
+          <p className="v2-login-subtitle">{username} 계정으로 접속 중입니다.</p>
+
+          <div className="v2-login-actions">
+            <Link href="/" className="v2-login-link-btn">
               아카이브로 이동
-            </button>
-            <button type="button" className="secondary" onClick={() => onLogout().catch(() => undefined)} style={{ maxWidth: 140 }}>
+            </Link>
+            <button type="button" className="v2-drawer-cancel-btn" onClick={() => handleLogout().catch(() => undefined)}>
               로그아웃
             </button>
           </div>
-          {message ? <p className="muted">{message}</p> : null}
-        </section>
-      </div>
+
+          {message ? <p className="v2-admin-message">{message}</p> : null}
+        </div>
+      </section>
     );
   }
 
   return (
-    <div className="page-center">
-      <section className="panel grid center-card">
-        <div>
-          <h1 className="section-title" style={{ fontSize: '38px' }}>
-            기록장을 위한 로그인
-          </h1>
-          <p className="section-subtitle">조용한 기록 공간을 안전하게 유지하기 위해 인증이 필요합니다.</p>
-        </div>
-        <form className="grid" onSubmit={onSubmit}>
-          <input
-            type="text"
-            placeholder="아이디"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            aria-label="아이디"
-          />
-          <input
-            type="password"
-            placeholder="비밀번호"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <div className="actions">
-            <button type="submit">로그인하고 이어쓰기</button>
-            <button type="button" className="secondary" onClick={() => onLogout().catch(() => undefined)} style={{ maxWidth: 140 }}>
-              로그아웃
-            </button>
-          </div>
+    <section className="v2-login-page">
+      <div className="v2-login-card">
+        <h1 className="v2-page-title">관리자 로그인</h1>
+        <p className="v2-login-subtitle">기록을 안전하게 관리하려면 인증이 필요합니다.</p>
+
+        <form className="v2-login-form" onSubmit={handleSubmit}>
+          <label className="v2-drawer-field">
+            <span className="v2-drawer-label">아이디</span>
+            <input
+              className="v2-drawer-input"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              required
+              autoComplete="username"
+            />
+          </label>
+
+          <label className="v2-drawer-field">
+            <span className="v2-drawer-label">비밀번호</span>
+            <input
+              type="password"
+              className="v2-drawer-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </label>
+
+          {error ? <div className="v2-error">{error}</div> : null}
+          {message ? <div className="v2-admin-message">{message}</div> : null}
+
+          <button type="submit" className="v2-submit-btn" disabled={submitting}>
+            {submitting ? '로그인 중...' : '로그인'}
+          </button>
         </form>
-        {message ? <p className="muted">{message}</p> : null}
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }
