@@ -73,4 +73,14 @@ export class EntriesController {
   ) {
     return this.entriesService.updateComment(id, commentId, body, req.user.username);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/comments/:commentId')
+  deleteComment(
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+    @Req() req: { user: { username: string } },
+  ) {
+    return this.entriesService.deleteComment(id, commentId, req.user.username);
+  }
 }

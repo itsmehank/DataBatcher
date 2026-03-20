@@ -1,6 +1,7 @@
 import './globals.css';
+import './app-shell.css';
 import type { Metadata } from 'next';
-import MainNav from './components/main-nav';
+import AppShell from './components/app-shell';
 
 export const metadata: Metadata = {
   title: 'My Insight Archive',
@@ -11,10 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body>
-        <header className="site-header">
-          <MainNav />
-        </header>
-        <main className="page-shell page">{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
