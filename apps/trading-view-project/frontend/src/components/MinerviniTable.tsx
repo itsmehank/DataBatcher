@@ -1,16 +1,44 @@
+import { useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import type { ListType, MinerviniRow } from "../types";
 
 type Props = {
   rows: MinerviniRow[];
   selectedSymbol: string;
+  checkedKeys: Record<string, boolean>;
+  areAllRowsChecked: boolean;
+  areSomeRowsChecked: boolean;
   onSelectTicker: (ticker: string) => void;
+  onToggleRowChecked: (row: MinerviniRow) => void;
+  onToggleAllChecked: () => void;
   onChangeListType: (row: MinerviniRow, listType: ListType | null) => void;
   savingKeys: Record<string, boolean>;
+  disableSelection?: boolean;
 };
 
-export default function MinerviniTable({ rows, selectedSymbol, onSelectTicker, onChangeListType, savingKeys }: Props) {
+const getRowKey = (row: MinerviniRow) => `${row.ticker}:${row.market}`;
+
+export default function MinerviniTable({
+  rows,
+  selectedSymbol,
+  checkedKeys,
+  areAllRowsChecked,
+  areSomeRowsChecked,
+  onSelectTicker,
+  onToggleRowChecked,
+  onToggleAllChecked,
+  onChangeListType,
+  savingKeys,
+  disableSelection = false,
+}: Props) {
   const { isEditor } = useAuth();
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!headerCheckboxRef.current) return;
+    headerCheckboxRef.current.indeterminate = areSomeRowsChecked;
+  }, [areSomeRowsChecked]);
+
   return (
     <section className="panel table-panel">
       <div className="panel-header">
@@ -21,6 +49,16 @@ export default function MinerviniTable({ rows, selectedSymbol, onSelectTicker, o
         <table>
           <thead>
             <tr>
+              <th className="checkbox-cell">
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  aria-label="Select all rows for download"
+                  checked={areAllRowsChecked}
+                  onChange={() => onToggleAllChecked()}
+                  disabled={disableSelection || rows.length === 0}
+                />
+              </th>
               <th>Ticker</th>
               <th>Name</th>
               <th>Market</th>
@@ -33,8 +71,17 @@ export default function MinerviniTable({ rows, selectedSymbol, onSelectTicker, o
           <tbody>
             {rows.map((row) => (
               <tr key={`${row.ticker}-${row.market}`} className={row.ticker === selectedSymbol ? "active" : ""}>
+                <td className="checkbox-cell">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${row.ticker} for download`}
+                    checked={Boolean(checkedKeys[getRowKey(row)])}
+                    onChange={() => onToggleRowChecked(row)}
+                    disabled={disableSelection}
+                  />
+                </td>
                 <td>
-                  <button className="link-button" onClick={() => onSelectTicker(row.ticker)}>
+                  <button className="link-button" onClick={() => onSelectTicker(row.ticker)} disabled={disableSelection}>
                     {row.ticker}
                   </button>
                 </td>

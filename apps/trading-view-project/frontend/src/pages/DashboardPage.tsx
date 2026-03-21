@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 import { useSearchParams } from "react-router-dom";
 import { toJpeg } from "html-to-image";
 
@@ -6,7 +7,7 @@ import ChartPanel from "../components/ChartPanel";
 import FilterBar from "../components/FilterBar";
 import MinerviniTable from "../components/MinerviniTable";
 import { REGIONS, useDashboardData } from "../hooks/useDashboardData";
-import type { ThemeMode } from "../types";
+import type { MinerviniRow, ThemeMode } from "../types";
 
 const DAILY_SMA_KEYS = ["sma_50", "sma_100", "sma_150", "sma_200"] as const;
 type DailySmaKey = (typeof DAILY_SMA_KEYS)[number];
@@ -14,6 +15,22 @@ type DailySmaKey = (typeof DAILY_SMA_KEYS)[number];
 type Props = {
   themeMode: ThemeMode;
 };
+
+type ExportProgress = {
+  current: number;
+  total: number;
+  symbol: string;
+};
+
+type CaptureReadyWaiter = {
+  symbol: string;
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
+
+const waitFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+const getRowKey = (row: MinerviniRow) => `${row.ticker}:${row.market}`;
+const sanitizeFilePart = (value: string) => value.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim() || "item";
 
 export default function DashboardPage({ themeMode }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,7 +74,11 @@ export default function DashboardPage({ themeMode }: Props) {
   const [showWeeklySma10, setShowWeeklySma10] = useState(true);
   const [showBenchmark, setShowBenchmark] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [checkedKeys, setCheckedKeys] = useState<Record<string, boolean>>({});
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [exportSummary, setExportSummary] = useState("");
   const [captureRef, setCaptureRef] = useState<HTMLDivElement | null>(null);
+  const captureReadyRef = useRef<CaptureReadyWaiter | null>(null);
 
   const titleBase = symbol || "-";
   const visibleDailySmaKeys = useMemo(
@@ -81,31 +102,118 @@ export default function DashboardPage({ themeMode }: Props) {
     [showWeeklySma10]
   );
 
+  const checkedCount = useMemo(
+    () => rows.reduce((count, row) => count + (checkedKeys[getRowKey(row)] ? 1 : 0), 0),
+    [checkedKeys, rows]
+  );
+  const areAllRowsChecked = rows.length > 0 && rows.every((row) => checkedKeys[getRowKey(row)]);
+  const areSomeRowsChecked = rows.some((row) => checkedKeys[getRowKey(row)]) && !areAllRowsChecked;
+  const batchButtonLabel = exportProgress
+    ? `Capturing ${exportProgress.current}/${exportProgress.total}...`
+    : checkedCount > 0
+      ? `Download Checked (${checkedCount})`
+      : "Download Checked";
+
+  useEffect(() => {
+    setCheckedKeys({});
+    setExportSummary("");
+  }, [region, date, market]);
+
+  useEffect(() => {
+    if (!captureReadyRef.current || loading) return;
+
+    const pending = captureReadyRef.current;
+    if (symbol !== pending.symbol) return;
+
+    if (error) {
+      captureReadyRef.current = null;
+      pending.reject(new Error(error));
+      return;
+    }
+
+    if (daily?.symbol !== pending.symbol || weekly?.symbol !== pending.symbol) {
+      return;
+    }
+
+    captureReadyRef.current = null;
+    void (async () => {
+      await waitFrame();
+      await waitFrame();
+      pending.resolve();
+    })();
+  }, [daily, error, loading, symbol, weekly]);
+
+  const capturePanelJpeg = useCallback(async () => {
+    if (!captureRef) {
+      throw new Error("Capture panel not ready");
+    }
+
+    await waitFrame();
+    await waitFrame();
+
+    return toJpeg(captureRef, {
+      quality: 0.95,
+      pixelRatio: 2,
+      cacheBust: true,
+      backgroundColor: themeMode === "paper" ? "#ffffff" : "#0f172a",
+      filter: (node) => {
+        if (!(node instanceof HTMLElement)) return true;
+        return !node.classList.contains("no-export");
+      },
+    });
+  }, [captureRef, themeMode]);
+
+  const waitForSymbolCaptureReady = useCallback(
+    async (targetSymbol: string) => {
+      if (symbol === targetSymbol && !loading && daily?.symbol === targetSymbol && weekly?.symbol === targetSymbol && !error) {
+        await waitFrame();
+        await waitFrame();
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        captureReadyRef.current = { symbol: targetSymbol, resolve, reject };
+        setSymbol(targetSymbol);
+      });
+    },
+    [daily?.symbol, error, loading, setSymbol, symbol, weekly?.symbol]
+  );
+
+  const onToggleRowChecked = useCallback((row: MinerviniRow) => {
+    const rowKey = getRowKey(row);
+    setCheckedKeys((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }));
+  }, []);
+
+  const onToggleAllChecked = useCallback(() => {
+    setCheckedKeys((prev) => {
+      const next = { ...prev };
+      if (areAllRowsChecked) {
+        rows.forEach((row) => {
+          delete next[getRowKey(row)];
+        });
+        return next;
+      }
+
+      rows.forEach((row) => {
+        next[getRowKey(row)] = true;
+      });
+      return next;
+    });
+  }, [areAllRowsChecked, rows]);
+
   const onDownloadJpeg = useCallback(async () => {
     if (!captureRef || isExporting) return;
 
-    const waitFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const safeSymbol = symbol || "symbol";
     const fileName = `benchmark-lab-${region}-${safeSymbol}-${timestamp}.jpeg`;
 
     setIsExporting(true);
     setError("");
+    setExportSummary("");
 
     try {
-      await waitFrame();
-      await waitFrame();
-
-      const dataUrl = await toJpeg(captureRef, {
-        quality: 0.95,
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: themeMode === "paper" ? "#ffffff" : "#0f172a",
-        filter: (node) => {
-          if (!(node instanceof HTMLElement)) return true;
-          return !node.classList.contains("no-export");
-        },
-      });
+      const dataUrl = await capturePanelJpeg();
 
       const link = document.createElement("a");
       link.download = fileName;
@@ -116,7 +224,73 @@ export default function DashboardPage({ themeMode }: Props) {
     } finally {
       setIsExporting(false);
     }
-  }, [captureRef, isExporting, region, setError, symbol, themeMode]);
+  }, [capturePanelJpeg, captureRef, isExporting, region, setError, symbol]);
+
+  const onDownloadChecked = useCallback(async () => {
+    if (isExporting) return;
+
+    const targets = rows.filter((row) => checkedKeys[getRowKey(row)]);
+    if (targets.length === 0) return;
+
+    const originalSymbol = symbol;
+    const zip = new JSZip();
+    const failures: string[] = [];
+    const indexWidth = Math.max(3, String(targets.length).length);
+    const zipDate = (date || new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+    const zipMarket = sanitizeFilePart(market || "ALL");
+
+    setIsExporting(true);
+    setExportProgress({ current: 0, total: targets.length, symbol: "" });
+    setError("");
+    setExportSummary("");
+
+    try {
+      for (const [index, row] of targets.entries()) {
+        const targetSymbol = row.ticker;
+        setExportProgress({ current: index + 1, total: targets.length, symbol: targetSymbol });
+
+        try {
+          await waitForSymbolCaptureReady(targetSymbol);
+
+          const dataUrl = await capturePanelJpeg();
+          const imageBlob = await (await fetch(dataUrl)).blob();
+          const fileName = `${String(index + 1).padStart(indexWidth, "0")}_${sanitizeFilePart(targetSymbol)}.jpg`;
+          zip.file(fileName, imageBlob);
+        } catch (e) {
+          failures.push(targetSymbol);
+          if (e instanceof Error) {
+            console.error(`Failed to export ${targetSymbol}:`, e);
+          }
+        }
+      }
+
+      const successCount = targets.length - failures.length;
+      if (successCount === 0) {
+        throw new Error("Failed to export all selected symbols");
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      link.download = `${region}-${zipDate}-${zipMarket}.zip`;
+      link.href = URL.createObjectURL(zipBlob);
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      setExportSummary(`Success ${successCount} / Failure ${failures.length}`);
+      if (failures.length > 0) {
+        setError(`Failed symbols: ${failures.join(", ")}`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to export checked charts");
+    } finally {
+      captureReadyRef.current = null;
+      setExportProgress(null);
+      setIsExporting(false);
+      if (originalSymbol) {
+        setSymbol(originalSymbol);
+      }
+    }
+  }, [capturePanelJpeg, checkedKeys, date, isExporting, market, region, rows, setError, setSymbol, symbol, waitForSymbolCaptureReady]);
 
   return (
     <main className="app-root">
@@ -124,8 +298,12 @@ export default function DashboardPage({ themeMode }: Props) {
         <h1>Minervini Dashboard Benchmark Lab</h1>
         <div className="topbar-actions">
           {loading ? <span className="badge">Loading</span> : null}
+          {exportSummary ? <span className="badge">{exportSummary}</span> : null}
           <button type="button" className="export-button" onClick={onDownloadJpeg} disabled={isExporting}>
             {isExporting ? "Preparing JPEG..." : "Download JPEG"}
+          </button>
+          <button type="button" className="export-button" onClick={onDownloadChecked} disabled={isExporting || checkedCount === 0}>
+            {batchButtonLabel}
           </button>
         </div>
       </header>
@@ -139,6 +317,7 @@ export default function DashboardPage({ themeMode }: Props) {
           market={market}
           category={category}
           symbol={symbol}
+          disabled={isExporting}
           regions={REGIONS}
           dates={dates.length ? dates : [date || "-"]}
           markets={markets.length ? markets : [market || "-"]}
@@ -182,9 +361,15 @@ export default function DashboardPage({ themeMode }: Props) {
           <MinerviniTable
             rows={rows}
             selectedSymbol={symbol}
+            checkedKeys={checkedKeys}
+            areAllRowsChecked={areAllRowsChecked}
+            areSomeRowsChecked={areSomeRowsChecked}
             onSelectTicker={setSymbol}
+            onToggleRowChecked={onToggleRowChecked}
+            onToggleAllChecked={onToggleAllChecked}
             onChangeListType={onChangeListType}
             savingKeys={savingKeys}
+            disableSelection={isExporting}
           />
         </div>
 
