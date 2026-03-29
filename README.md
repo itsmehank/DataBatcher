@@ -1,6 +1,6 @@
 # DataBatcher
 
-KR/US/Crypto 데이터를 배치로 수집하고 지표를 계산해 MySQL에 적재하는 프로젝트입니다.
+KR/US/Crypto 데이터 배치 수집기와 보조 웹앱들을 함께 관리하는 모노레포입니다.
 
 ## 무엇을 하는 프로젝트인가
 - KR 주식/ETF, US 주식/ETF, KR/US 지수, Crypto(Binance Spot) 데이터 수집
@@ -9,10 +9,12 @@ KR/US/Crypto 데이터를 배치로 수집하고 지표를 계산해 MySQL에 �
 - `apps/ingest-databatcher/scripts/` 단위 실행과 `apps/ingest-databatcher/ops/shell/` 통합 실행 래퍼 제공
 
 ## 프로젝트 구조
+- `apps/`: 앱 단위 디렉토리 (`ingest-databatcher`, `trading-view-project`, `my-insight-archieve`, `real-estate-project`)
 - `apps/ingest-databatcher/scripts/`: 시장별 수집/업데이트/초기화 엔트리포인트
 - `apps/ingest-databatcher/ops/shell/`: bulk/daily/weekly 통합 실행 스크립트
 - `apps/ingest-databatcher/core/`, `apps/ingest-databatcher/collectors/`, `apps/ingest-databatcher/indicators/`, `apps/ingest-databatcher/savers/`: 핵심 로직
 - `apps/ingest-databatcher/config/`: 런타임 설정(`settings.yaml`, `settings.dev.yaml`)
+- `apps/real-estate-project/`: 부동산 실거래 수집/분석/Flask 웹 시각화 앱
 - `db/`: 공통 DB 자산(Compose/Init/Migrations)
 - `apps/ingest-databatcher/tests/`: 테스트 코드 및 테스트 DB 가이드
 
