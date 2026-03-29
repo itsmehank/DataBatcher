@@ -1,0 +1,109 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  APP_DIR: /app
+  SSH_USER: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.VM_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy code to VM
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude '.venv' \
+            --exclude 'logs/' \
+            --exclude '__pycache__' \
+            --exclude '.sisyphus/' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts" \
+            ./ ${{ env.SSH_USER }}@${{ secrets.VM_HOST }}:${{ env.APP_DIR }}/
+
+      - name: Install dependencies and restart services
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
+            ${{ env.SSH_USER }}@${{ secrets.VM_HOST }} << 'DEPLOY_SCRIPT'
+
+          set -euo pipefail
+          cd /app
+
+          # Python 가상환경 설정
+          if [ ! -d .venv ]; then
+              python3 -m venv .venv
+          fi
+          source .venv/bin/activate
+
+          # 의존성 설치
+          pip install -q -r requirements.txt
+
+          # 스크립트 실행 권한 부여
+          chmod +x scripts/collect_initial.sh
+          chmod +x scripts/collect_daily.sh
+
+          # Flask 웹앱 재시작 (systemd 사용 시)
+          if systemctl is-active --quiet real-estate-web 2>/dev/null; then
+              sudo systemctl restart real-estate-web
+              echo "Flask 웹앱 재시작 완료 (systemd)"
+          else
+              # systemd 미설정 시 프로세스 직접 관리
+              pkill -f "python web_ui/app.py" 2>/dev/null || true
+              sleep 2
+              source .env
+              nohup .venv/bin/python web_ui/app.py > logs/web_app.log 2>&1 &
+              echo "Flask 웹앱 시작 완료 (PID: $!)"
+          fi
+
+          # cron 등록: 매일 오전 6시 KST (= UTC 21:00) 데이터 수집
+          CRON_JOB="0 21 * * * cd /app && .venv/bin/python -c 'pass' && bash scripts/collect_daily.sh >> logs/cron_collect.log 2>&1"
+
+          # 기존 collect_daily cron 제거 후 재등록 (중복 방지)
+          (crontab -l 2>/dev/null | grep -v "collect_daily" ; echo "$CRON_JOB") | crontab -
+          echo "cron 등록 완료: 매일 06:00 KST (21:00 UTC) 데이터 수집"
+
+          # 현재 cron 확인
+          echo "현재 등록된 cron:"
+          crontab -l
+
+          DEPLOY_SCRIPT
+
+      - name: Verify deployment
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
+            ${{ env.SSH_USER }}@${{ secrets.VM_HOST }} << 'VERIFY_SCRIPT'
+
+          cd /app
+          source .venv/bin/activate
+
+          # 구문 검증
+          python -m py_compile src/real_estate/backend/web_app.py
+          echo "구문 검증: PASS"
+
+          # 웹앱 응답 확인 (최대 10초 대기)
+          for i in $(seq 1 10); do
+              if curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/ | grep -q "200"; then
+                  echo "웹앱 응답: PASS (HTTP 200)"
+                  exit 0
+              fi
+              sleep 1
+          done
+          echo "WARNING: 웹앱 응답 확인 실패. 로그를 확인하세요."
+          exit 1
+
+          VERIFY_SCRIPT

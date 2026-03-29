@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부동산 급등 분석 시스템 v2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f4f6f8;
+            --card: #ffffff;
+            --text: #18212f;
+            --muted: #6a7380;
+            --line: #dde3ea;
+            --accent: #0d6efd;
+            --accent-soft: #e9f2ff;
+            --success: #1f9d63;
+            --warning: #d9822b;
+            --radius: 14px;
+            --shadow: 0 10px 26px rgba(15, 29, 46, 0.08);
+        }
+
+        body {
+            background: radial-gradient(circle at 10% -5%, #e8eef7, transparent 35%), var(--bg);
+            color: var(--text);
+        }
+
+        .page-wrap {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 24px 20px 36px;
+        }
+
+        .hero {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 22px 24px;
+            margin-bottom: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: 1.7rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .hero p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .hero .v2-badge {
+            border: 1px solid var(--line);
+            background: #f8fafc;
+            color: #445063;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .panel-card {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--card);
+            box-shadow: var(--shadow);
+        }
+
+        .panel-card .card-header {
+            background: transparent;
+            border-bottom: 1px solid var(--line);
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-card .card-header h5 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .panel-card .card-header i {
+            color: var(--accent);
+        }
+
+        .panel-card .card-body {
+            padding: 18px;
+        }
+
+        .panel-note {
+            color: var(--muted);
+            font-size: 0.84rem;
+            margin-top: 8px;
+        }
+
+        .analysis-form {
+            background: #f8fafc;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 12px;
+        }
+
+        .analysis-form .form-label {
+            color: #4e5968;
+            font-size: 0.86rem;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .analysis-form .form-control,
+        .analysis-form .form-select {
+            border-radius: 10px;
+            border: 1px solid #cfd8e2;
+            height: 42px;
+            font-size: 0.92rem;
+        }
+
+        .analysis-form .btn {
+            border-radius: 10px;
+            height: 42px;
+            font-weight: 700;
+            box-shadow: none;
+        }
+
+        .message-box {
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: #f8fafc;
+            color: #374355;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            display: none;
+        }
+
+        .map-panel-title {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        #kakaoMap {
+            width: 100%;
+            height: 460px;
+            border-radius: 12px;
+            background: #eaf0f6;
+            border: 1px solid var(--line);
+        }
+
+        .map-disabled {
+            min-height: 460px;
+            border: 1px dashed #adb5bd;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            background: #f8f9fa;
+            text-align: center;
+            padding: 16px;
+        }
+
+        .score-chip {
+            background: rgba(33, 37, 41, 0.92);
+            color: #fff;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .results-table {
+            font-size: 0.9rem;
+            margin-bottom: 0;
+        }
+
+        .results-table thead {
+            background: #303a46;
+            color: #f7f9fc;
+            vertical-align: middle;
+        }
+
+        .results-table tbody tr:hover {
+            background: #eef4fb;
+        }
+
+        .num-col {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .badge-rank {
+            background: var(--accent-soft);
+            color: #1455b8;
+            border: 1px solid #cfe1ff;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .badge-floor {
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 0.76rem;
+            font-weight: 700;
+        }
+
+        .badge-floor.above {
+            background: #e8f7ef;
+            color: #1b7f4e;
+            border: 1px solid #bce8d0;
+        }
+
+        .badge-floor.below {
+            background: #fff3e8;
+            color: #9b5e1c;
+            border: 1px solid #f5d4b1;
+        }
+
+        .detail-btn {
+            border-radius: 9px;
+            background: #eff3f8;
+            border: 1px solid #d4dde8;
+            color: #2d3b4d;
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 5px 10px;
+        }
+
+        .detail-btn:hover {
+            background: #e3ecf8;
+            border-color: #b8cae4;
+            color: #1c2a3d;
+        }
+
+        @media (max-width: 991px) {
+            .page-wrap {
+                padding: 16px 12px 24px;
+            }
+
+            .hero {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            #kakaoMap,
+            .map-disabled {
+                min-height: 360px;
+                height: 360px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrap">
+        <section class="hero">
+            <div>
+                <h1><i class="fas fa-chart-line"></i> 부동산 급등 분석 시스템</h1>
+                <p>화면 계층과 가독성을 개선한 운영 UI입니다.</p>
+            </div>
+            <span class="v2-badge">Live UI</span>
+        </section>
+
+        <div class="row g-3 mb-3">
+            <div class="col-lg-6">
+                <div class="card panel-card h-100">
+                    <div class="card-header">
+                        <h5><i class="fas fa-globe-asia"></i> 전체 지역 급등 분석</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="combinedForm" class="analysis-form">
+                            <div class="mb-3">
+                                <label for="combined_target_ymd" class="form-label">분석 기준 년월</label>
+                                <input type="month" class="form-control" id="combined_target_ymd" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="combined_top_percent" class="form-label">상위 비율 (%)</label>
+                                <input type="number" class="form-control" id="combined_top_percent" value="1.0" step="0.1" min="0.1" max="10">
+                            </div>
+                            <div class="mb-3">
+                                <label for="combined_analysis_period" class="form-label">분석 기간 (개월)</label>
+                                <select class="form-select" id="combined_analysis_period">
+                                    <option value="3">3개월</option>
+                                    <option value="6" selected>6개월</option>
+                                    <option value="12">12개월</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> 전체 지역 분석 시작</button>
+                            <div class="panel-note">조회 결과는 최대 10개까지만 표시됩니다.</div>
+                        </form>
+
+                        <div id="combinedLoading" class="loading text-center py-3">
+                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">분석 중...</span></div>
+                            <p class="mt-2 mb-0">전체 지역을 분석하고 있습니다...</p>
+                        </div>
+                        <div id="combinedResults"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card panel-card h-100">
+                    <div class="card-header">
+                        <h5><i class="fas fa-map-marker-alt"></i> 특정 지역 급등 분석</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="districtForm" class="analysis-form">
+                            <div class="mb-3">
+                                <label for="district_target_ymd" class="form-label">분석 기준 년월</label>
+                                <input type="month" class="form-control" id="district_target_ymd" required>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <label for="district_gu" class="form-label">구 선택 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="district_gu" required>
+                                        <option value="">구를 선택하세요</option>
+                                        {% for gu in gu_list %}
+                                        <option value="{{ gu }}">{{ gu }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="district_name" class="form-label">동 선택 (선택)</label>
+                                    <select class="form-select" id="district_name" disabled>
+                                        <option value="">전체 동 (구만 선택시)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <label for="district_top_n" class="form-label">상위 개수</label>
+                                    <input type="number" class="form-control" id="district_top_n" value="10" min="1" max="10">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="district_analysis_period" class="form-label">분석 기간 (개월)</label>
+                                    <select class="form-select" id="district_analysis_period">
+                                        <option value="3">3개월</option>
+                                        <option value="6" selected>6개월</option>
+                                        <option value="12">12개월</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> 특정 지역 분석 시작</button>
+                            <div class="panel-note">조회 결과는 최대 10개까지만 표시됩니다.</div>
+                        </form>
+
+                        <div id="districtLoading" class="loading text-center py-3">
+                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">분석 중...</span></div>
+                            <p class="mt-2 mb-0">선택한 지역을 분석하고 있습니다...</p>
+                        </div>
+                        <div id="districtResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card panel-card mb-3" id="mapPanel" style="display: none;">
+            <div class="card-header">
+                <h5><i class="fas fa-map-marked-alt"></i> Kakao 지도 시각화</h5>
+            </div>
+            <div class="card-body">
+                <div class="map-panel-title">조회 결과는 최대 10개까지만 지도에 표시됩니다.</div>
+                <div id="mapStatus" class="message-box mb-3">지도 데이터를 준비 중입니다.</div>
+                <div id="kakaoMapWrapper"><div id="kakaoMap"></div></div>
+            </div>
+        </div>
+
+        <div class="card panel-card" id="fullResults" style="display: none;">
+            <div class="card-header">
+                <h5><i class="fas fa-table"></i> 분석 결과</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover results-table">
+                        <thead>
+                            <tr>
+                                <th>순위</th>
+                                <th>법정동코드</th>
+                                <th>동이름</th>
+                                <th>지번</th>
+                                <th>건축년도</th>
+                                <th>건물명</th>
+                                <th class="num-col">급등점수</th>
+                                <th class="num-col">신뢰도</th>
+                                <th>최근거래월</th>
+                                <th class="num-col">평균거래금액</th>
+                                <th>층유형</th>
+                                <th>상세보기</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% if kakao_js_key %}
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey={{ kakao_js_key }}"></script>
+    {% endif %}
+    <script>
+        const KAKAO_JS_KEY_AVAILABLE = {{ 'true' if kakao_js_key else 'false' }};
+        let kakaoMap = null;
+        let kakaoMarkers = [];
+        let kakaoOverlays = [];
+
+        function setMapStatus(message, level = 'info') {
+            const statusEl = document.getElementById('mapStatus');
+            statusEl.className = 'message-box mb-3';
+            if (level === 'danger') {
+                statusEl.style.borderColor = '#f2c6c6';
+                statusEl.style.background = '#fff4f4';
+            } else if (level === 'warning') {
+                statusEl.style.borderColor = '#f0ddbd';
+                statusEl.style.background = '#fffaf1';
+            } else if (level === 'success') {
+                statusEl.style.borderColor = '#bfe5d2';
+                statusEl.style.background = '#eefaf4';
+            } else {
+                statusEl.style.borderColor = '#dde3ea';
+                statusEl.style.background = '#f8fafc';
+            }
+            statusEl.textContent = message;
+        }
+
+        function clearKakaoMarkers() {
+            kakaoMarkers.forEach(marker => marker.setMap(null));
+            kakaoMarkers = [];
+            kakaoOverlays.forEach(overlay => overlay.setMap(null));
+            kakaoOverlays = [];
+        }
+
+        function createRankMarkerImage(rank) {
+            const text = String(rank);
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="17" fill="#0d6efd" stroke="#ffffff" stroke-width="3" />
+                    <text x="20" y="24" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">${text}</text>
+                </svg>
+            `;
+            const encoded = encodeURIComponent(svg.trim());
+            return new kakao.maps.MarkerImage(`data:image/svg+xml;charset=UTF-8,${encoded}`, new kakao.maps.Size(40, 40), {
+                offset: new kakao.maps.Point(20, 20)
+            });
+        }
+
+        function ensureKakaoMap() {
+            if (!KAKAO_JS_KEY_AVAILABLE || typeof kakao === 'undefined' || !kakao.maps) {
+                return false;
+            }
+            if (!kakaoMap) {
+                const container = document.getElementById('kakaoMap');
+                kakaoMap = new kakao.maps.Map(container, {
+                    center: new kakao.maps.LatLng(37.5665, 126.9780),
+                    level: 7
+                });
+            }
+            return true;
+        }
+
+        function renderKakaoMap(results, title) {
+            const mapPanel = document.getElementById('mapPanel');
+            const wrapper = document.getElementById('kakaoMapWrapper');
+            mapPanel.style.display = 'block';
+
+            if (!KAKAO_JS_KEY_AVAILABLE) {
+                wrapper.innerHTML = '<div class="map-disabled">KAKAO_JS_KEY가 설정되지 않아 브라우저 지도를 표시할 수 없습니다.</div>';
+                setMapStatus('KAKAO_JS_KEY 미설정: 브라우저 지도를 표시할 수 없습니다.', 'warning');
+                return;
+            }
+
+            const validPoints = (results || []).filter(item => typeof item.lat === 'number' && typeof item.lng === 'number');
+            if (validPoints.length === 0) {
+                setMapStatus('좌표를 가진 결과가 없어 지도에 표시할 수 없습니다.', 'warning');
+                clearKakaoMarkers();
+                return;
+            }
+
+            if (!ensureKakaoMap()) {
+                setMapStatus('Kakao 지도 SDK 로딩에 실패했습니다. 도메인 등록과 JS 키를 확인하세요.', 'danger');
+                return;
+            }
+
+            clearKakaoMarkers();
+            const bounds = new kakao.maps.LatLngBounds();
+
+            validPoints.forEach((item, index) => {
+                const position = new kakao.maps.LatLng(item.lat, item.lng);
+                const rankValue = Number.isInteger(item.rank) ? item.rank : index + 1;
+                const marker = new kakao.maps.Marker({
+                    position: position,
+                    map: kakaoMap,
+                    image: createRankMarkerImage(rankValue),
+                    title: `${item.umdNm || ''} ${item.jibun || ''}`.trim()
+                });
+
+                const score = item.surge_score !== undefined && item.surge_score !== null ? `${item.surge_score}%` : '-';
+                const overlay = new kakao.maps.CustomOverlay({
+                    content: `<div class="score-chip">${score}</div>`,
+                    position: position,
+                    yAnchor: 1.9
+                });
+                kakao.maps.event.addListener(marker, 'mouseover', function() {
+                    overlay.setMap(kakaoMap);
+                });
+                kakao.maps.event.addListener(marker, 'mouseout', function() {
+                    overlay.setMap(null);
+                });
+
+                kakaoMarkers.push(marker);
+                kakaoOverlays.push(overlay);
+                bounds.extend(position);
+            });
+
+            kakaoMap.setBounds(bounds);
+            setMapStatus(`${title}: 좌표 ${validPoints.length}건을 지도에 표시했습니다.`, 'success');
+        }
+
+        const now = new Date();
+        const currentMonth = now.toISOString().slice(0, 7);
+        document.getElementById('combined_target_ymd').value = currentMonth;
+        document.getElementById('district_target_ymd').value = currentMonth;
+
+        document.getElementById('district_gu').addEventListener('change', function() {
+            const guName = this.value;
+            const districtSelect = document.getElementById('district_name');
+
+            if (guName) {
+                fetch(`/get_districts?gu=${encodeURIComponent(guName)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        districtSelect.innerHTML = '<option value="">동을 선택하세요</option>';
+                        data.districts.forEach(district => {
+                            districtSelect.innerHTML += `<option value="${district}">${district}</option>`;
+                        });
+                        districtSelect.disabled = false;
+                    })
+                    .catch(() => {
+                        districtSelect.innerHTML = '<option value="">동 목록 로드 실패</option>';
+                    });
+            } else {
+                districtSelect.innerHTML = '<option value="">먼저 구를 선택하세요</option>';
+                districtSelect.disabled = true;
+            }
+        });
+
+        document.getElementById('combinedForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const targetYmd = document.getElementById('combined_target_ymd').value.replace('-', '');
+            const topPercent = document.getElementById('combined_top_percent').value;
+            const analysisPeriod = document.getElementById('combined_analysis_period').value;
+
+            document.getElementById('combinedLoading').style.display = 'block';
+            document.getElementById('combinedResults').innerHTML = '';
+
+            fetch('/combined_analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_ymd: targetYmd, top_percent: topPercent, analysis_period: analysisPeriod })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('combinedLoading').style.display = 'none';
+                    if (data.success) {
+                        if (data.data.length > 0) {
+                            window.currentAnalysisContext = { type: 'combined', target_ymd: targetYmd, analysis_period: analysisPeriod };
+                            displayResults(data.data, '전체 지역 분석 결과');
+                            renderKakaoMap(data.data, '전체 지역 분석 결과');
+                            document.getElementById('combinedResults').innerHTML = `<div class="message-box">${data.message}</div>`;
+                        } else {
+                            renderKakaoMap([], '전체 지역 분석 결과');
+                            document.getElementById('combinedResults').innerHTML = `<div class="message-box">${data.message}</div>`;
+                        }
+                    } else {
+                        renderKakaoMap([], '전체 지역 분석 결과');
+                        document.getElementById('combinedResults').innerHTML = `<div class="message-box">오류: ${data.error}</div>`;
+                    }
+                })
+                .catch(error => {
+                    renderKakaoMap([], '전체 지역 분석 결과');
+                    document.getElementById('combinedLoading').style.display = 'none';
+                    document.getElementById('combinedResults').innerHTML = `<div class="message-box">네트워크 오류: ${error.message}</div>`;
+                });
+        });
+
+        document.getElementById('districtForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const targetYmd = document.getElementById('district_target_ymd').value.replace('-', '');
+            const guName = document.getElementById('district_gu').value;
+            const districtName = document.getElementById('district_name').value;
+            const topN = document.getElementById('district_top_n').value;
+            const analysisPeriod = document.getElementById('district_analysis_period').value;
+
+            if (!guName) {
+                alert('구를 선택해주세요.');
+                return;
+            }
+
+            document.getElementById('districtLoading').style.display = 'block';
+            document.getElementById('districtResults').innerHTML = '';
+
+            fetch('/district_analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target_ymd: targetYmd,
+                    gu_name: guName,
+                    district_name: districtName,
+                    top_n: topN,
+                    analysis_period: analysisPeriod
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('districtLoading').style.display = 'none';
+                    if (data.success) {
+                        if (data.data.length > 0) {
+                            window.currentAnalysisContext = {
+                                type: 'district',
+                                target_ymd: targetYmd,
+                                analysis_period: analysisPeriod,
+                                gu_name: guName,
+                                district_name: districtName
+                            };
+                            displayResults(data.data, `${districtName || guName} 지역 분석 결과`);
+                            renderKakaoMap(data.data, `${districtName || guName} 지역 분석 결과`);
+                            document.getElementById('districtResults').innerHTML = `<div class="message-box">${data.message}</div>`;
+                        } else {
+                            renderKakaoMap([], `${districtName || guName} 지역 분석 결과`);
+                            document.getElementById('districtResults').innerHTML = `<div class="message-box">${data.message}</div>`;
+                        }
+                    } else {
+                        renderKakaoMap([], `${districtName || guName} 지역 분석 결과`);
+                        document.getElementById('districtResults').innerHTML = `<div class="message-box">오류: ${data.error}</div>`;
+                    }
+                })
+                .catch(error => {
+                    renderKakaoMap([], `${districtName || guName} 지역 분석 결과`);
+                    document.getElementById('districtLoading').style.display = 'none';
+                    document.getElementById('districtResults').innerHTML = `<div class="message-box">네트워크 오류: ${error.message}</div>`;
+                });
+        });
+
+        window.currentAnalysisContext = null;
+
+        function viewBuildingDetails(sggCd, umdNm, jibun, buildYear) {
+            if (!window.currentAnalysisContext) {
+                alert('분석 조건 정보가 없습니다.');
+                return;
+            }
+            const context = window.currentAnalysisContext;
+            const url = `/building_detail?sggCd=${encodeURIComponent(sggCd)}&umdNm=${encodeURIComponent(umdNm)}&jibun=${encodeURIComponent(jibun)}&buildYear=${buildYear}&analysisType=${context.type}&targetYmd=${context.target_ymd}&analysisPeriod=${context.analysis_period}`;
+            window.open(url, '_blank', 'width=1200,height=800');
+        }
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) {
+                return '-';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function displayResults(data, title) {
+            const fullResults = document.getElementById('fullResults');
+            const tableBody = document.getElementById('resultsTableBody');
+            document.querySelector('#fullResults .card-header h5').innerHTML = `<i class="fas fa-table"></i> ${title}`;
+            tableBody.innerHTML = '';
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                const rank = row.rank || '-';
+                const sggCd = row.sggCd || '-';
+                const umdNm = row.umdNm || '-';
+                const jibun = row.jibun || '-';
+                const buildYear = row.buildYear || '-';
+                const mhouseNm = row.mhouseNm || '-';
+                const surgeScore = row.surge_score || '-';
+                const reliability = row.reliability_score || '-';
+                const latestTradeYmd = row.latest_trade_ymd || '-';
+                const avgDealAmount = row.avg_dealAmount ? Number(row.avg_dealAmount).toLocaleString() + '만원' : '-';
+                const floorType = row.floor_type || '-';
+                const floorClass = floorType === '지상' ? 'above' : 'below';
+
+                tr.innerHTML = `
+                    <td><span class="badge-rank">${escapeHtml(rank)}</span></td>
+                    <td>${escapeHtml(sggCd)}</td>
+                    <td>${escapeHtml(umdNm)}</td>
+                    <td>${escapeHtml(jibun)}</td>
+                    <td>${escapeHtml(buildYear)}</td>
+                    <td>${escapeHtml(mhouseNm)}</td>
+                    <td class="num-col"><strong class="text-success">${escapeHtml(surgeScore)}%</strong></td>
+                    <td class="num-col">${escapeHtml(reliability)}</td>
+                    <td>${escapeHtml(latestTradeYmd)}</td>
+                    <td class="num-col">${escapeHtml(avgDealAmount)}</td>
+                    <td><span class="badge-floor ${floorClass}">${escapeHtml(floorType)}</span></td>
+                    <td><button class="detail-btn detail-btn-trigger" title="건물 상세 거래 내역 보기"><i class="fas fa-info-circle"></i> 상세보기</button></td>
+                `;
+
+                const detailBtn = tr.querySelector('.detail-btn-trigger');
+                detailBtn.addEventListener('click', () => {
+                    viewBuildingDetails(sggCd, umdNm, jibun, buildYear);
+                });
+
+                tableBody.appendChild(tr);
+            });
+
+            fullResults.style.display = 'block';
+            fullResults.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

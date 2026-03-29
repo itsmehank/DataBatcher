@@ -1,0 +1,234 @@
+import mysql.connector
+from mysql.connector import Error
+import pandas as pd
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import numpy as np
+
+
+class FlexibleSurgeDetector:
+    """
+    확정된 로직에 따라 과거 특정 시점의 급등 건물을 탐지하고 순위를 매기는 클래스.
+    사용자가 분석 대상 테이블을 선택할 수 있습니다.
+    """
+
+    def __init__(self, db_config):
+        self.db_config = db_config
+
+    def _get_db_connection(self):
+        """데이터베이스 연결을 생성하고 반환합니다."""
+        try:
+            return mysql.connector.connect(**self.db_config)
+        except Error as e:
+            print(f"데이터베이스 연결 중 오류 발생: {e}")
+            return None
+
+    def _calculate_surge_score(self, group):
+        """단일 건물 그룹에 대한 급등 점수와 관련 지표를 계산합니다."""
+
+        # 분석 기간 내 거래가 2건 이상인 경우에만 의미가 있음
+        if len(group) < 2:
+            return None
+
+        # --- 1. '꾸준한 상승률' 계산 ---
+        # 기간 내 첫 거래와 마지막 거래의 가격을 직접 비교
+        first_row = group.iloc[0]
+        last_row = group.iloc[-1]
+
+        # 전용면적 기준 누적 수익률
+        exclu_first_price = first_row['avg_exclu_price_per_pyeong']
+        exclu_last_price = last_row['avg_exclu_price_per_pyeong']
+        if exclu_first_price is not None and exclu_first_price > 0:
+            exclu_cumulative_return = ((exclu_last_price - exclu_first_price) / exclu_first_price) * 100
+        else:
+            exclu_cumulative_return = 0
+
+        # 대지권 기준 누적 수익률
+        land_first_price = first_row['avg_land_price_per_pyeong']
+        land_last_price = last_row['avg_land_price_per_pyeong']
+        if land_first_price is not None and land_first_price > 0:
+            land_cumulative_return = ((land_last_price - land_first_price) / land_first_price) * 100
+        else:
+            land_cumulative_return = 0
+
+        cumulative_return = max(exclu_cumulative_return or 0, land_cumulative_return or 0)
+
+        # --- 2. '순간 폭등률' 계산 ---
+        # 분석 기간의 첫 거래 데이터는 제외하고, 그 이후의 변동률만으로 계산
+        sub_group = group.iloc[1:]
+
+        if not sub_group.empty:
+            # 남은 기간 동안의 전용면적/대지권 변동률 중 가장 큰 값
+            max_rate = sub_group[['exclu_price_change_rate_vs_prev', 'land_price_change_rate_vs_prev']].max().max()
+            max_rate = max_rate if pd.notna(max_rate) else 0
+        else:
+            max_rate = 0  # 비교 대상이 없으면 0
+
+        # 변경된 로직
+        surge_score = cumulative_return
+        surge_type = '꾸준한 상승률'
+
+        # 신뢰도 지표 (분석 기간 내 총 거래 건수)
+        reliability_score = group['trade_count'].sum()
+
+        # 반환 데이터에 avg_dealAmount 추가
+        return pd.Series({
+            'sggCd': last_row['sggCd'],
+            'umdNm': last_row['umdNm'],
+            'jibun': last_row['jibun'],
+            'buildYear': last_row['buildYear'],
+            'mhouseNm': last_row['mhouseNm'],
+            'surge_score': surge_score,
+            'surge_type': surge_type,
+            'reliability_score': reliability_score,
+            'latest_trade_ymd': last_row['deal_ymd'],
+            'avg_dealAmount': last_row['avg_dealAmount']
+        })
+
+    def find_surging_properties(self, target_ymd, source_table='building_transaction_analysis', top_percent=1.0,
+                                analysis_period_months=6):
+        """
+        지정된 년월과 기간을 기준으로 급등한 건물을 찾아 상위 N%를 반환합니다.
+
+        Parameters:
+        -----------
+        target_ymd : str
+            분석 기준 년월 (예: '202507')
+        source_table : str, optional
+            분석 대상 테이블 이름. 기본값은 'building_transaction_analysis'
+            - 'building_transaction_analysis': 전체 데이터
+            - 'building_transaction_analysis_above_ground': 1층 이상 데이터
+            - 'building_transaction_analysis_below_ground': -1층 이하 데이터
+        top_percent : float, optional
+            상위 몇 %를 반환할지 지정. 기본값은 1.0%
+        analysis_period_months : int, optional
+            분석 기간(개월). 기본값은 6개월
+        """
+
+        end_date = datetime.strptime(target_ymd, '%Y%m')
+        start_date = end_date - relativedelta(months=analysis_period_months - 1)
+        start_ymd = start_date.strftime('%Y%m')
+
+        # 테이블 이름에 따른 설명 추가
+        table_description = {
+            'building_transaction_analysis': '전체',
+            'building_transaction_analysis_above_ground': '지상층(1층 이상)',
+            'building_transaction_analysis_below_ground': '지하층(-1층 이하)'
+        }
+
+        table_desc = table_description.get(source_table, '알 수 없음')
+        print(f"분석 대상: {table_desc} 데이터")
+
+        # 필요한 모든 컬럼을 명시적으로 SELECT 하도록 변경
+        query = f"""
+        SELECT 
+            sggCd, umdNm, jibun, buildYear, mhouseNm, deal_ymd, 
+            trade_count, avg_dealAmount,
+            avg_exclu_price_per_pyeong, exclu_price_change_rate_vs_prev,
+            avg_land_price_per_pyeong, land_price_change_rate_vs_prev
+        FROM {source_table}
+        WHERE (sggCd, jibun, buildYear) IN (
+            SELECT sggCd, jibun, buildYear
+            FROM {source_table}
+            WHERE deal_ymd >= '{start_ymd}' AND deal_ymd <= '{target_ymd}'
+            GROUP BY sggCd, jibun, buildYear
+            HAVING COUNT(*) >= 2
+        )
+        AND deal_ymd >= '{start_ymd}' AND deal_ymd <= '{target_ymd}'  -- 분석 기간 제한 추가
+        ORDER BY sggCd, jibun, buildYear, deal_ymd;
+        """
+
+        print(f"분석 기간: {start_ymd} ~ {target_ymd} (총 {analysis_period_months}개월)")
+
+        connection = self._get_db_connection()
+        if not connection:
+            return pd.DataFrame()
+
+        try:
+            # pandas의 read_sql 사용 시 경고가 발생할 수 있으나, 동작에는 문제가 없습니다.
+            df = pd.read_sql(query, connection)
+            if df.empty:
+                print("분석 기간 내 2회 이상 거래된 건물이 없습니다.")
+                return pd.DataFrame()
+        except Error as e:
+            print(f"데이터 조회 중 오류 발생: {e}")
+            return pd.DataFrame()
+        finally:
+            if connection.is_connected():
+                connection.close()
+
+        print(
+            f"총 {df.groupby(['sggCd', 'jibun', 'buildYear']).ngroups}개 건물의 데이터를 분석합니다...")
+
+        # DataFrame을 미리 시간순으로 정렬
+        df_sorted = df.sort_values(by='deal_ymd')
+
+        results_df = df_sorted.groupby(['sggCd', 'jibun', 'buildYear']).apply(self._calculate_surge_score)
+
+        # apply 결과가 None인 경우(거래건수 부족) drop
+        results_df.dropna(subset=['sggCd'], inplace=True)
+        if results_df.empty:
+            return pd.DataFrame()
+
+        results_df = results_df.sort_values(by='surge_score', ascending=False).reset_index(drop=True)
+
+        num_to_return = int(len(results_df) * (top_percent / 100))
+        if num_to_return == 0 and len(results_df) > 0:
+            num_to_return = 1
+
+        top_results = results_df.head(num_to_return)
+        top_results['rank'] = np.arange(1, len(top_results) + 1)
+
+        # 최종 컬럼 목록에 avg_dealAmount 추가
+        final_columns = [
+            'rank', 'sggCd', 'umdNm', 'jibun', 'buildYear', 'mhouseNm',
+            'surge_score', 'reliability_score', 'latest_trade_ymd',
+            'avg_dealAmount'
+        ]
+        return top_results[final_columns]
+
+
+if __name__ == '__main__':
+    from project_config import get_db_config
+    # --- 설정 ---
+    DB_CONNECTION_INFO = get_db_config()
+
+    detector = FlexibleSurgeDetector(db_config=DB_CONNECTION_INFO)
+
+    # --- 백테스팅 실행 ---
+    # 분석 기준 년월, 상위 퍼센트, 분석 기간(개월)을 설정
+    target_analysis_ymd = '202507'
+    target_top_percent = 1.0
+    target_analysis_period_months = 6
+
+    # 사용자 입력으로 소스 테이블 선택
+    print("\n--- 분석 대상 테이블 선택 ---")
+    print("1: 전체 데이터 (building_transaction_analysis)")
+    print("2: 지상층 데이터 (building_transaction_analysis_above_ground)")
+    print("3: 지하층 데이터 (building_transaction_analysis_below_ground)")
+
+    choice = input("분석할 데이터를 선택하세요 (1-3): ")
+
+    source_tables = {
+        '1': 'building_transaction_analysis',
+        '2': 'building_transaction_analysis_above_ground',
+        '3': 'building_transaction_analysis_below_ground'
+    }
+
+    selected_table = source_tables.get(choice, 'building_transaction_analysis')
+
+    print(
+        f"\n--- 급등 신호 백테스팅 시작 (기준: {target_analysis_ymd}, 상위: {target_top_percent}%, 기간: {target_analysis_period_months}개월) ---")
+
+    surging_properties = detector.find_surging_properties(
+        target_ymd=target_analysis_ymd,
+        source_table=selected_table,
+        top_percent=target_top_percent,
+        analysis_period_months=target_analysis_period_months
+    )
+
+    if not surging_properties.empty:
+        print("\n[백테스팅 결과: 급등 신호 포착 목록]")
+        print(surging_properties.to_string())
+    else:
+        print("\n[백테스팅 결과: 포착된 급등 신호가 없습니다.]")

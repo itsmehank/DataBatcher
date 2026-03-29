@@ -1,0 +1,30 @@
+<form id="combinedForm">
+    <div class="field-grid {{ combined_grid_class|default('two-col') }}">
+        <div class="field-block field-span-2">
+            <label for="combined_target_ymd">분석 기준 년월</label>
+            <input type="month" id="combined_target_ymd" required>
+        </div>
+        <div class="field-block">
+            <label for="combined_top_percent">상위 비율 (%)</label>
+            <input type="number" id="combined_top_percent" value="1.0" step="0.1" min="0.1" max="10">
+        </div>
+        <div class="field-block">
+            <label for="combined_analysis_period">분석 기간 (개월)</label>
+            <select id="combined_analysis_period">
+                <option value="3">3개월</option>
+                <option value="6" selected>6개월</option>
+                <option value="12">12개월</option>
+            </select>
+        </div>
+    </div>
+    <div class="submit-row">
+        <div class="submit-note">서울 전체를 대상으로 급등 후보를 넓게 탐색합니다.</div>
+        <button type="submit" class="primary-btn"><i class="fas fa-search"></i> 서울 전체 분석</button>
+    </div>
+</form>
+
+<div id="combinedLoading" class="loading text-center py-4">
+    <div class="spinner-border" role="status"><span class="visually-hidden">분석 중...</span></div>
+    <p class="mt-3 mb-0">서울 전체 데이터를 분석 중입니다...</p>
+</div>
+<div id="combinedFeedback" class="inline-feedback"></div>
