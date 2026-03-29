@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연립다세대 급등 분석 콘솔</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f3f5f7;
+            --surface: #ffffff;
+            --surface-soft: #f8fafc;
+            --text: #0f172a;
+            --muted: #64748b;
+            --line: #dbe2ea;
+            --accent: #2563eb;
+            --accent-dark: #1d4ed8;
+            --shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif; }
+        .page { max-width: 1480px; margin: 0 auto; padding: 20px 16px 32px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .header h1 { margin: 0; font-size: 1.65rem; letter-spacing: -0.03em; }
+        .header p { margin: 6px 0 0; color: var(--muted); }
+        .header a { color: var(--muted); text-decoration: none; font-weight: 700; }
+        .header-badge { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 999px; background: #eff6ff; color: var(--accent-dark); border: 1px solid #bfdbfe; font-size: 0.82rem; font-weight: 800; }
+        .workspace { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; }
+        .sidebar, .main-panel, .panel { border-radius: 24px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
+        .sidebar { padding: 18px; position: sticky; top: 16px; align-self: start; }
+        .sidebar h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
+        .sidebar p { margin: 10px 0 0; color: var(--muted); line-height: 1.7; }
+        .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; }
+        .mode-btn { border: 0; border-radius: 16px; padding: 12px 14px; background: var(--surface-soft); color: #334155; font-weight: 800; }
+        .mode-btn.active { background: #0f172a; color: #fff; }
+        .mode-panel { display: none; }
+        .mode-panel.active { display: block; }
+        .mode-panel .panel-tip { border-radius: 16px; border: 1px solid var(--line); background: var(--surface-soft); padding: 14px; margin-bottom: 14px; }
+        .mode-panel .panel-tip strong { display: block; margin-bottom: 6px; }
+        .mode-panel .panel-tip span { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+        .field-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .field-block { display: grid; gap: 6px; }
+        .field-block label { font-size: 0.84rem; font-weight: 700; color: #334155; }
+        .field-block input, .field-block select { height: 46px; border-radius: 14px; border: 1px solid var(--line); padding: 0 14px; background: #fff; }
+        .submit-row { display: grid; gap: 10px; margin-top: 14px; }
+        .submit-note { color: var(--muted); font-size: 0.84rem; }
+        .primary-btn, .detail-btn { border: 0; }
+        .primary-btn { border-radius: 14px; padding: 12px 16px; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; font-weight: 800; }
+        .loading { display: none; }
+        .inline-feedback { margin-top: 12px; }
+        .message-box, .summary-card, .status-pill, .empty-card, .table-wrap { border-radius: 18px; border: 1px solid var(--line); background: var(--surface-soft); }
+        .message-box, .status-pill { padding: 12px 14px; }
+        .main-panel { padding: 18px; }
+        .stage { display: grid; gap: 16px; }
+        .top-map-shell { display: grid; grid-template-columns: minmax(0, 1.1fr) 320px; gap: 16px; }
+        .panel-head, .result-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .panel-head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+        .panel-head h4, .result-header h3 { margin: 0; letter-spacing: -0.02em; }
+        .panel-meta, .result-header p, .summary-card-desc, .building-sub { color: var(--muted); }
+        .panel-body { padding: 18px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+        .summary-card { padding: 16px; }
+        .summary-card-label { font-size: 0.82rem; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+        .summary-card-value { margin: 0; font-size: 1.35rem; font-weight: 800; }
+        .status-stack { display: grid; gap: 12px; }
+        .status-pill { display: flex; gap: 10px; align-items: center; }
+        .status-pill[data-level="success"] { background: #eff6ff; }
+        .status-pill[data-level="warning"] { background: #fffbeb; }
+        .status-pill[data-level="danger"] { background: #fef2f2; }
+        .result-shell { display: none; }
+        .result-header { margin-bottom: 16px; }
+        .empty-card { min-height: 250px; display: grid; place-items: center; text-align: center; padding: 24px; }
+        .empty-card h5 { margin: 0 0 8px; }
+        .empty-card p { margin: 0; color: var(--muted); max-width: 30ch; }
+        #kakaoMap { width: 100%; height: 560px; border-radius: 18px; border: 1px solid var(--line); background: #e8edf4; }
+        .map-disabled { min-height: 560px; display: grid; place-items: center; border-radius: 18px; border: 1px dashed var(--line); color: var(--muted); }
+        .score-chip { background: rgba(15, 23, 42, 0.94); color: #fff; padding: 7px 11px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+        .table-wrap { overflow: hidden; }
+        .results-table { margin: 0; }
+        .results-table thead { background: #0f172a; color: #fff; }
+        .results-table tbody tr:hover { background: #f8fafc; }
+        .rank-pill { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 800; }
+        .building-cell { display: grid; gap: 4px; }
+        .building-name, .score-value { font-weight: 800; }
+        .score-value { color: var(--accent-dark); }
+        .meta-badge { display: inline-flex; padding: 5px 10px; border-radius: 999px; font-weight: 700; font-size: 0.78rem; }
+        .meta-badge.above { background: #dcfce7; color: #166534; }
+        .meta-badge.below { background: #ffedd5; color: #9a3412; }
+        .detail-btn { border-radius: 999px; padding: 8px 12px; background: #eff6ff; color: var(--accent-dark); font-weight: 700; }
+        .num-col { text-align: right; font-variant-numeric: tabular-nums; }
+        @media (max-width: 1200px) { .workspace, .top-map-shell, .summary-grid { grid-template-columns: 1fr; } .sidebar { position: static; } }
+        @media (max-width: 768px) { .page { padding: 14px 12px 24px; } .header, .result-header { flex-direction: column; align-items: stretch; } .summary-grid { grid-template-columns: 1fr 1fr; } #kakaoMap, .map-disabled { min-height: 320px; height: 320px; } }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <div>
+                <div class="header-badge"><i class="fas fa-map"></i> 분석 콘솔</div>
+                <h1>지도 중심 분석 콘솔</h1>
+                <p>서울 연립·다세대 급등 후보를 지도와 함께 분석합니다.</p>
+            </div>
+        </div>
+
+        <div class="workspace">
+            <aside class="sidebar">
+                <h2>탐색 패널</h2>
+                <p>분석 모드를 선택하고 조건을 입력하면 지도와 후보 리스트를 확인할 수 있습니다.</p>
+
+                <div class="mode-switch">
+                    <button type="button" class="mode-btn active" data-mode="combined">서울 전체</button>
+                    <button type="button" class="mode-btn" data-mode="district">특정 지역</button>
+                </div>
+
+                <div id="combinedPanel" class="mode-panel active">
+                    <div class="panel-tip">
+                        <strong>서울 전체 탐색</strong>
+                        <span>서울 전체를 대상으로 급등 후보를 탐색하고, 지도에서 분포를 확인합니다.</span>
+                    </div>
+                    {% set combined_grid_class = 'single-col' %}
+                    {% include 'partials/combined_form.html' %}
+                </div>
+
+                <div id="districtPanel" class="mode-panel">
+                    <div class="panel-tip">
+                        <strong>특정 지역 탐색</strong>
+                        <span>구 또는 동을 선택하여 해당 지역의 급등 후보를 집중 분석합니다.</span>
+                    </div>
+                    {% set district_grid_class = 'single-col' %}
+                    {% include 'partials/district_form.html' %}
+                </div>
+            </aside>
+
+            <main class="main-panel">
+                <section id="resultShell" class="result-shell stage">
+                    <div class="result-header">
+                        <div>
+                            <h3 id="resultTitle">분석 결과</h3>
+                            <p id="resultSubtitle">지도, 요약 카드, 결과표를 한눈에 확인할 수 있습니다.</p>
+                        </div>
+                        <div class="message-box" id="resultMessage">분석을 실행하면 결과 요약이 표시됩니다.</div>
+                    </div>
+
+                    <div class="top-map-shell">
+                        <div class="panel map-panel">
+                            <div class="panel-head">
+                                <h4><i class="fas fa-map-marked-alt"></i> 지도</h4>
+                                <div class="panel-meta">좌표가 있는 결과만 표시</div>
+                            </div>
+                            <div class="panel-body">
+                                <div id="kakaoMapWrapper">
+                                    <div class="empty-card" id="mapEmptyState">
+                                        <div>
+                                            <i class="fas fa-location-dot"></i>
+                                            <h5>분석 대기 중</h5>
+                                            <p>분석을 실행하면 후보 건물 위치가 지도에 표시됩니다.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel status-panel">
+                            <div class="panel-head">
+                                <h4><i class="fas fa-radar"></i> 상태 요약</h4>
+                                <div class="panel-meta">현재 상태</div>
+                            </div>
+                            <div class="panel-body">
+                                <div class="status-stack">
+                                    <div class="status-pill" id="analysisStatus"><i class="fas fa-circle-info"></i><span>분석 실행 전입니다.</span></div>
+                                    <div class="status-pill" id="mapStatus"><i class="fas fa-map"></i><span>지도 데이터 준비 중입니다.</span></div>
+                                    <div class="status-pill"><i class="fas fa-arrow-up-right-from-square"></i><span>상세보기를 클릭하면 건물별 거래 내역을 확인할 수 있습니다.</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="summary-grid" id="summaryGrid">
+                        <div class="summary-card"><div class="summary-card-label">조회 건수</div><p class="summary-card-value" id="summaryCount">-</p><div class="summary-card-desc">현재 화면에 표시된 건수</div></div>
+                        <div class="summary-card"><div class="summary-card-label">최고 급등점수</div><p class="summary-card-value" id="summaryTopScore">-</p><div class="summary-card-desc">가장 높은 score</div></div>
+                        <div class="summary-card"><div class="summary-card-label">평균 거래금액</div><p class="summary-card-value" id="summaryAvgDeal">-</p><div class="summary-card-desc">현재 결과 기준 평균</div></div>
+                        <div class="summary-card"><div class="summary-card-label">최근 거래월</div><p class="summary-card-value" id="summaryLatestTrade">-</p><div class="summary-card-desc">가장 최근 거래월</div></div>
+                    </div>
+
+                    <div class="panel table-panel">
+                        <div class="panel-head">
+                            <h4><i class="fas fa-table"></i> 후보 리스트</h4>
+                            <div class="panel-meta">지도와 함께 보는 결과표</div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="table-wrap">
+                                <table class="table results-table align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>순위</th>
+                                            <th>건물 / 위치</th>
+                                            <th class="num-col">급등점수</th>
+                                            <th class="num-col">신뢰도</th>
+                                            <th>최근거래월</th>
+                                            <th class="num-col">평균거래금액</th>
+                                            <th>층유형</th>
+                                            <th>상세</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="resultsTableBody">
+                                        <tr>
+                                            <td colspan="8">
+                                                <div class="empty-card">
+                                                    <div>
+                                                        <i class="fas fa-chart-simple"></i>
+                                                        <h5>아직 표시할 결과가 없습니다</h5>
+                                                         <p>분석 조건을 입력하고 실행하면 결과가 표시됩니다.</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    {% include 'partials/shared_script.html' %}
+</body>
+</html>

@@ -1,0 +1,394 @@
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+{% if kakao_js_key %}
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey={{ kakao_js_key }}"></script>
+{% endif %}
+<script>
+    const KAKAO_JS_KEY_AVAILABLE = {{ 'true' if kakao_js_key else 'false' }};
+    let kakaoMap = null;
+    let kakaoMarkers = [];
+    let kakaoOverlays = [];
+    window.currentAnalysisContext = null;
+
+    function escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return '-';
+        }
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatMoney(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) {
+            return '-';
+        }
+        return `${num.toLocaleString()}만원`;
+    }
+
+    function setStatusPill(id, message, level = 'default', icon = 'fa-circle-info') {
+        const element = document.getElementById(id);
+        if (!element) {
+            return;
+        }
+        element.dataset.level = level;
+        element.innerHTML = `<i class="fas ${icon}"></i><span>${escapeHtml(message)}</span>`;
+    }
+
+    function showMode(mode) {
+        document.querySelectorAll('.mode-btn').forEach((button) => {
+            button.classList.toggle('active', button.dataset.mode === mode);
+        });
+        const combinedPanel = document.getElementById('combinedPanel');
+        const districtPanel = document.getElementById('districtPanel');
+        if (combinedPanel) {
+            combinedPanel.classList.toggle('active', mode === 'combined');
+        }
+        if (districtPanel) {
+            districtPanel.classList.toggle('active', mode === 'district');
+        }
+    }
+
+    function clearKakaoMarkers() {
+        kakaoMarkers.forEach((marker) => marker.setMap(null));
+        kakaoMarkers = [];
+        kakaoOverlays.forEach((overlay) => overlay.setMap(null));
+        kakaoOverlays = [];
+    }
+
+    function createRankMarkerImage(rank) {
+        const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="17" fill="#0f172a" stroke="#ffffff" stroke-width="3" />
+                <text x="20" y="24" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">${String(rank)}</text>
+            </svg>
+        `;
+        const encoded = encodeURIComponent(svg.trim());
+        return new kakao.maps.MarkerImage(`data:image/svg+xml;charset=UTF-8,${encoded}`, new kakao.maps.Size(40, 40), {
+            offset: new kakao.maps.Point(20, 20)
+        });
+    }
+
+    function ensureKakaoMap() {
+        if (!KAKAO_JS_KEY_AVAILABLE || typeof kakao === 'undefined' || !kakao.maps) {
+            return false;
+        }
+        if (!kakaoMap) {
+            document.getElementById('kakaoMapWrapper').innerHTML = '<div id="kakaoMap"></div>';
+            kakaoMap = new kakao.maps.Map(document.getElementById('kakaoMap'), {
+                center: new kakao.maps.LatLng(37.5665, 126.9780),
+                level: 7
+            });
+        }
+        return true;
+    }
+
+    function renderKakaoMap(results, title) {
+        const wrapper = document.getElementById('kakaoMapWrapper');
+        const validPoints = (results || []).filter((item) => typeof item.lat === 'number' && typeof item.lng === 'number');
+
+        if (!KAKAO_JS_KEY_AVAILABLE) {
+            wrapper.innerHTML = '<div class="map-disabled">지도 서비스가 준비되지 않아 지도를 표시할 수 없습니다.</div>';
+            setStatusPill('mapStatus', '지도 서비스를 사용할 수 없는 상태입니다.', 'warning', 'fa-key');
+            return;
+        }
+
+        if (validPoints.length === 0) {
+            clearKakaoMarkers();
+            wrapper.innerHTML = '<div class="empty-card"><div><i class="fas fa-location-dot"></i><h5>지도에 표시할 위치가 없습니다</h5><p>이번 결과에는 위치 정보가 있는 건물이 없습니다.</p></div></div>';
+            kakaoMap = null;
+            setStatusPill('mapStatus', '위치 정보가 있는 결과가 없어 지도에 표시할 수 없습니다.', 'warning', 'fa-triangle-exclamation');
+            return;
+        }
+
+        if (!ensureKakaoMap()) {
+            setStatusPill('mapStatus', '지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', 'danger', 'fa-circle-xmark');
+            return;
+        }
+
+        clearKakaoMarkers();
+        const bounds = new kakao.maps.LatLngBounds();
+
+        validPoints.forEach((item, index) => {
+            const position = new kakao.maps.LatLng(item.lat, item.lng);
+            const rankValue = Number.isInteger(item.rank) ? item.rank : index + 1;
+            const marker = new kakao.maps.Marker({
+                position: position,
+                map: kakaoMap,
+                image: createRankMarkerImage(rankValue),
+                title: `${item.umdNm || ''} ${item.jibun || ''}`.trim()
+            });
+            const score = item.surge_score !== undefined && item.surge_score !== null ? `${item.surge_score}%` : '-';
+            const overlay = new kakao.maps.CustomOverlay({
+                content: `<div class="score-chip">${escapeHtml(score)}</div>`,
+                position: position,
+                yAnchor: 1.9
+            });
+
+            kakao.maps.event.addListener(marker, 'mouseover', function () {
+                overlay.setMap(kakaoMap);
+            });
+            kakao.maps.event.addListener(marker, 'mouseout', function () {
+                overlay.setMap(null);
+            });
+
+            kakaoMarkers.push(marker);
+            kakaoOverlays.push(overlay);
+            bounds.extend(position);
+        });
+
+        kakaoMap.setBounds(bounds);
+        setStatusPill('mapStatus', `${title}: 좌표 ${validPoints.length}건을 지도에 표시했습니다.`, 'success', 'fa-map-location-dot');
+    }
+
+    function updateSummaryCards(rows) {
+        const scores = rows.map((row) => Number(row.surge_score)).filter((value) => Number.isFinite(value));
+        const amounts = rows.map((row) => Number(row.avg_dealAmount)).filter((value) => Number.isFinite(value));
+        const latestTrade = rows.map((row) => String(row.latest_trade_ymd || '').trim()).filter(Boolean).sort().pop();
+
+        document.getElementById('summaryCount').textContent = `${rows.length}건`;
+        document.getElementById('summaryTopScore').textContent = scores.length ? `${Math.max(...scores).toFixed(2)}%` : '-';
+        document.getElementById('summaryAvgDeal').textContent = amounts.length ? `${Math.round(amounts.reduce((sum, value) => sum + value, 0) / amounts.length).toLocaleString()}만원` : '-';
+        document.getElementById('summaryLatestTrade').textContent = latestTrade || '-';
+    }
+
+    function viewBuildingDetails(sggCd, umdNm, jibun, buildYear) {
+        if (!window.currentAnalysisContext) {
+            alert('분석 조건 정보가 없습니다.');
+            return;
+        }
+        const context = window.currentAnalysisContext;
+        const url = `/building_detail?sggCd=${encodeURIComponent(sggCd)}&umdNm=${encodeURIComponent(umdNm)}&jibun=${encodeURIComponent(jibun)}&buildYear=${buildYear}&analysisType=${context.type}&targetYmd=${context.target_ymd}&analysisPeriod=${context.analysis_period}`;
+        window.open(url, '_blank', 'width=1200,height=800');
+    }
+
+    function renderEmptyTable(message, icon) {
+        document.getElementById('resultsTableBody').innerHTML = `
+            <tr>
+                <td colspan="8">
+                    <div class="empty-card compact-empty">
+                        <div>
+                            <i class="fas ${icon}"></i>
+                            <h5>표시할 결과가 없습니다</h5>
+                            <p>${escapeHtml(message)}</p>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    function displayResults(rows, title, message) {
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultSubtitle').textContent = '지도, 요약 카드, 결과표를 한눈에 확인할 수 있습니다.';
+        document.getElementById('resultMessage').textContent = message;
+        updateSummaryCards(rows);
+
+        const tableBody = document.getElementById('resultsTableBody');
+        tableBody.innerHTML = '';
+
+        rows.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            const rank = row.rank || index + 1;
+            const sggCd = row.sggCd || '-';
+            const umdNm = row.umdNm || '-';
+            const jibun = row.jibun || '-';
+            const buildYear = row.buildYear || '-';
+            const buildingName = row.mhouseNm || '건물명 없음';
+            const surgeScore = Number(row.surge_score);
+            const reliability = row.reliability_score || '-';
+            const latestTradeYmd = row.latest_trade_ymd || '-';
+            const avgDealAmount = formatMoney(row.avg_dealAmount);
+            const floorType = row.floor_type || '-';
+            const floorClass = floorType === '지상' ? 'above' : 'below';
+            const locationText = `${umdNm} ${jibun}`.trim();
+
+            tr.innerHTML = `
+                <td><span class="rank-pill">${escapeHtml(rank)}</span></td>
+                <td>
+                    <div class="building-cell">
+                        <span class="building-name">${escapeHtml(buildingName)}</span>
+                        <span class="building-sub">${escapeHtml(locationText)} · ${escapeHtml(sggCd)} · ${escapeHtml(buildYear)}년</span>
+                    </div>
+                </td>
+                <td class="num-col"><span class="score-value">${Number.isFinite(surgeScore) ? `${surgeScore.toFixed(2)}%` : '-'}</span></td>
+                <td class="num-col">${escapeHtml(reliability)}</td>
+                <td>${escapeHtml(latestTradeYmd)}</td>
+                <td class="num-col">${escapeHtml(avgDealAmount)}</td>
+                <td><span class="meta-badge ${floorClass}">${escapeHtml(floorType)}</span></td>
+                <td><button class="detail-btn detail-btn-trigger"><i class="fas fa-arrow-up-right-from-square"></i> 상세보기</button></td>
+            `;
+
+            tr.querySelector('.detail-btn-trigger').addEventListener('click', () => {
+                viewBuildingDetails(sggCd, umdNm, jibun, buildYear);
+            });
+            tableBody.appendChild(tr);
+        });
+    }
+
+    function handleAnalysisSuccess(rows, title, message) {
+        const resultShell = document.getElementById('resultShell');
+        resultShell.style.display = 'block';
+        setStatusPill('analysisStatus', `${title}: ${rows.length}건의 결과를 정리했습니다.`, 'success', 'fa-chart-line');
+
+        if (rows.length > 0) {
+            displayResults(rows, title, message);
+            renderKakaoMap(rows, title);
+            resultShell.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultSubtitle').textContent = '이번 조건에서는 급등 후보가 포착되지 않았습니다.';
+        document.getElementById('resultMessage').textContent = message;
+        updateSummaryCards([]);
+        renderEmptyTable(message, 'fa-face-meh');
+        renderKakaoMap([], title);
+        resultShell.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function handleAnalysisError(title, errorMessage) {
+        const resultShell = document.getElementById('resultShell');
+        resultShell.style.display = 'block';
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultSubtitle').textContent = '분석 요청 중 오류가 발생했습니다.';
+        document.getElementById('resultMessage').textContent = `오류: ${errorMessage}`;
+        updateSummaryCards([]);
+        renderEmptyTable(errorMessage, 'fa-circle-exclamation');
+        setStatusPill('analysisStatus', `분석 실패: ${errorMessage}`, 'danger', 'fa-circle-xmark');
+        renderKakaoMap([], title);
+        resultShell.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.querySelectorAll('.mode-btn').forEach((button) => {
+        button.addEventListener('click', () => showMode(button.dataset.mode));
+    });
+
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
+    document.getElementById('combined_target_ymd').value = currentMonth;
+    document.getElementById('district_target_ymd').value = currentMonth;
+
+    document.getElementById('district_gu').addEventListener('change', function () {
+        const guName = this.value;
+        const districtSelect = document.getElementById('district_name');
+
+        if (guName) {
+            fetch(`/get_districts?gu=${encodeURIComponent(guName)}`)
+                .then((response) => response.json())
+                .then((data) => {
+                    districtSelect.innerHTML = '<option value="">전체 동 (구만 선택시)</option>';
+                    data.districts.forEach((district) => {
+                        districtSelect.innerHTML += `<option value="${district}">${district}</option>`;
+                    });
+                    districtSelect.disabled = false;
+                })
+                .catch(() => {
+                    districtSelect.innerHTML = '<option value="">동 목록 로드 실패</option>';
+                });
+        } else {
+            districtSelect.innerHTML = '<option value="">전체 동 (구만 선택시)</option>';
+            districtSelect.disabled = true;
+        }
+    });
+
+    document.getElementById('combinedForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+        const targetYmd = document.getElementById('combined_target_ymd').value.replace('-', '');
+        const topPercent = document.getElementById('combined_top_percent').value;
+        const analysisPeriod = document.getElementById('combined_analysis_period').value;
+
+        document.getElementById('combinedLoading').style.display = 'block';
+        document.getElementById('combinedFeedback').innerHTML = '';
+        setStatusPill('analysisStatus', '서울 전체 분석 요청을 전송했습니다.', 'default', 'fa-paper-plane');
+
+        fetch('/combined_analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_ymd: targetYmd, top_percent: topPercent, analysis_period: analysisPeriod })
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                document.getElementById('combinedLoading').style.display = 'none';
+                if (data.success) {
+                    window.currentAnalysisContext = { type: 'combined', target_ymd: targetYmd, analysis_period: analysisPeriod };
+                    handleAnalysisSuccess(data.data || [], '서울 전체 분석 결과', data.message || '결과를 불러왔습니다.');
+                    document.getElementById('combinedFeedback').innerHTML = `<div class="message-box">${escapeHtml(data.message || '')}</div>`;
+                } else {
+                    handleAnalysisError('서울 전체 분석 결과', data.error || '알 수 없는 오류');
+                    document.getElementById('combinedFeedback').innerHTML = `<div class="message-box">오류: ${escapeHtml(data.error || '알 수 없는 오류')}</div>`;
+                }
+            })
+            .catch((error) => {
+                document.getElementById('combinedLoading').style.display = 'none';
+                handleAnalysisError('서울 전체 분석 결과', error.message);
+                document.getElementById('combinedFeedback').innerHTML = `<div class="message-box">네트워크 오류: ${escapeHtml(error.message)}</div>`;
+            });
+    });
+
+    document.getElementById('districtForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+        const targetYmd = document.getElementById('district_target_ymd').value.replace('-', '');
+        const guName = document.getElementById('district_gu').value;
+        const districtName = document.getElementById('district_name').value;
+        const topN = document.getElementById('district_top_n').value;
+        const analysisPeriod = document.getElementById('district_analysis_period').value;
+
+        if (!guName) {
+            alert('구를 선택해주세요.');
+            return;
+        }
+
+        document.getElementById('districtLoading').style.display = 'block';
+        document.getElementById('districtFeedback').innerHTML = '';
+        setStatusPill('analysisStatus', `${districtName || guName} 분석 요청을 전송했습니다.`, 'default', 'fa-paper-plane');
+
+        fetch('/district_analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                target_ymd: targetYmd,
+                gu_name: guName,
+                district_name: districtName,
+                top_n: topN,
+                analysis_period: analysisPeriod
+            })
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                document.getElementById('districtLoading').style.display = 'none';
+                const areaName = districtName || guName;
+                if (data.success) {
+                    window.currentAnalysisContext = {
+                        type: 'district',
+                        target_ymd: targetYmd,
+                        analysis_period: analysisPeriod,
+                        gu_name: guName,
+                        district_name: districtName
+                    };
+                    handleAnalysisSuccess(data.data || [], `${areaName} 분석 결과`, data.message || '결과를 불러왔습니다.');
+                    document.getElementById('districtFeedback').innerHTML = `<div class="message-box">${escapeHtml(data.message || '')}</div>`;
+                } else {
+                    handleAnalysisError(`${areaName} 분석 결과`, data.error || '알 수 없는 오류');
+                    document.getElementById('districtFeedback').innerHTML = `<div class="message-box">오류: ${escapeHtml(data.error || '알 수 없는 오류')}</div>`;
+                }
+            })
+            .catch((error) => {
+                document.getElementById('districtLoading').style.display = 'none';
+                const areaName = districtName || guName;
+                handleAnalysisError(`${areaName} 분석 결과`, error.message);
+                document.getElementById('districtFeedback').innerHTML = `<div class="message-box">네트워크 오류: ${escapeHtml(error.message)}</div>`;
+            });
+    });
+
+    // 페이지 로드 시 기본 조건으로 서울 전체 분석 자동 실행
+    window.addEventListener('load', function () {
+        const form = document.getElementById('combinedForm');
+        if (form) {
+            form.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+    });
+</script>
