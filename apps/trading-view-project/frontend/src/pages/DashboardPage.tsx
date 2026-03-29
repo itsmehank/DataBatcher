@@ -397,6 +397,7 @@ export default function DashboardPage({ themeMode }: Props) {
             title={`${titleBase} Weekly (Price + SMA/EMA + Volume)`}
             mode="candles"
             themeMode={themeMode}
+            showOhlcOnHover
             payload={weekly}
             overlayKeys={weeklyOverlayKeys}
             volumeOverlayKeys={["volume_sma_10"]}
