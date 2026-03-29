@@ -51,7 +51,7 @@
 - JWT 인증 구조는 있으나 운영 보안 수준으로 보강이 필요하다.
 
 ### `apps/trading-view-project/`
-- **DB 공유 토폴로지**: `trade` 데이터베이스를 ingest-databatcher와 공유하므로, 배치 전용 계정(읽기만)과 대시보드 전용 계정(쓰기 제한) 분리 설계 필수
+- **DB 공유 토폴로지**: `trade` 데이터베이스를 ingest-databatcher의 `market` 데이터베이스와 공유하므로, 배치 전용 계정(읽기만)과 대시보드 전용 계정(쓰기 제한) 분리 설계 필수
 
 ## 공통 원칙
 
@@ -68,6 +68,7 @@
 - **MongoDB 백업**: 현재 백업 로직 없음, mongodump 기반 정기 백업 스크립트 구현 필요
 - **백업 디렉토리 접근 권한**: 배치 실행 계정 소유, 운영 담당자만 읽기 (600/640 권한), my-insight 백업은 `./backups:/app/backups` 볼륨 마운트로 호스트 접근 가능
 - **백업 검증**: 월간 복구 테스트 및 무결성 체크(checksum) 권장
+- **백업 데이터 암호화 및 보관 기간**: 백업 데이터 암호화 여부와 보관 정책(보관 기간, 삭제 규칙) 결정 필요
 
 ## 착수 전 체크리스트
 
@@ -89,5 +90,5 @@
 - `plans/future-tasks/my-insight-security-hardening-plan.md`: my-insight 보안 강화 계획
 - `plans/future-tasks/gcp-deployment-architecture.md`: GCP 배포 구조 및 네트워크 정책
 - `db/compose/mysql-standalone/README.md`: MySQL 백업/복구 가이드
-- `apps/my-insight-archieve/docs/backup_restore.md`: MongoDB 백업 복구 문서
-- `apps/ingest-databatcher/AGENTS.md`: 배치 프로젝트 운영 규칙
+- `apps/my-insight-archieve/docs/BACKUP_RESTORE.md`: MongoDB 백업 복구 문서
+- `AGENTS.md`: 배치 프로젝트 운영 규칙

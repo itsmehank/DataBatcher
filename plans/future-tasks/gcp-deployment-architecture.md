@@ -88,8 +88,16 @@
 - 백업 보관 위치와 복구 절차
 - 인스턴스 타입 및 디스크 용량 기준
 - **CI/CD 경로 설계**: 코드 → Container Registry → VM 배포 경로 설계 필요 (GitHub Actions 또는 GCP Cloud Build 선택, 배포 파이프라인 구성)
-- **컨테이너 운영 방식**: Docker Compose vs Kubernetes vs systemd 선택, 자동 재시작 정책
-- **nginx 통합 방안**: my-insight 프로젝트에 nginx 설정 추가, 라우팅 규칙 통합
+  - 현재 `.github/workflows/` 디렉토리가 비어 있으므로 CI/CD 파이프라인 구성이 필수
+- **컨테이너 운영 방식**: 다음 옵션 중 선택 필요
+  - `앱별 docker-compose 사용`: 각 앱(my-insight, trading-view, ingest-databatcher)이 독립적인 docker-compose.yml 유지
+  - `VM 레벨 통합 compose`: 단일 docker-compose.yml에서 모든 서비스 통합 관리
+  - `개별 docker run`: 각 컨테이너를 systemd 또는 cron으로 개별 실행
+  - 자동 재시작 정책 및 헬스 체크 메커니즘 함께 결정 필요
+- **nginx 통합 방안**: 
+  - trading-view는 `apps/trading-view-project/frontend/nginx.conf`가 이미 존재하여 reverse proxy 설정 완료
+  - my-insight는 현재 nginx 설정이 없으므로, 이중 프록시(App VM의 reverse proxy → my-insight backend) 구조로 통합 필요
+  - 두 프론트엔드의 라우팅 규칙을 단일 reverse proxy에서 통합 관리하는 방안 검토 필요
 
 ## 착수 전 체크리스트
 
