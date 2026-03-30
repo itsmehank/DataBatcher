@@ -8,6 +8,10 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REAL_ESTATE_DB_NAME: ${REAL_ESTATE_DB_NAME}
+      REAL_ESTATE_TEST_DB_NAME: ${REAL_ESTATE_TEST_DB_NAME}
+      REAL_ESTATE_DB_USER: ${REAL_ESTATE_DB_USER}
+      REAL_ESTATE_DB_PASSWORD: ${REAL_ESTATE_DB_PASSWORD}
       TZ: ${TZ:-Asia/Seoul}
     command:
       [
@@ -19,6 +23,7 @@ services:
       - ../../init/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ../../init/02_auth_schema.sql:/docker-entrypoint-initdb.d/02_auth_schema.sql:ro
       - ./mysql/init/setup.sh:/docker-entrypoint-initdb.d/99_setup.sh:ro
+      - ../../init/03_real_estate_schema.sql:/opt/bootstrap/real_estate_schema.sql:ro
       - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
