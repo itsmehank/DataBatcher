@@ -6,8 +6,8 @@ Split the project into 4 operational domains plus legacy, then keep one standard
 
 ## Standard Runtime Sequence
 
-1. `python -m src.real_estate.cli validate-config --require-api-key`
-2. `python -m src.real_estate.cli init-db`
+1. `set -a && source .env && set +a`
+2. `python -m src.real_estate.cli validate-config --require-api-key`
 3. `python -m src.real_estate.cli ingest --lawd-cds 11650 --start-ymd 202401 --end-ymd 202402`
 4. Optional quality pass:
    - `python -m src.real_estate.cli clean-anomalies`
@@ -117,8 +117,8 @@ Map output consolidation:
 1. Baseline gate
    - `pytest -q tests -m "not db"`
 2. DB gate
-   - init-db succeeds
    - required tables exist
+   - missing tables or drift suspected: `init-db` succeeds
 3. Data gate
    - `rh_trade_analysis` row count > 0
    - analysis tables row count > 0

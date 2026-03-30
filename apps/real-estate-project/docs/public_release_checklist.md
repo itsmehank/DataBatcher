@@ -6,7 +6,6 @@
 
 - [ ] `.env` 파일이 git에 추적되지 않는다.
 - [ ] 실제 DB 비밀번호, API 키, Flask secret이 코드/문서에 하드코딩되어 있지 않다.
-- [ ] GitHub Secrets에 `VM_HOST`, `VM_SSH_KEY`, `VM_SSH_KNOWN_HOSTS`가 설정되어 있다.
 - [ ] VM의 운영용 `.env`는 서버에만 존재하고 저장소에는 없다.
 
 ## 2. Runtime Safety
@@ -19,8 +18,8 @@
 ## 3. Database
 
 - [ ] `python -m src.real_estate.cli validate-config --require-api-key` 성공
-- [ ] `python -m src.real_estate.cli init-db` 성공
-- [ ] `sql/init_schema.sql`이 최신 스키마와 일치한다.
+- [ ] required tables exist in `real_estate` (bootstrap or DBA manual apply completed)
+- [ ] `db/init/03_real_estate_schema.sql`이 최신 스키마와 일치한다.
 - [ ] 운영 DB 계정은 최소 권한 원칙을 따른다.
 
 ## 4. Tests and Verification
@@ -32,8 +31,6 @@
 
 ## 5. Dependency and CI Security
 
-- [ ] `.github/workflows/security.yml`의 `pip-audit`가 통과한다.
-- [ ] `.github/dependabot.yml`가 활성화되어 있다.
 - [ ] `requirements.txt`와 `web_ui/requirements.txt`가 최신 상태다.
 
 ## 6. Documents and Community Readiness
@@ -45,7 +42,6 @@
 
 ## 7. Deployment
 
-- [ ] 루트 `.github/workflows/`의 real-estate 배포 워크플로가 `VM_SSH_KNOWN_HOSTS`를 사용한다.
 - [ ] 배포 후 `http://127.0.0.1:5001/` 응답 검증이 포함되어 있다.
 - [ ] VM cron 또는 배포 스크립트가 `scripts/collect_daily.sh`를 등록한다.
 

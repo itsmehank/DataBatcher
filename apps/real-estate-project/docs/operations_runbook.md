@@ -2,21 +2,21 @@
 
 ## Scope
 
-이 문서는 외부 MySQL을 사용하는 RealEstateProject 운영 절차와 장애 대응 기준을 정의합니다.
+이 문서는 공용 MySQL 인프라 안의 `real_estate` 전용 DB를 사용하는 운영 절차와 장애 대응 기준을 정의합니다.
 공개 전 최종 점검은 `docs/public_release_checklist.md`를 함께 참고합니다.
 
 운영 권장 구조:
 
 - 외부 사용자 요청은 Nginx가 수신
 - Flask 앱은 VM 내부 `127.0.0.1:5001`에만 바인딩
-- GitHub Actions 배포 시 `VM_SSH_KNOWN_HOSTS` secret으로 SSH 호스트 검증 수행
+- DB bootstrap은 루트 `.env` + `db/compose/mysql-standalone/`에서 수행
 
 ## Standard Commands
 
 ```bash
 cd apps/real-estate-project
+set -a && source .env && set +a
 python -m src.real_estate.cli validate-config --require-api-key
-python -m src.real_estate.cli init-db
 python -m src.real_estate.cli ingest --lawd-cds 11650 --start-ymd 202401 --end-ymd 202402
 python -m src.real_estate.cli clean-anomalies
 python -m src.real_estate.cli recalculate-derived
@@ -26,17 +26,17 @@ python -m src.real_estate.cli serve-web --port 5001
 
 ## Schema Management
 
-전체 테이블 스키마는 `sql/init_schema.sql`에 단일 정의(SSOT).
-`init-db` 또는 각 모듈의 `setup_database()` 실행 시 `project_config.ensure_schema()`가 이 SQL을 실행합니다.
-DBA 직접 실행: `mysql -u <user> -p real_estate < sql/init_schema.sql`
+전체 테이블 스키마 실행 기준은 `db/init/03_real_estate_schema.sql`입니다.
+공용 bootstrap이 첫 볼륨 초기화 시 이 DDL을 적용하고, `init-db`는 기존 DB 재적용/복구 용도로만 사용합니다.
+DBA 직접 실행: `mysql -u <user> -p <target_db> < db/init/03_real_estate_schema.sql`
 
 ## Phase Gates
 
 1. Config Gate
    - `validate-config --require-api-key` success
 2. DB Gate
-   - `init-db` success (또는 `sql/init_schema.sql` 직접 실행)
    - required tables exist
+   - missing tables or drift suspected: `init-db` success (또는 `db/init/03_real_estate_schema.sql` 직접 실행)
 3. Ingest Gate
    - `rh_trade_analysis` row count > 0
 4. Analyze Gate
@@ -87,7 +87,7 @@ FROM rh_trade_analysis;
 bash apps/real-estate-project/scripts/collect_initial.sh
 ```
 
-- DB 초기화 + 2020.01~현재 전체 수집 + 후처리
+- bootstrap이 준비된 DB 기준 2020.01~현재 전체 수집 + 후처리
 - 로그: `logs/collect_initial_YYYYMMDD_HHMMSS.log`
 - API 제한 시 다음 날 재실행 가능 (중복 방지 내장)
 
@@ -100,7 +100,7 @@ bash apps/real-estate-project/scripts/collect_initial.sh
 
 - 전월+당월 수집 + 후처리 (개별 단계 실패 시 다음 단계 계속)
 - 로그: `logs/collect_daily_YYYYMMDD.log` (7일 자동 보관)
-- 모노레포 배포 시 루트 `.github/workflows/`에서 동일 cron 등록 로직 구성 필요
+- cron 등록은 VM/system scheduler에서 별도로 관리
 
 ### 수집 실패 대응
 
