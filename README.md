@@ -29,13 +29,15 @@ pip install -r requirements.txt
 ### 2) 로컬 DB 실행(Docker)
 ```bash
 cp .env.example .env
-# .env에서 값 수정 (MYSQL_* / DATABASE_URL)
+# .env에서 값 수정 (MYSQL_* / DATABASE_URL / REAL_ESTATE_*)
 docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
 ```
 
-`db/compose/mysql-standalone/docker-compose-mysql.yaml`을 사용할 때도 동일하게 **루트 `.env`만** 사용합니다.
+`db/compose/mysql-standalone/docker-compose-mysql.yaml`은 **루트 `.env`만** 사용해 공용 MySQL 인스턴스와 기본 DB bootstrap을 구성합니다.
+여기에는 `MYSQL_DATABASE` 계열과 `REAL_ESTATE_*` 계열이 함께 들어가며, 앱 런타임용 개별 `.env`는 각 앱 디렉토리에서 별도로 관리합니다.
 
 MySQL 월간 백업/복구는 `apps/ingest-databatcher/ops/shell/db_backup_monthly.sh`, `apps/ingest-databatcher/ops/shell/db_restore_full.sh`를 사용하세요.
+이 스크립트는 공용 주 DB와 `real_estate` DB를 함께 다룹니다.
 
 ### 3) 스키마 초기화
 ```bash
@@ -43,7 +45,12 @@ python apps/ingest-databatcher/scripts/init_db.py
 ```
 
 ## DB 연결 설정 (중요)
-이 프로젝트는 실행 시점에 어떤 DB로 적재할지 다음 우선순위로 결정합니다.
+이 저장소는 DB 관련 환경 파일을 두 층으로 나눕니다.
+
+- 루트 `.env`: 공용 MySQL bootstrap, 기본 `DATABASE_URL`, real-estate DB/user 생성 정보
+- 앱별 `.env`: 각 앱의 실제 런타임 접속 정보와 앱 전용 시크릿
+
+`apps/ingest-databatcher`는 실행 시점에 어떤 DB로 적재할지 다음 우선순위로 결정합니다.
 
 1. `DATABASE_URL` 환경변수 (최우선)
 2. `apps/ingest-databatcher/config/settings.dev.yaml`의 `database.url`
@@ -60,6 +67,10 @@ MYSQL_DATABASE=market
 MYSQL_USER=YOUR_DB_USER
 MYSQL_PASSWORD=YOUR_DB_PASSWORD
 MYSQL_PORT=3306
+REAL_ESTATE_DB_NAME=real_estate
+REAL_ESTATE_TEST_DB_NAME=real_estate_test
+REAL_ESTATE_DB_USER=YOUR_RE_DB_USER
+REAL_ESTATE_DB_PASSWORD=YOUR_RE_DB_PASSWORD
 
 DATABASE_URL=mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4
 ```
@@ -89,6 +100,8 @@ database:
   export DATABASE_URL="mysql+pymysql://user:pass@127.0.0.1:3306/trade_test?charset=utf8mb4"
   bash apps/ingest-databatcher/ops/shell/daily_all.sh
   ```
+
+`apps/real-estate-project`는 루트 `DATABASE_URL` 대신 앱 내부 `.env`의 `RE_DB_*`를 사용합니다.
 
 ## 실행 가이드
 ### Bulk (초기 대량 적재)

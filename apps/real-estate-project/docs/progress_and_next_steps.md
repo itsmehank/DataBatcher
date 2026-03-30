@@ -7,7 +7,7 @@
 이 문서만 보고 새 세션에서 이어서 진행할 수 있도록 핵심 맥락을 정리합니다.
 
 - 표준 실행 경로는 `python -m src.real_estate.cli ...` 입니다.
-- 이 프로젝트는 외부 DB 전용입니다. 테스트 시에는 임시 Docker MySQL(3308)을 사용했습니다.
+- 현재 모노레포 기준 운영 모델은 공용 MySQL 인스턴스 안의 `real_estate` 전용 DB 사용입니다. 이 문서의 3308 임시 컨테이너 예시는 과거 검증 기록입니다.
 - 현재 상태 기준으로 DB 비의존 테스트는 통과 상태입니다.
   - `pytest -q tests -m "not db"` -> `11 passed, 3 deselected`
 - API 키가 없으면 `ingest`는 401이 정상입니다.
@@ -33,8 +33,9 @@ export RE_DB_NAME=real_estate
 # export RE_API_SERVICE_KEY=실제키
 
 # 4) 파이프라인
+set -a && source .env && set +a
 python -m src.real_estate.cli validate-config
-python -m src.real_estate.cli init-db
+# 필요 시만: python -m src.real_estate.cli init-db
 python -m src.real_estate.cli ingest --lawd-cds 11650 --start-ymd 202401 --end-ymd 202402
 python -m src.real_estate.cli clean-anomalies
 python -m src.real_estate.cli recalculate-derived
@@ -65,7 +66,7 @@ docker rm -f re-mysql-test
 
 ### B. 설정/보안/환경 개선
 - `project_config.py`에 DB 환경변수 strict 검증 로직을 추가했습니다.
-- `.env.example`를 추가해 외부 DB 전용 실행 모델을 명확히 했습니다.
+- `.env.example`를 추가해 앱 런타임 env 모델을 명확히 했습니다.
 - README를 외부 DB 기준으로 재작성했습니다.
 
 ### C. 코드 구조 개선

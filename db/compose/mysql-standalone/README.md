@@ -7,8 +7,9 @@ This directory is a standalone MySQL project extracted from the original Grafana
 - `docker-compose-mysql.yaml`: MySQL-only Docker Compose file
 - `../.env.example`: Root environment template (single source of truth)
 - `mysql/my.cnf`: MySQL server configuration
-- `mysql/init/setup.sh`: Extra bootstrap for `${MYSQL_DATABASE}_test` grants
+- `mysql/init/setup.sh`: Extra bootstrap for `${MYSQL_DATABASE}_test`, `real_estate`, `real_estate_test` grants
 - `../db/init/01_schema.sql`: DataBatcher main schema (mounted into init dir)
+- `../db/init/03_real_estate_schema.sql`: RealEstateProject schema (mounted for bootstrap reuse)
 
 ## Quick Start
 
@@ -19,11 +20,12 @@ This directory is a standalone MySQL project extracted from the original Grafana
    cp .env.example .env
    ```
 
-2. Update values in root `.env` (at minimum `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `DATABASE_URL`).
+2. Update values in root `.env` (at minimum `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `DATABASE_URL`, `REAL_ESTATE_*`).
 
    Keep these values aligned:
    - `MYSQL_DATABASE` == database name in `DATABASE_URL`
    - `MYSQL_PORT` == port in `DATABASE_URL`
+   - `REAL_ESTATE_DB_NAME` / `REAL_ESTATE_TEST_DB_NAME` are the dedicated DBs for `apps/real-estate-project`
 
 3. Start MySQL from project root:
 
@@ -63,9 +65,12 @@ This directory is a standalone MySQL project extracted from the original Grafana
 - This compose and DataBatcher scripts share the same root `.env` values.
 - Init scripts run only on first initialization (when volume is empty):
   - `01_schema.sql` creates DataBatcher tables/views.
-  - `setup.sh` creates `${MYSQL_DATABASE}_test` and grants test DB privileges.
+  - `02_auth_schema.sql` creates the trading-view auth table.
+  - `03_real_estate_schema.sql` provides the real-estate table DDL.
+  - `setup.sh` creates `${MYSQL_DATABASE}_test`, `REAL_ESTATE_DB_NAME`, `REAL_ESTATE_TEST_DB_NAME` and grants the configured users.
 - Auth still uses `MYSQL_*` credentials from root `.env` (password-based login).
-- If schema changes after first init, re-apply with `python apps/ingest-databatcher/scripts/init_db.py` (or reset volume).
+- `apps/real-estate-project` runtime uses its own `.env` for `RE_DB_*`; root `.env` is the bootstrap contract, not the app runtime secret store.
+- If schema changes after first init, re-apply the relevant init path or reset volume.
 - To fully reset data, run:
 
   ```bash
@@ -84,6 +89,7 @@ This directory is a standalone MySQL project extracted from the original Grafana
 
   - 출력 경로: `backups/mysql/monthly/`
   - 파일 형식: `.sql.zst` (zstd 미설치 시 `.sql.gz`)
+  - 기본 출력: `${MYSQL_DATABASE}`와 `${REAL_ESTATE_DB_NAME}` 각각 1개씩
 
 - 복구(대상 MySQL 컨테이너는 먼저 수동 기동):
 
