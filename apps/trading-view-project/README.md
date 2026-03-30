@@ -78,7 +78,20 @@ mysql -u root -p < db/init/02_auth_schema.sql
 # 2. .env에 SECRET_KEY 설정
 echo 'SECRET_KEY=your-random-secret-key-at-least-32-chars' >> apps/trading-view-project/backend/.env
 
-# 3. 사용자 생성
+# 3. 관리자 bootstrap 설정(권장)
+cat <<'EOF' >> apps/trading-view-project/backend/.env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=yourpassword
+EOF
+```
+
+`STARTUP_DB_CHECK=true`일 때 백엔드 startup이 `ADMIN_USERNAME` / `ADMIN_PASSWORD`를 읽어 `users` 테이블의 editor 계정을 생성 또는 필요한 경우 갱신합니다.
+
+둘 중 하나만 설정하면 bootstrap은 실행되지 않고 warning만 남깁니다.
+
+자동 bootstrap을 쓰지 않거나 수동 복구가 필요하면 기존 CLI도 계속 사용할 수 있습니다.
+
+```bash
 cd apps/trading-view-project/backend
 source .venv/bin/activate
 python -m scripts.create_user --username admin --password yourpassword --role editor
@@ -115,6 +128,8 @@ npm run build
 - `ALLOWED_ORIGINS`: CORS 허용 Origin(쉼표로 여러 개 지정 가능)  
   예) `http://localhost:5173`
 - `STARTUP_DB_CHECK`: 서버 시작 시 DB 연결 체크 수행 여부 (`true`/`false`, 기본 `true`)
+- `SECRET_KEY`: JWT 서명 키(인증 사용 시 필수)
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`: startup 시 `users` 테이블의 editor 계정을 bootstrap할 때 사용하는 값(둘 다 설정해야 동작)
 
 ## DB 사전 준비 (권한/객체 점검)
 
