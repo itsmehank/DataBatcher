@@ -60,4 +60,5 @@ BACKEND_PORT=8002 FRONTEND_PORT=5174 ./run-dev.sh
 - `Address already in use`
   - Change ports with `BACKEND_PORT` and `FRONTEND_PORT`.
 - DB connection error
-  - Check `DATABASE_URL` in `backend/.env` or repo root `.env`.
+  - Check `DATABASE_URL` in `backend/.env` first.
+  - Repo root `.env` is for shared MySQL bootstrap and should not be treated as the primary runtime config for this app.

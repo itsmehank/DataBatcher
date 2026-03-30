@@ -3,20 +3,21 @@ RealEstateProject 빠른 실행 치트시트
 표준 실행 경로: `python -m src.real_estate.cli ...`
 
 1) 설정 검증
+- `set -a && source .env && set +a`
 - `python -m src.real_estate.cli validate-config --require-api-key`
 
-2) DB 초기화
-- `python -m src.real_estate.cli init-db`
-
-3) 데이터 수집(예시)
+2) 데이터 수집(예시)
 - `python -m src.real_estate.cli ingest --lawd-cds 11650 --start-ymd 202401 --end-ymd 202402`
 
-4) 분석
+`init-db`는 테이블 누락/복구가 필요할 때만 사용:
+- `python -m src.real_estate.cli init-db`
+
+3) 분석
 - `python -m src.real_estate.cli clean-anomalies` (선택)
 - `python -m src.real_estate.cli recalculate-derived` (선택)
 - `python -m src.real_estate.cli analyze`
 
-5) 웹 실행
+4) 웹 실행
 - `python -m src.real_estate.cli serve-web --port 5001`
 
 상세 가이드(필수 확인)

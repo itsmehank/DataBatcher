@@ -12,10 +12,10 @@ Follow these conventions unless the user explicitly asks otherwise.
 - Main language: Python (3.9)
 - Main domain: Korean real-estate transaction ingestion, analysis, and surge detection
 - Core runtime dependencies: `mysql-connector-python`, `pandas`, `numpy`, `python-dateutil`, `requests`, `flask`, `folium`
-- Database: MySQL (`real_estate`), with heavy SQL usage
+- Database: shared MySQL instance with dedicated `real_estate` / `real_estate_test` databases
 - UI: Flask app in `web_ui/`
-- Schema SSOT: `sql/init_schema.sql` (all table definitions unified here)
-- Deployment automation reference: app-local `.github/workflows/deploy.yml` template; real monorepo automation should live in the repository root `.github/workflows/`
+- Schema SSOT: `db/init/03_real_estate_schema.sql`
+- Deployment automation: out of scope in this monorepo task set
 - Data collection scripts: `scripts/collect_initial.sh`, `scripts/collect_daily.sh`
 - Nginx example config: `ops/nginx/real-estate.conf`
 - Public release checklist: `docs/public_release_checklist.md`
@@ -65,36 +65,33 @@ If user asks for linting, use safe ad-hoc checks:
 Do not assume lint tools exist unless installed in the current environment.
 
 ## Test Commands
-This repo uses script-style tests, not a formal pytest suite.
+This repo has a formal pytest suite under `tests/` and also keeps a few ad-hoc utility scripts.
 
-### Full test scripts
-- Building query test suite:
+### Preferred pytest suite
+- Run unit + non-DB integration tests:
+  - `pytest -q tests -m "not db"`
+- Run DB integration tests:
+  - `pytest -q tests -m db`
+
+### Supplemental utility scripts
+- Building query smoke script:
   - `python building_query/test_building_query.py`
-- Web UI dummy-mode server smoke test:
+- Web UI dummy-mode server smoke script:
   - `python web_ui/test_app.py`
   - Then verify `GET http://localhost:5002/health`
 
-### Run a single test (important)
-Use direct function invocation:
-
-- Single building query test function:
-  - `python -c "from building_query.test_building_query import test_basic_query; test_basic_query()"`
-- Another single test example:
-  - `python -c "from building_query.test_building_query import test_summary_function; test_summary_function()"`
-
-If you use pytest locally (not guaranteed installed), function targeting would be:
-- `pytest building_query/test_building_query.py::test_basic_query -q`
-
 ## Main Runtime Commands
 - The commands below assume the current working directory is `apps/real-estate-project/`.
+- For direct CLI commands, load runtime env first:
+  - `set -a && source .env && set +a`
 - Run main Flask app:
   - `python -m src.real_estate.cli serve-web --port 5001`
 - Production deployment expectation:
   - Run Flask on `127.0.0.1:5001` behind Nginx (`ops/nginx/real-estate.conf`)
-- Initialize DB schema (via unified SQL):
+- Re-apply DB schema when recovery/manual DDL sync is needed:
   - `python -m src.real_estate.cli init-db`
 - Run schema SQL directly (DBA/manual):
-  - `mysql -u <user> -p real_estate < sql/init_schema.sql`
+  - `mysql -u <user> -p <target_db> < ../../db/init/03_real_estate_schema.sql`
 - Run ingestion pipeline:
   - `python -m src.real_estate.cli ingest --lawd-cds 11650 --start-ymd 202401 --end-ymd 202402`
 - Run analyzer pipeline:
@@ -136,10 +133,9 @@ If you use pytest locally (not guaranteed installed), function targeting would b
 - Keep domain field names aligned with DB schema (`sggCd`, `umdNm`, `deal_ymd`, etc.) when mapping DataFrames/SQL rows.
 
 ### SQL and Database
-- Schema definitions are centralized in `sql/init_schema.sql`.
+- Shared bootstrap DDL lives in `db/init/03_real_estate_schema.sql`.
 - Do not add or modify inline `CREATE TABLE` SQL across multiple modules.
-- If schema changes are needed, update `sql/init_schema.sql` first.
-- `setup_database()` paths should call shared schema bootstrap (`project_config.ensure_schema`).
+- If schema changes are needed, update `db/init/03_real_estate_schema.sql` first.
 - Prefer parameterized queries (`%s` placeholders) for user/input-derived values.
 - Reuse existing transaction patterns:
   - explicit commit on success

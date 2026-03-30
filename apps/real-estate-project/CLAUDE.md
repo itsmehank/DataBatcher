@@ -36,9 +36,9 @@ This is a Korean real estate analysis project that collects and analyzes apartme
 - Uses MySQL with `rh_trade_analysis` as the main transaction table
 - Secondary analysis tables created by `RealEstateAnalyzer`
 - Seoul district codes defined in `gu_codes.json`
-- **Schema SSOT**: `sql/init_schema.sql` — 전체 10개 테이블 정의가 이 파일 하나에 통합
+- **Schema SSOT**: `db/init/03_real_estate_schema.sql` — real-estate 전용 테이블 DDL 기준
 - `project_config.ensure_schema(db_config)` 함수가 SQL 파일을 실행 (프로세스 내 1회)
-- `init-db`, `ingest`, `analyze` 등 어떤 명령이든 최초 실행 시 자동으로 스키마 초기화
+- 공용 MySQL bootstrap이 `real_estate` / `real_estate_test` DB를 준비하고, `init-db`는 기존 DB에 DDL을 다시 적용할 때만 사용
 
 ### Database Connection
 환경변수 기반 (`RE_DB_HOST`, `RE_DB_PORT`, `RE_DB_USER`, `RE_DB_PASSWORD`, `RE_DB_NAME`).
@@ -48,7 +48,7 @@ This is a Korean real estate analysis project that collects and analyzes apartme
 - `RE_FLASK_SECRET`는 필수이며, 하드코딩 fallback이 없습니다.
 - `web_ui/app.py`와 CLI 기본 바인딩은 `127.0.0.1` 기준입니다.
 - 운영 배포는 Nginx 리버스 프록시 뒤에서 수행하는 것을 전제로 합니다.
-- CI 보안 점검: `.github/workflows/security.yml` (`pip-audit`), `.github/dependabot.yml`
+- 자동 CI/workflow는 현재 이 모노레포 범위 밖
 - 배포 예시 설정: `ops/nginx/real-estate.conf`
 - 공개 전 최종 점검: `docs/public_release_checklist.md`
 
