@@ -33,7 +33,7 @@ def _load_lawd_codes(path: str):
 def run_init_db(_args):
     db_config = get_db_config()
     ensure_schema(db_config)
-    print("init-db 완료: 수집/분석/시각화용 테이블 준비 완료")
+    print("init-db 완료: 기존 DB에 수집/분석/시각화용 테이블을 재적용했습니다")
 
 
 def run_ingest(args):
@@ -111,7 +111,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="RealEstateProject 운영 CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_db = subparsers.add_parser("init-db", help="외부 DB에 필요한 테이블 초기화")
+    init_db = subparsers.add_parser("init-db", help="기존 DB에 필요한 테이블 DDL 재적용")
     init_db.set_defaults(func=run_init_db)
 
     ingest = subparsers.add_parser("ingest", help="API에서 거래 데이터 수집/적재")
