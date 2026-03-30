@@ -38,7 +38,16 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-required_vars=(MYSQL_USER MYSQL_PASSWORD MYSQL_DATABASE MYSQL_PORT DATABASE_URL)
+required_vars=(
+    MYSQL_USER
+    MYSQL_PASSWORD
+    MYSQL_DATABASE
+    MYSQL_PORT
+    DATABASE_URL
+    REAL_ESTATE_DB_NAME
+    REAL_ESTATE_DB_USER
+    REAL_ESTATE_DB_PASSWORD
+)
 for var_name in "${required_vars[@]}"; do
     if [ -z "${!var_name:-}" ]; then
         echo "Error: ${var_name} 값이 비어 있습니다 (${ENV_FILE})."
@@ -72,6 +81,55 @@ if [ "${url_port}" != "${MYSQL_PORT}" ]; then
     exit 1
 fi
 
+backup_database() {
+    local db_name="$1"
+    local user_var="$2"
+    local password_var="$3"
+
+    local final_backup="${BACKUP_DIR}/${db_name}_full_${ym}.sql.${ext}"
+    local tmp_backup="${final_backup}.tmp"
+    local sha_file="${final_backup}.sha256"
+    local meta_file="${final_backup}.meta.txt"
+
+    echo "[backup] 백업 생성 시작: ${final_backup}"
+    docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
+        sh -lc 'MYSQL_PWD="${'"${password_var}"'}" mysqldump -u"${'"${user_var}"'}" --single-transaction --quick --routines --events --triggers --set-gtid-purged=OFF --no-tablespaces "'"${db_name}"'"' \
+        | "${compressor_cmd[@]}" > "${tmp_backup}"
+
+    if [ ! -s "${tmp_backup}" ]; then
+        echo "Error: 백업 파일이 비어 있습니다: ${tmp_backup}"
+        rm -f "${tmp_backup}"
+        exit 1
+    fi
+
+    mv "${tmp_backup}" "${final_backup}"
+    shasum -a 256 "${final_backup}" > "${sha_file}"
+
+    cat > "${meta_file}" <<EOF
+created_at=${timestamp}
+database=${db_name}
+port=${MYSQL_PORT}
+backup_file=${final_backup}
+sha256_file=${sha_file}
+compression=${ext}
+EOF
+
+    echo "[backup] 이전 백업 정리 중 (${db_name})..."
+    shopt -s nullglob
+    for old in "${BACKUP_DIR}/${db_name}_full_"*.sql.zst "${BACKUP_DIR}/${db_name}_full_"*.sql.gz; do
+        if [ "${old}" = "${final_backup}" ]; then
+            continue
+        fi
+        rm -f "${old}" "${old}.sha256" "${old}.meta.txt"
+    done
+    shopt -u nullglob
+
+    size=$(du -h "${final_backup}" | awk '{print $1}')
+    echo "[backup] 완료: ${final_backup} (${size})"
+    echo "[backup] 해시: ${sha_file}"
+    echo "[backup] 메타: ${meta_file}"
+}
+
 echo "[backup] DB 접속 가능 여부 확인 중..."
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
     sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin -uroot -h 127.0.0.1 ping --silent'
@@ -87,47 +145,5 @@ else
     compressor_cmd=(gzip -c)
 fi
 
-final_backup="${BACKUP_DIR}/${MYSQL_DATABASE}_full_${ym}.sql.${ext}"
-tmp_backup="${final_backup}.tmp"
-
-echo "[backup] 백업 생성 시작: ${final_backup}"
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
-    sh -lc 'MYSQL_PWD="$MYSQL_PASSWORD" mysqldump -u"$MYSQL_USER" --single-transaction --quick --routines --events --triggers --set-gtid-purged=OFF --no-tablespaces "$MYSQL_DATABASE"' \
-    | "${compressor_cmd[@]}" > "${tmp_backup}"
-
-if [ ! -s "${tmp_backup}" ]; then
-    echo "Error: 백업 파일이 비어 있습니다: ${tmp_backup}"
-    rm -f "${tmp_backup}"
-    exit 1
-fi
-
-mv "${tmp_backup}" "${final_backup}"
-
-sha_file="${final_backup}.sha256"
-meta_file="${final_backup}.meta.txt"
-
-shasum -a 256 "${final_backup}" > "${sha_file}"
-
-cat > "${meta_file}" <<EOF
-created_at=${timestamp}
-database=${MYSQL_DATABASE}
-port=${MYSQL_PORT}
-backup_file=${final_backup}
-sha256_file=${sha_file}
-compression=${ext}
-EOF
-
-echo "[backup] 이전 백업 정리 중..."
-shopt -s nullglob
-for old in "${BACKUP_DIR}/${MYSQL_DATABASE}_full_"*.sql.zst "${BACKUP_DIR}/${MYSQL_DATABASE}_full_"*.sql.gz; do
-    if [ "${old}" = "${final_backup}" ]; then
-        continue
-    fi
-    rm -f "${old}" "${old}.sha256" "${old}.meta.txt"
-done
-shopt -u nullglob
-
-size=$(du -h "${final_backup}" | awk '{print $1}')
-echo "[backup] 완료: ${final_backup} (${size})"
-echo "[backup] 해시: ${sha_file}"
-echo "[backup] 메타: ${meta_file}"
+backup_database "${MYSQL_DATABASE}" MYSQL_USER MYSQL_PASSWORD
+backup_database "${REAL_ESTATE_DB_NAME}" REAL_ESTATE_DB_USER REAL_ESTATE_DB_PASSWORD
