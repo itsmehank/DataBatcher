@@ -38,7 +38,17 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-required_vars=(MYSQL_USER MYSQL_PASSWORD MYSQL_DATABASE MYSQL_PORT MYSQL_ROOT_PASSWORD)
+required_vars=(
+    MYSQL_USER
+    MYSQL_PASSWORD
+    MYSQL_DATABASE
+    MYSQL_PORT
+    MYSQL_ROOT_PASSWORD
+    REAL_ESTATE_DB_NAME
+    REAL_ESTATE_TEST_DB_NAME
+    REAL_ESTATE_DB_USER
+    REAL_ESTATE_DB_PASSWORD
+)
 for var_name in "${required_vars[@]}"; do
     if [ -z "${!var_name:-}" ]; then
         echo "Error: ${var_name} 값이 비어 있습니다 (${ENV_FILE})."
@@ -50,6 +60,18 @@ backup_file=""
 target_db="${MYSQL_DATABASE}"
 recreate_db="false"
 auto_yes="false"
+
+resolve_runtime_credentials() {
+    if [ "$1" = "${REAL_ESTATE_DB_NAME}" ] || [ "$1" = "${REAL_ESTATE_TEST_DB_NAME}" ]; then
+        runtime_user_var="REAL_ESTATE_DB_USER"
+        runtime_password_var="REAL_ESTATE_DB_PASSWORD"
+        verify_table="rh_trade_analysis"
+    else
+        runtime_user_var="MYSQL_USER"
+        runtime_password_var="MYSQL_PASSWORD"
+        verify_table="stock_prices"
+    fi
+}
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -105,6 +127,8 @@ echo "[restore] 파일: ${backup_file}"
 echo "[restore] 대상 DB: ${target_db}"
 echo "[restore] recreate-db: ${recreate_db}"
 
+resolve_runtime_credentials "${target_db}"
+
 if [ "${auto_yes}" != "true" ]; then
     echo ""
     echo "주의: 대상 DB에 데이터가 덮어써질 수 있습니다."
@@ -118,19 +142,19 @@ fi
 if [ "${recreate_db}" = "true" ]; then
     echo "[restore] 대상 DB 재생성 중..."
     docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql sh -lc \
-        "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql -uroot -e \"DROP DATABASE IF EXISTS \\\`${target_db}\\\`; CREATE DATABASE \\\`${target_db}\\\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON \\\`${target_db}\\\`.* TO '\$MYSQL_USER'@'%'; FLUSH PRIVILEGES;\""
+        "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql -uroot -e \"DROP DATABASE IF EXISTS \\\`${target_db}\\\`; CREATE DATABASE \\\`${target_db}\\\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON \\\`${target_db}\\\`.* TO '\${${runtime_user_var}}'@'%'; FLUSH PRIVILEGES;\""
 fi
 
 echo "[restore] 데이터 복구 중..."
 if [[ "${backup_file}" == *.zst ]]; then
     zstd -dc "${backup_file}" | docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
-        sh -lc "MYSQL_PWD=\"\$MYSQL_PASSWORD\" mysql -u\"\$MYSQL_USER\" \"${target_db}\""
+        sh -lc 'MYSQL_PWD="${'"${runtime_password_var}"'}" mysql -u"${'"${runtime_user_var}"'}" "'"${target_db}"'"'
 elif [[ "${backup_file}" == *.gz ]]; then
     gunzip -c "${backup_file}" | docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
-        sh -lc "MYSQL_PWD=\"\$MYSQL_PASSWORD\" mysql -u\"\$MYSQL_USER\" \"${target_db}\""
+        sh -lc 'MYSQL_PWD="${'"${runtime_password_var}"'}" mysql -u"${'"${runtime_user_var}"'}" "'"${target_db}"'"'
 elif [[ "${backup_file}" == *.sql ]]; then
     cat "${backup_file}" | docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
-        sh -lc "MYSQL_PWD=\"\$MYSQL_PASSWORD\" mysql -u\"\$MYSQL_USER\" \"${target_db}\""
+        sh -lc 'MYSQL_PWD="${'"${runtime_password_var}"'}" mysql -u"${'"${runtime_user_var}"'}" "'"${target_db}"'"'
 else
     echo "Error: 지원하지 않는 백업 파일 확장자입니다 (.sql/.sql.gz/.sql.zst)."
     exit 1
@@ -138,11 +162,11 @@ fi
 
 echo "[restore] 복구 검증 중..."
 table_count=$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
-    sh -lc "MYSQL_PWD=\"\$MYSQL_PASSWORD\" mysql -N -u\"\$MYSQL_USER\" -D \"${target_db}\" -e \"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE();\"")
+    sh -lc 'MYSQL_PWD="${'"${runtime_password_var}"'}" mysql -N -u"${'"${runtime_user_var}"'}" -D "'"${target_db}"'" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE();"')
 
-stock_exists=$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
-    sh -lc "MYSQL_PWD=\"\$MYSQL_PASSWORD\" mysql -N -u\"\$MYSQL_USER\" -D \"${target_db}\" -e \"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='stock_prices';\"")
+expected_table_exists=$(docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T mysql \
+    sh -lc 'MYSQL_PWD="${'"${runtime_password_var}"'}" mysql -N -u"${'"${runtime_user_var}"'}" -D "'"${target_db}"'" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='"'"${verify_table}"'"';"')
 
 echo "[restore] 완료"
 echo "[restore] table_count=${table_count}"
-echo "[restore] stock_prices_exists=${stock_exists}"
+echo "[restore] ${verify_table}_exists=${expected_table_exists}"
