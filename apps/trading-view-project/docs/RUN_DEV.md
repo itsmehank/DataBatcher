@@ -62,3 +62,16 @@ BACKEND_PORT=8002 FRONTEND_PORT=5174 ./run-dev.sh
 - DB connection error
   - Check `DATABASE_URL` in `backend/.env` first.
   - Repo root `.env` is for shared MySQL bootstrap and should not be treated as the primary runtime config for this app.
+
+## Optional admin bootstrap
+
+- If `ADMIN_USERNAME` and `ADMIN_PASSWORD` are both set in `backend/.env`, backend startup bootstraps that editor account in `users`.
+- Bootstrap runs only when `STARTUP_DB_CHECK=true`.
+- If only one of the two values is set, backend skips bootstrap and logs a warning.
+- Manual fallback remains available:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -m scripts.create_user --username admin --password yourpassword --role editor
+```
