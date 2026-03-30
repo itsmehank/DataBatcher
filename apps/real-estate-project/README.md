@@ -2,8 +2,7 @@
 
 연립/다세대 실거래 데이터를 수집하고, 분석 테이블을 생성한 뒤, 웹 UI로 급등 후보를 시각화하는 프로젝트입니다.
 
-중요: 이 프로젝트는 **DB 인프라를 제공하지 않습니다.**
-MySQL은 사용자가 별도로 준비한 외부 DB(RDS/Cloud SQL/사내 DB/로컬 DB)에 연결해서 사용합니다.
+중요: 이 프로젝트는 모노레포의 공용 MySQL 인프라를 사용하되, 데이터는 `real_estate` / `real_estate_test` 별도 DB에 분리해 저장합니다.
 
 ## 핵심 기능
 
@@ -25,7 +24,7 @@ MySQL은 사용자가 별도로 준비한 외부 DB(RDS/Cloud SQL/사내 DB/로�
 - 웹 화면 기능 설명은 `web_ui/README.md`를 참고합니다.
 - 운영 절차는 `docs/operations_runbook.md`, 공개 전 점검은 `docs/public_release_checklist.md`를 참고합니다.
 
-## 빠른 시작 (외부 DB 전용)
+## 빠른 시작
 
 ### 1) 가상환경 생성 및 패키지 설치
 
@@ -39,47 +38,26 @@ pip install pytest
 
 `web_ui/requirements.txt`는 웹 런타임 전용 하위 의존성 목록이며, 일반적인 설치는 루트 `requirements.txt` 기준으로 진행합니다.
 
-### 2) DB 사전 준비(SQL)
+### 2) 공용 MySQL bootstrap 실행
 
-이 프로젝트는 DB를 자동 생성/관리하지 않으므로, 먼저 MySQL에서 스키마와 권한을 준비해야 합니다.
-아래 SQL은 `root` 또는 동등 권한 계정으로 실행하세요.
+루트 `.env`는 공용 MySQL 인스턴스와 DB bootstrap 계약을 정의합니다.
 
-데이터베이스 생성:
-
-```sql
-CREATE DATABASE IF NOT EXISTS real_estate
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+```bash
+cp .env.example .env
+# MYSQL_* / DATABASE_URL / REAL_ESTATE_* 값 수정
+docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
 ```
 
-프로젝트 실행 계정 권한 부여(예: `hank@'%'`):
+첫 볼륨 초기화 시 다음이 자동으로 준비됩니다.
 
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX
-ON real_estate.* TO 'hank'@'%';
-```
+- 주 DB(`MYSQL_DATABASE`) + 테스트 DB(`${MYSQL_DATABASE}_test`)
+- real-estate 운영 DB(`REAL_ESTATE_DB_NAME`) + 테스트 DB(`REAL_ESTATE_TEST_DB_NAME`)
+- `MYSQL_USER`, `REAL_ESTATE_DB_USER` 권한 부여
+- `real_estate` 계열 테이블 DDL 적용
 
-검증용으로 생성 후 삭제 테스트까지 하려면 `DROP` 권한을 임시 부여:
+### 3) 앱 환경 변수 설정
 
-```sql
-GRANT DROP ON real_estate.* TO 'hank'@'%';
-SHOW GRANTS FOR 'hank'@'%';
-```
-
-검증 완료 후 `DROP` 권한 회수 권장:
-
-```sql
-REVOKE DROP ON real_estate.* FROM 'hank'@'%';
-SHOW GRANTS FOR 'hank'@'%';
-```
-
-주의:
-
-- 접속 주체가 `hank@localhost`로 인식되는 환경이면 동일 권한을 `'hank'@'localhost'`에도 부여해야 합니다.
-
-### 3) 환경 변수 설정
-
-`.env.example`를 참고해 환경변수를 설정하세요.
+앱 런타임은 `apps/real-estate-project/.env.example`를 기준으로 설정합니다.
 
 ```bash
 cd apps/real-estate-project
@@ -87,6 +65,11 @@ cp .env.example .env
 # .env 파일에서 값 수정 후
 set -a && source .env && set +a
 ```
+
+루트 `.env`와 앱 `.env`의 역할은 다릅니다.
+
+- 루트 `.env`: 공용 MySQL bootstrap용
+- `apps/real-estate-project/.env`: real-estate 런타임용
 
 주의: `.env`에는 실제 키/비밀번호가 들어가므로 커밋하지 마세요.
 
@@ -120,25 +103,16 @@ set -a && source .env && set +a
 
 ```bash
 cd apps/real-estate-project
+set -a && source .env && set +a
 python -m src.real_estate.cli validate-config
 python -m src.real_estate.cli validate-config --require-api-key
 ```
 
-### 5) DB 초기화
+### 5) 데이터 수집
 
 ```bash
 cd apps/real-estate-project
-python -m src.real_estate.cli init-db
-```
-
-전체 테이블 스키마는 `sql/init_schema.sql`에 정의되어 있으며, `init-db` 실행 시 이 파일이 실행됩니다.
-`ingest`, `analyze` 등 각 모듈도 내부적으로 동일한 스키마 파일을 사용하므로, `init-db`를 생략해도 최초 실행 시 자동으로 테이블이 생성됩니다.
-DBA가 직접 실행할 경우: `mysql -u <user> -p real_estate < sql/init_schema.sql`
-
-### 6) 데이터 수집
-
-```bash
-cd apps/real-estate-project
+set -a && source .env && set +a
 python -m src.real_estate.cli ingest --start-ymd 202001 --end-ymd 202412
 ```
 
@@ -146,13 +120,20 @@ python -m src.real_estate.cli ingest --start-ymd 202001 --end-ymd 202412
 
 ```bash
 cd apps/real-estate-project
+set -a && source .env && set +a
 python -m src.real_estate.cli ingest --lawd-cds 11650,11710 --start-ymd 202301 --end-ymd 202412
 ```
 
-### 7) 분석 실행
+공용 bootstrap 또는 DBA 수동 반영으로 `real_estate` 계열 DB와 테이블이 이미 준비된 상태를 전제로 합니다.
+
+`init-db`는 기본 적재 절차가 아니라, 기존 DB에 real-estate DDL을 다시 적용해야 할 때만 사용합니다.
+실행 SQL 원본은 `db/init/03_real_estate_schema.sql`입니다.
+
+### 6) 분석 실행
 
 ```bash
 cd apps/real-estate-project
+set -a && source .env && set +a
 python -m src.real_estate.cli clean-anomalies
 python -m src.real_estate.cli recalculate-derived
 python -m src.real_estate.cli analyze
@@ -160,10 +141,11 @@ python -m src.real_estate.cli analyze
 
 품질 보정이 필요 없으면 `clean-anomalies`, `recalculate-derived`는 생략 가능합니다.
 
-### 8) 웹 실행
+### 7) 웹 실행
 
 ```bash
 cd apps/real-estate-project
+set -a && source .env && set +a
 python -m src.real_estate.cli serve-web --port 5001
 ```
 
@@ -177,7 +159,7 @@ python -m src.real_estate.cli serve-web --port 5001
 
 ## CLI 명령 요약
 
-- `init-db`: 수집/분석/시각화에 필요한 테이블 초기화
+- `init-db`: 기존 DB에 real-estate DDL을 다시 적용할 때 사용하는 복구/수동 명령
 - `ingest`: API 데이터 수집/적재
 - `analyze`: 분석 테이블 생성
 - `clean-anomalies`: 원천 데이터 대지권 이상치 보정
@@ -323,7 +305,8 @@ Kakao JavaScript 키를 사용할 때는 Kakao 개발자 콘솔에 사이트 도
 ## DB 권한 가이드 (최소 권한 권장)
 
 - `init-db`
-  - 필요 권한: `CREATE DATABASE`, `CREATE TABLE`, `ALTER`(마이그레이션 시), `INDEX`
+  - 필요 권한: `CREATE TABLE`, `ALTER`(마이그레이션 시), `INDEX`
+  - 전제: 대상 DB는 bootstrap 또는 DBA 수동 작업으로 이미 생성되어 있어야 함
 - `ingest`
   - 필요 권한: `SELECT`, `INSERT`, `UPDATE`, `DELETE`
 - `analyze`
@@ -369,7 +352,7 @@ pytest -q tests -m db
 bash apps/real-estate-project/scripts/collect_initial.sh
 ```
 
-DB 초기화(`init-db`) + 2020.01부터 현재까지 전체 수집 + 후처리 파이프라인을 순차 실행합니다.
+2020.01부터 현재까지 전체 수집 + 후처리 파이프라인을 순차 실행합니다.
 API 일일 호출량 제한에 걸릴 경우 다음 날 재실행하면 이미 수집된 데이터는 건너뛰고 나머지만 수집합니다.
 
 ### 일일 정기 수집
@@ -387,8 +370,7 @@ bash apps/real-estate-project/scripts/collect_daily.sh
 
 ## VM 배포
 
-앱 내부 `.github/workflows/deploy.yml`은 원본 프로젝트의 배포 템플릿입니다.
-모노레포에 병합한 뒤에는 같은 로직을 루트 `.github/workflows/`로 옮겨서 앱 경로를 `apps/real-estate-project/` 기준으로 맞춰야 합니다.
+앱 내부 `.github/workflows/deploy.yml`은 원본 프로젝트에서 가져온 참고 템플릿이며, 이 모노레포에서는 자동 배포 범위에 포함하지 않습니다.
 
 필요한 GitHub Secrets:
 
@@ -406,14 +388,13 @@ Nginx 예시 설정: `ops/nginx/real-estate.conf`
 ## Security
 
 - 보안 이슈 신고 절차는 `SECURITY.md`를 참고하세요.
-- GitHub Actions 연동 시에는 루트 `.github/workflows/`에서 `apps/real-estate-project/` 경로 기준으로 보안 검사를 구성하세요.
 - 공개 리포지토리 운영 전 `pytest -q tests -m "not db"`와 `python -m src.real_estate.cli validate-config --require-api-key` 실행을 권장합니다.
 
 ## 장애 대응 체크리스트
 
 - DB 연결 실패: `RE_DB_*` 값, DB 접근 제어(보안그룹/방화벽), 사용자 권한 확인
 - API 수집 실패: `RE_API_SERVICE_KEY` 유효성 확인
-- 테이블 누락 오류: `python -m src.real_estate.cli init-db` 재실행
+- 테이블 누락 오류: 공용 bootstrap 상태를 확인한 뒤 `python -m src.real_estate.cli init-db` 재실행
 - 포트 충돌: 다른 `--port` 지정 또는 자동 할당 로그 확인
 
 운영 상세 절차/장애 대응은 `docs/operations_runbook.md`를 참고하세요.
