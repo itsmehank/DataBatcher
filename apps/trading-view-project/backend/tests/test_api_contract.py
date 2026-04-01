@@ -17,6 +17,24 @@ def test_get_dates_returns_values(client: TestClient, monkeypatch) -> None:
     assert response.json() == ["2026-03-13", "2026-03-12"]
 
 
+def test_get_symbol_options_returns_symbol_name_pairs(client: TestClient, monkeypatch) -> None:
+    def fake_fetch_all(sql: str, params=None):
+        return [{"symbol": "AAPL", "name": "Apple Inc."}, {"symbol": "MSFT", "name": "Microsoft Corp."}]
+
+    monkeypatch.setattr(options, "fetch_all", fake_fetch_all)
+
+    response = client.get(
+        "/api/symbol-options",
+        params={"region": "US", "market": "NASDAQ", "category": "A"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"symbol": "AAPL", "name": "Apple Inc."},
+        {"symbol": "MSFT", "name": "Microsoft Corp."},
+    ]
+
+
 def test_invalid_region_returns_400(client: TestClient) -> None:
     response = client.get("/api/options/dates", params={"region": "INVALID"})
 
