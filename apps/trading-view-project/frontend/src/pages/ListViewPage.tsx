@@ -2,12 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import ChartPanel from "../components/ChartPanel";
+import { useSymbolCharts } from "../hooks/useSymbolCharts";
 import { getInitialListViewState } from "../lib/queryState";
-import type { ListType, ListViewItem, Region } from "../types";
+import type { ListType, ListViewItem, Region, ThemeMode } from "../types";
 
 const REGIONS: Region[] = ["US", "KR"];
 
-export default function ListViewPage() {
+type Props = {
+  themeMode: ThemeMode;
+};
+
+export default function ListViewPage({ themeMode }: Props) {
   const { isEditor } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -21,6 +27,7 @@ export default function ListViewPage() {
 
   const [dates, setDates] = useState<string[]>([]);
   const [items, setItems] = useState<ListViewItem[]>([]);
+  const [selectedSymbol, setSelectedSymbol] = useState("");
   const [savingKeys, setSavingKeys] = useState<Record<string, boolean>>({});
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [datesLoading, setDatesLoading] = useState(false);
@@ -29,6 +36,18 @@ export default function ListViewPage() {
 
   const datesRequestIdRef = useRef(0);
   const itemsRequestIdRef = useRef(0);
+
+  const {
+    daily,
+    weekly,
+    dailyHasMoreHistory,
+    weeklyHasMoreHistory,
+    dailyLoadingMoreHistory,
+    weeklyLoadingMoreHistory,
+    loading: chartLoading,
+    loadMoreDailyHistory,
+    loadMoreWeeklyHistory,
+  } = useSymbolCharts({ region, symbol: selectedSymbol, onError: setError });
 
   useEffect(() => {
     if (!isBootstrapped) return;
@@ -94,6 +113,7 @@ export default function ListViewPage() {
 
     if (!date) {
       setItems([]);
+      setSelectedSymbol("");
       setLoading(false);
       return;
     }
@@ -109,6 +129,7 @@ export default function ListViewPage() {
         if (requestId !== itemsRequestIdRef.current) return;
 
         setItems(loaded);
+        setSelectedSymbol((prev) => (prev && loaded.some((item) => item.symbol === prev) ? prev : ""));
       } catch (e) {
         if (!mounted) return;
         if (requestId !== itemsRequestIdRef.current) return;
@@ -160,7 +181,7 @@ export default function ListViewPage() {
     <main className="app-root">
       <header className="topbar">
         <h1>List View</h1>
-        {loading ? <span className="badge">Loading</span> : null}
+        {loading || chartLoading ? <span className="badge">Loading</span> : null}
       </header>
 
       {error ? <div className="error-box">{error}</div> : null}
@@ -234,8 +255,15 @@ export default function ListViewPage() {
                 </tr>
               ) : (
                 items.map((item) => (
-                  <tr key={`${item.symbol}-${item.market}-${item.list_type}`}>
-                    <td>{item.symbol}</td>
+                  <tr
+                    key={`${item.symbol}-${item.market}-${item.list_type}`}
+                    className={item.symbol === selectedSymbol ? "active" : ""}
+                  >
+                    <td>
+                      <button type="button" className="link-button" onClick={() => setSelectedSymbol(item.symbol)}>
+                        {item.symbol}
+                      </button>
+                    </td>
                     <td>{item.name ?? "-"}</td>
                     <td>{item.market}</td>
                     <td>{item.list_type}</td>
@@ -316,6 +344,40 @@ export default function ListViewPage() {
           )}
         </div>
       </section>
+
+      <div className="chart-grid two-col">
+        <ChartPanel
+          title={`${selectedSymbol || "-"} Daily (Price + SMA + Benchmark + Volume)`}
+          mode="candles"
+          themeMode={themeMode}
+          singleAxisHover
+          showOhlcOnHover
+          payload={daily}
+          overlayKeys={["sma_50", "sma_100", "sma_150", "sma_200", "benchmark_close"]}
+          leftScaleKeys={["benchmark_close"]}
+          leftScaleMargins={{ top: 0.05, bottom: 0.65 }}
+          volumeOverlayKeys={["volume_sma_50"]}
+          onNeedMoreHistory={loadMoreDailyHistory}
+          canLoadMoreHistory={dailyHasMoreHistory}
+          isLoadingMoreHistory={dailyLoadingMoreHistory}
+        />
+        <ChartPanel title={`${selectedSymbol || "-"} Daily RS Line`} mode="line" themeMode={themeMode} payload={daily} lineKey="rs_line" />
+      </div>
+
+      <div className="chart-grid one-col">
+        <ChartPanel
+          title={`${selectedSymbol || "-"} Weekly (Price + SMA/EMA + Volume)`}
+          mode="candles"
+          themeMode={themeMode}
+          showOhlcOnHover
+          payload={weekly}
+          overlayKeys={["sma_10", "sma_20", "sma_50", "sma_100", "sma_200", "ema_21"]}
+          volumeOverlayKeys={["volume_sma_10"]}
+          onNeedMoreHistory={loadMoreWeeklyHistory}
+          canLoadMoreHistory={weeklyHasMoreHistory}
+          isLoadingMoreHistory={weeklyLoadingMoreHistory}
+        />
+      </div>
     </main>
   );
 }
