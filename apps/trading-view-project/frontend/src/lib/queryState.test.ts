@@ -4,13 +4,12 @@ import { getInitialDashboardState, getInitialListViewState } from "./queryState"
 
 describe("query state helpers", () => {
   it("parses dashboard query values with defaults", () => {
-    const params = new URLSearchParams("region=KR&date=2026-03-01&market=KOSPI&category=A&symbol=005930");
+    const params = new URLSearchParams("region=KR&date=2026-03-01&market=KOSPI&listCategory=focus");
     expect(getInitialDashboardState(params)).toEqual({
       region: "KR",
       date: "2026-03-01",
       market: "KOSPI",
-      category: "A",
-      symbol: "005930",
+      listCategory: "focus",
     });
   });
 
