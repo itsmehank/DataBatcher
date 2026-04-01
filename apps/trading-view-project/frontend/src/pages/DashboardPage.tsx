@@ -7,6 +7,7 @@ import ChartPanel from "../components/ChartPanel";
 import FilterBar from "../components/FilterBar";
 import MinerviniTable from "../components/MinerviniTable";
 import { REGIONS, useDashboardData } from "../hooks/useDashboardData";
+import { buildDailyExportCsv, buildRsExportCsv, buildWeeklyExportCsv } from "../lib/dashboardExport";
 import type { MinerviniRow, ThemeMode } from "../types";
 
 const DAILY_SMA_KEYS = ["sma_50", "sma_100", "sma_150", "sma_200"] as const;
@@ -26,6 +27,11 @@ type CaptureReadyWaiter = {
   symbol: string;
   resolve: () => void;
   reject: (error: Error) => void;
+};
+
+type ExportAsset = {
+  name: string;
+  blob: Blob;
 };
 
 const waitFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -200,29 +206,94 @@ export default function DashboardPage({ themeMode }: Props) {
   }, [areAllRowsChecked, rows]);
 
   const onDownloadJpeg = useCallback(async () => {
-    if (!captureRef || isExporting) return;
+    if (!captureRef || isExporting || !daily || !weekly || !symbol) return;
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const safeSymbol = symbol || "symbol";
-    const fileName = `benchmark-lab-${region}-${safeSymbol}-${timestamp}.jpeg`;
+    const safeSymbol = sanitizeFilePart(symbol || "symbol");
+    const fileBase = `benchmark-lab-${region}-${safeSymbol}-${timestamp}`;
+
+    const buildCurrentExportAssets = async (): Promise<ExportAsset[]> => {
+      const imageBlob = await (await fetch(await capturePanelJpeg())).blob();
+      return [
+        { name: `${fileBase}.jpeg`, blob: imageBlob },
+        { name: `${fileBase}-daily-90d.csv`, blob: new Blob([buildDailyExportCsv(daily)], { type: "text/csv;charset=utf-8" }) },
+        { name: `${fileBase}-weekly-52w.csv`, blob: new Blob([buildWeeklyExportCsv(weekly)], { type: "text/csv;charset=utf-8" }) },
+        { name: `${fileBase}-rs-90d.csv`, blob: new Blob([buildRsExportCsv(daily)], { type: "text/csv;charset=utf-8" }) },
+      ];
+    };
+
+    const triggerDownload = (asset: ExportAsset) => {
+      const link = document.createElement("a");
+      const href = URL.createObjectURL(asset.blob);
+      link.download = asset.name;
+      link.href = href;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+    };
 
     setIsExporting(true);
     setError("");
     setExportSummary("");
 
     try {
-      const dataUrl = await capturePanelJpeg();
-
-      const link = document.createElement("a");
-      link.download = fileName;
-      link.href = dataUrl;
-      link.click();
+      const assets = await buildCurrentExportAssets();
+      const zip = new JSZip();
+      assets.forEach((asset) => zip.file(asset.name, asset.blob));
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      triggerDownload({ name: `${fileBase}.zip`, blob: zipBlob });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to export JPEG");
+      setError(e instanceof Error ? e.message : "Failed to export ZIP");
     } finally {
       setIsExporting(false);
     }
-  }, [capturePanelJpeg, captureRef, isExporting, region, setError, symbol]);
+  }, [capturePanelJpeg, captureRef, daily, isExporting, region, setError, symbol, weekly]);
+
+  const onDownloadFiles = useCallback(async () => {
+    if (!captureRef || isExporting || !daily || !weekly || !symbol) return;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeSymbol = sanitizeFilePart(symbol || "symbol");
+    const fileBase = `benchmark-lab-${region}-${safeSymbol}-${timestamp}`;
+
+    const assets: ExportAsset[] = [
+      {
+        name: `${fileBase}.jpeg`,
+        blob: await (await fetch(await capturePanelJpeg())).blob(),
+      },
+      {
+        name: `${fileBase}-daily-90d.csv`,
+        blob: new Blob([buildDailyExportCsv(daily)], { type: "text/csv;charset=utf-8" }),
+      },
+      {
+        name: `${fileBase}-weekly-52w.csv`,
+        blob: new Blob([buildWeeklyExportCsv(weekly)], { type: "text/csv;charset=utf-8" }),
+      },
+      {
+        name: `${fileBase}-rs-90d.csv`,
+        blob: new Blob([buildRsExportCsv(daily)], { type: "text/csv;charset=utf-8" }),
+      },
+    ];
+
+    setIsExporting(true);
+    setError("");
+    setExportSummary("");
+
+    try {
+      for (const asset of assets) {
+        const link = document.createElement("a");
+        const href = URL.createObjectURL(asset.blob);
+        link.download = asset.name;
+        link.href = href;
+        link.click();
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+        URL.revokeObjectURL(href);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to export files");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [capturePanelJpeg, captureRef, daily, isExporting, region, setError, symbol, weekly]);
 
   const onDownloadChecked = useCallback(async () => {
     if (isExporting) return;
@@ -298,7 +369,10 @@ export default function DashboardPage({ themeMode }: Props) {
           {loading ? <span className="badge">Loading</span> : null}
           {exportSummary ? <span className="badge">{exportSummary}</span> : null}
           <button type="button" className="export-button" onClick={onDownloadJpeg} disabled={isExporting}>
-            {isExporting ? "Preparing JPEG..." : "Download JPEG"}
+            {isExporting ? "Preparing Export..." : "Download ZIP"}
+          </button>
+          <button type="button" className="export-button" onClick={onDownloadFiles} disabled={isExporting}>
+            {isExporting ? "Preparing Export..." : "Download Files"}
           </button>
           <button type="button" className="export-button" onClick={onDownloadChecked} disabled={isExporting || checkedCount === 0}>
             {batchButtonLabel}
