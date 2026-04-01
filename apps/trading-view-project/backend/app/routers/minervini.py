@@ -60,9 +60,15 @@ def get_minervini(
     region: str = Query("US"),
     date_value: str = Query(..., alias="date"),
     market: str = Query(...),
+    list_category: str = Query("all", alias="listCategory"),
 ) -> list[dict[str, Any]]:
     region_key = parse_region_key(region)
+    allowed = {"focus", "action", "pass", "all"}
+    if list_category not in allowed:
+        raise HTTPException(status_code=400, detail="Invalid listCategory")
+
     tables = get_region_tables(region_key)
+    where_category = "" if list_category == "all" else "AND ls.list_type = :list_type"
     sql = f"""
     SELECT
       m.symbol AS ticker,
@@ -81,9 +87,18 @@ def get_minervini(
      AND BINARY ls.market = BINARY m.market
      AND BINARY ls.symbol = BINARY m.symbol
     WHERE m.date = :date_value AND BINARY m.market = BINARY :market
+      {where_category}
     ORDER BY m.rs_rating DESC
     """
-    rows = fetch_all(sql, {"date_value": date_value, "market": market, "region_key": region_key})
+    rows = fetch_all(
+        sql,
+        {
+            "date_value": date_value,
+            "market": market,
+            "region_key": region_key,
+            "list_type": list_category,
+        },
+    )
     return normalize_row(rows)
 
 
