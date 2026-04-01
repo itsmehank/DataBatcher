@@ -78,7 +78,7 @@ export default function App() {
       </nav>
       <Routes>
         <Route path="/dashboard" element={<DashboardPage themeMode={themeMode} />} />
-        <Route path="/list-view" element={<ListViewPage />} />
+        <Route path="/list-view" element={<ListViewPage themeMode={themeMode} />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
