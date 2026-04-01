@@ -27,13 +27,11 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
   const [region, setRegion] = useState<Region>(REGIONS.includes(initial.region) ? initial.region : "US");
   const [date, setDate] = useState(initial.date);
   const [market, setMarket] = useState(initial.market);
-  const [category, setCategory] = useState(initial.category);
-  const [symbol, setSymbol] = useState(initial.symbol);
+  const [listCategory, setListCategory] = useState<ListType | "all">(initial.listCategory);
+  const [symbol, setSymbol] = useState("");
 
   const [dates, setDates] = useState<string[]>([]);
   const [markets, setMarkets] = useState<string[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [symbols, setSymbols] = useState<string[]>([]);
 
   const [rows, setRows] = useState<MinerviniRow[]>([]);
   const [savingKeys, setSavingKeys] = useState<Record<string, boolean>>({});
@@ -65,10 +63,9 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
     const nextParams: Record<string, string> = { region };
     if (date) nextParams.date = date;
     if (market) nextParams.market = market;
-    if (category) nextParams.category = category;
-    if (symbol) nextParams.symbol = symbol;
+    if (listCategory) nextParams.listCategory = listCategory;
     setSearchParams(nextParams, { replace: true });
-  }, [region, date, market, category, symbol, setSearchParams]);
+  }, [region, date, market, listCategory, setSearchParams]);
 
   useEffect(() => {
     contextRef.current = `${region}:${symbol}`;
@@ -104,43 +101,6 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
   }, [region]);
 
   useEffect(() => {
-    if (!market) return;
-    let mounted = true;
-    (async () => {
-      try {
-        const loaded = await api.getCategories(region, market);
-        if (!mounted) return;
-        setCategories(loaded);
-        setCategory((prev) => (prev && loaded.includes(prev) ? prev : loaded[0] || ""));
-      } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load categories");
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [region, market]);
-
-  useEffect(() => {
-    if (!market || !category) return;
-    let mounted = true;
-    (async () => {
-      try {
-        const loaded = await api.getSymbols(region, market, category);
-        if (!mounted) return;
-        setSymbols(loaded);
-      } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load symbols");
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [region, market, category]);
-
-  useEffect(() => {
     if (!date || !market) {
       setRows([]);
       setSymbol("");
@@ -152,11 +112,11 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
     }
 
     let mounted = true;
-    const currentListContext = `${region}:${date}:${market}`;
+    const currentListContext = `${region}:${date}:${market}:${listCategory}`;
 
     (async () => {
       try {
-        const loaded = await api.getMinervini(region, date, market);
+        const loaded = await api.getMinervini(region, date, market, listCategory);
         if (!mounted) return;
         setRows(loaded);
 
@@ -186,7 +146,7 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
     return () => {
       mounted = false;
     };
-  }, [region, date, market, symbol]);
+  }, [region, date, market, listCategory, symbol]);
 
   useEffect(() => {
     if (!symbol) {
@@ -401,14 +361,12 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
     setDate,
     market,
     setMarket,
-    category,
-    setCategory,
+    listCategory,
+    setListCategory,
     symbol,
     setSymbol,
     dates,
     markets,
-    categories,
-    symbols,
     rows,
     savingKeys,
     daily,
