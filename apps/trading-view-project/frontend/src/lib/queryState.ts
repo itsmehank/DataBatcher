@@ -21,3 +21,10 @@ export const getInitialListViewState = (search: URLSearchParams) => ({
   date: search.get("date") || "",
   listCategory: parseListCategory(search.get("listCategory")),
 });
+
+export const getInitialChartViewState = (search: URLSearchParams) => ({
+  region: parseRegion(search.get("region")),
+  market: search.get("market") || "",
+  category: search.get("category") || "",
+  symbol: search.get("symbol") || "",
+});

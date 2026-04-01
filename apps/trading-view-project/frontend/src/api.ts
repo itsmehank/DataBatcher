@@ -1,4 +1,4 @@
-import type { ChartPayload, ListType, ListViewItem, MinerviniRow, Region } from "./types";
+import type { ChartPayload, ListType, ListViewItem, MinerviniRow, Region, SymbolOption } from "./types";
 
 const qs = (params: Record<string, string | undefined>) => {
   const search = new URLSearchParams();
@@ -59,6 +59,8 @@ export const api = {
     requestJson<string[]>("/api/options/categories", { params: { region, market } }),
   getSymbols: (region: Region, market: string, category: string) =>
     requestJson<string[]>("/api/symbols", { params: { region, market, category } }),
+  getSymbolOptions: (region: Region, market: string, category: string) =>
+    requestJson<SymbolOption[]>("/api/symbol-options", { params: { region, market, category } }),
   getMinervini: (region: Region, date: string, market: string, listCategory: ListType | "all" = "all") =>
     requestJson<MinerviniRow[]>("/api/minervini", { params: { region, date, market, listCategory } }),
   updateMinerviniListType: (

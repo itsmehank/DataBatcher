@@ -28,6 +28,11 @@ export type ListViewItem = {
   memo: string | null;
 };
 
+export type SymbolOption = {
+  symbol: string;
+  name: string | null;
+};
+
 export type CandlePoint = {
   time: string;
   open: number;

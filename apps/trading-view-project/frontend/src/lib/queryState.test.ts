@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getInitialDashboardState, getInitialListViewState } from "./queryState";
+import { getInitialChartViewState, getInitialDashboardState, getInitialListViewState } from "./queryState";
 
 describe("query state helpers", () => {
   it("parses dashboard query values with defaults", () => {
@@ -19,6 +19,16 @@ describe("query state helpers", () => {
       region: "US",
       date: "",
       listCategory: "all",
+    });
+  });
+
+  it("parses chart view query values with defaults", () => {
+    const params = new URLSearchParams("region=KR&market=KOSPI&category=A&symbol=005930");
+    expect(getInitialChartViewState(params)).toEqual({
+      region: "KR",
+      market: "KOSPI",
+      category: "A",
+      symbol: "005930",
     });
   });
 });
