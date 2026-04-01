@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import DashboardPage from "./pages/DashboardPage";
+import ChartViewPage from "./pages/ChartViewPage";
 import ListViewPage from "./pages/ListViewPage";
 import LoginPage from "./pages/LoginPage";
 import type { ThemeMode } from "./types";
@@ -58,6 +59,7 @@ export default function App() {
       <nav className="main-nav">
         <div className="nav-links">
           <NavLink to="/dashboard">Dashboard</NavLink>
+          <NavLink to="/chart-view">Chart View</NavLink>
           <NavLink to="/list-view">List View</NavLink>
         </div>
         <div className="nav-right">
@@ -78,6 +80,7 @@ export default function App() {
       </nav>
       <Routes>
         <Route path="/dashboard" element={<DashboardPage themeMode={themeMode} />} />
+        <Route path="/chart-view" element={<ChartViewPage themeMode={themeMode} />} />
         <Route path="/list-view" element={<ListViewPage themeMode={themeMode} />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

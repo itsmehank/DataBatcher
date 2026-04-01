@@ -296,6 +296,21 @@ body {
   grid-template-columns: repeat(3, minmax(130px, 1fr));
 }
 
+.chart-view-filters {
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+}
+
+.filter-static-value {
+  min-height: 2.2rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--panel);
+  color: var(--text);
+}
+
 .sma-toggle-bar {
   display: flex;
   align-items: center;
