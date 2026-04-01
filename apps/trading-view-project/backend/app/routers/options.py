@@ -113,3 +113,22 @@ def get_symbols(
     """
     rows = fetch_all(sql, {"market": market, "category": category})
     return [row["value"] for row in rows]
+
+
+@router.get("/api/symbol-options")
+def get_symbol_options(
+    region: str = Query("US"),
+    market: str = Query(...),
+    category: str = Query(...),
+) -> list[dict[str, str | None]]:
+    tables = get_region_tables(region)
+    sql = f"""
+    SELECT symbol, name
+    FROM {tables['symbol_master']}
+    WHERE status = 'ACTIVE'
+      AND market = :market
+      AND ({category_expr('name')}) = :category
+    ORDER BY name
+    """
+    rows = fetch_all(sql, {"market": market, "category": category})
+    return [{"symbol": row["symbol"], "name": row.get("name")} for row in rows]
