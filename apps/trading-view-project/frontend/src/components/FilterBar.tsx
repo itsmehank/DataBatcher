@@ -1,18 +1,15 @@
-import type { Region } from "../types";
+import type { ListType, Region } from "../types";
 
 type Props = {
   region: Region;
   date: string;
   market: string;
-  category: string;
-  symbol: string;
+  listCategory: ListType | "all";
   disabled?: boolean;
   regions: Region[];
   dates: string[];
   markets: string[];
-  categories: string[];
-  symbols: string[];
-  onChange: (key: "region" | "date" | "market" | "category" | "symbol", value: string) => void;
+  onChange: (key: "region" | "date" | "market" | "listCategory", value: string) => void;
 };
 
 function SelectField({
@@ -67,18 +64,11 @@ export default function FilterBar(props: Props) {
         onChange={(value) => props.onChange("market", value)}
       />
       <SelectField
-        label="Category"
-        value={props.category}
-        options={props.categories}
+        label="List Type"
+        value={props.listCategory}
+        options={["all", "focus", "action", "pass"]}
         disabled={props.disabled}
-        onChange={(value) => props.onChange("category", value)}
-      />
-      <SelectField
-        label="Ticker"
-        value={props.symbol}
-        options={props.symbols}
-        disabled={props.disabled}
-        onChange={(value) => props.onChange("symbol", value)}
+        onChange={(value) => props.onChange("listCategory", value)}
       />
     </section>
   );

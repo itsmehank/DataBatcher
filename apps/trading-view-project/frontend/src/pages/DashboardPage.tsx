@@ -41,14 +41,12 @@ export default function DashboardPage({ themeMode }: Props) {
     setDate,
     market,
     setMarket,
-    category,
-    setCategory,
+    listCategory,
+    setListCategory,
     symbol,
     setSymbol,
     dates,
     markets,
-    categories,
-    symbols,
     rows,
     savingKeys,
     daily,
@@ -315,20 +313,16 @@ export default function DashboardPage({ themeMode }: Props) {
           region={region}
           date={date}
           market={market}
-          category={category}
-          symbol={symbol}
+          listCategory={listCategory}
           disabled={isExporting}
           regions={REGIONS}
           dates={dates.length ? dates : [date || "-"]}
           markets={markets.length ? markets : [market || "-"]}
-          categories={categories.length ? categories : [category || "-"]}
-          symbols={symbols.length ? symbols : [symbol || "-"]}
           onChange={(key, value) => {
             if (key === "region") setRegion(value as (typeof REGIONS)[number]);
             if (key === "date") setDate(value);
             if (key === "market") setMarket(value);
-            if (key === "category") setCategory(value);
-            if (key === "symbol") setSymbol(value);
+            if (key === "listCategory") setListCategory(value as "all" | "focus" | "action" | "pass");
           }}
         />
 
