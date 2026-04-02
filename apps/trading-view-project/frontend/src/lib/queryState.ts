@@ -7,6 +7,7 @@ export const getInitialDashboardState = (search: URLSearchParams) => ({
   date: search.get("date") || "",
   market: search.get("market") || "",
   listCategory: parseListCategory(search.get("listCategory")),
+  symbol: search.get("symbol") || "",
 });
 
 const parseListCategory = (value: string | null): ListType | "all" => {
