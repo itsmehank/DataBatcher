@@ -34,6 +34,37 @@ minervini-lwc-dashboard/
 - `apps/trading-view-project/backend/.env`: trading-view runtime 연결 정보. `DATABASE_URL`은 실제로 사용할 DB를 가리킨다.
 - 공용 bootstrap을 사용할 때는 보통 루트 `.env`에서 만든 `trade` DB와 앱 `DATABASE_URL`의 DB 이름을 같게 맞춘다.
 
+## 실행 전 설정 파일 가이드
+
+실행 전 확인할 파일은 `apps/trading-view-project/backend/.env` 하나다.
+
+준비 방법:
+
+```bash
+cp apps/trading-view-project/backend/.env.example apps/trading-view-project/backend/.env
+```
+
+필수 값:
+
+- `DATABASE_URL`: trading-view가 접속할 MySQL URL
+- `ALLOWED_ORIGINS`: 프론트엔드 Origin (로컬 기본값 `http://localhost:5173`)
+
+상황별 추가 값:
+
+- `SECRET_KEY`: 로그인/권한 기능을 사용할 때 필수
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`: startup 시 editor 계정 bootstrap이 필요할 때 둘 다 설정
+- `STARTUP_DB_CHECK`: 시작 시 DB readiness 확인 여부
+- `BACKEND_PORT`, `FRONTEND_PORT`: 포트 충돌 시 조정
+
+기본 예시:
+
+```env
+DATABASE_URL=mysql+pymysql://<db_user>:<db_password>@127.0.0.1:3306/trade?charset=utf8mb4
+ALLOWED_ORIGINS=http://localhost:5173
+STARTUP_DB_CHECK=true
+SECRET_KEY=CHANGE_ME_RANDOM_SECRET_AT_LEAST_32_CHARS
+```
+
 ## 빠른 시작 (백엔드 + 프론트 동시 실행)
 
 모노레포 루트(`DataBatcher`)에서:
