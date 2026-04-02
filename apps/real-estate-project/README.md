@@ -81,25 +81,41 @@ set -a && source .env && set +a
 
 주의: `.env`에는 실제 키/비밀번호가 들어가므로 커밋하지 마세요.
 
-필수 DB 변수:
+## 실행 전 설정 파일 가이드
+
+real-estate는 두 종류의 설정 파일을 구분해서 봐야 합니다.
+
+1. 루트 `.env`
+   - 공용 MySQL bootstrap 계약
+   - `REAL_ESTATE_DB_NAME`, `REAL_ESTATE_DB_USER`, `REAL_ESTATE_DB_PASSWORD` 등으로 DB/사용자 생성 기준 정의
+2. `apps/real-estate-project/.env`
+   - 앱 런타임이 실제로 읽는 설정
+   - `RE_DB_*`, `RE_API_SERVICE_KEY`, `RE_FLASK_SECRET` 등을 관리
+
+앱 실행 전 최소 준비:
+
+```bash
+cd apps/real-estate-project
+cp .env.example .env
+```
+
+필수 값:
 
 - `RE_DB_HOST`
 - `RE_DB_PORT`
 - `RE_DB_USER`
 - `RE_DB_PASSWORD`
 - `RE_DB_NAME`
+- `RE_API_SERVICE_KEY` (수집 실행 시)
 
-데이터 수집 시 필수:
+기능별 추가 값:
 
-- `RE_API_SERVICE_KEY`
+- `RE_FLASK_SECRET`: `serve-web` 실행 시 필수
+- `KAKAO_REST_API_KEY`, `KAKAO_JS_KEY`: 지도/지오코딩 기능 사용 시 필요
 
-선택:
+즉, 루트 `.env`로 DB를 준비하고, 앱 `.env`로 real-estate 런타임 접속 대상을 지정한다고 보면 됩니다.
 
-- `RE_FLASK_SECRET` (웹 실행 시 필수)
-- `KAKAO_REST_API_KEY` (서버 주소->좌표 변환)
-- `KAKAO_JS_KEY` (브라우저 Kakao 지도 렌더링)
-- `KAKAO_API_KEY` (`KAKAO_REST_API_KEY` 미설정 시 하위호환)
-- `KAKAO_COORD_CACHE_FILE` (좌표 캐시 파일 경로, 미설정 시 `map_images/kakao_geocode_cache.json`)
+이미 공용 bootstrap 또는 DBA 수동 작업으로 DB/권한이 준비되어 있다면, 실제 앱 실행 시에는 `apps/real-estate-project/.env`만 올바르게 채워도 됩니다.
 
 보안 권장:
 
