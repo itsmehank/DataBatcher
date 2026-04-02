@@ -10,6 +10,7 @@ describe("query state helpers", () => {
       date: "2026-03-01",
       market: "KOSPI",
       listCategory: "focus",
+      symbol: "",
     });
   });
 
@@ -29,6 +30,17 @@ describe("query state helpers", () => {
       market: "KOSPI",
       category: "A",
       symbol: "005930",
+    });
+  });
+
+  it("parses dashboard symbol query when present", () => {
+    const params = new URLSearchParams("region=US&date=2026-03-01&market=NASDAQ&listCategory=focus&symbol=AAPL");
+    expect(getInitialDashboardState(params)).toEqual({
+      region: "US",
+      date: "2026-03-01",
+      market: "NASDAQ",
+      listCategory: "focus",
+      symbol: "AAPL",
     });
   });
 });
