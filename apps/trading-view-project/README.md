@@ -28,6 +28,12 @@ minervini-lwc-dashboard/
 - Node.js 20 이상
 - `trade` 데이터베이스에 접근 가능한 MySQL 인스턴스(예: Docker)
 
+## 공용 MySQL bootstrap과 앱 runtime 설정
+
+- 루트 `.env`: 공용 MySQL bootstrap 계약. 기본 DataBatcher/trading-view DB 이름은 `trade`다.
+- `apps/trading-view-project/backend/.env`: trading-view runtime 연결 정보. `DATABASE_URL`은 실제로 사용할 DB를 가리킨다.
+- 공용 bootstrap을 사용할 때는 보통 루트 `.env`에서 만든 `trade` DB와 앱 `DATABASE_URL`의 DB 이름을 같게 맞춘다.
+
 ## 빠른 시작 (백엔드 + 프론트 동시 실행)
 
 모노레포 루트(`DataBatcher`)에서:
@@ -57,6 +63,7 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 `apps/trading-view-project/backend/.env`에서 `DATABASE_URL`을 실제 환경에 맞게 설정하세요.
+모노레포 공용 bootstrap을 함께 쓰는 경우, 이 값은 일반적으로 루트 `.env`가 준비한 `trade` DB를 가리켜야 합니다.
 
 백엔드 테스트 실행:
 
@@ -123,7 +130,7 @@ npm run build
 `backend/.env.example` 기준:
 
 - `DATABASE_URL`: MySQL 연결 문자열  
-  예) `mysql+pymysql://<db_user>:<db_password>@127.0.0.1:3306/<db_name>?charset=utf8mb4`
+  예) `mysql+pymysql://<db_user>:<db_password>@127.0.0.1:3306/trade?charset=utf8mb4`
   (Docker 백엔드 컨테이너에서 호스트 MySQL에 접속할 때는 `127.0.0.1` 대신 `host.docker.internal` 사용)
 - `ALLOWED_ORIGINS`: CORS 허용 Origin(쉼표로 여러 개 지정 가능)  
   예) `http://localhost:5173`
@@ -194,6 +201,8 @@ ORDER BY table_name;
 DATABASE_URL=mysql+pymysql://dashboard_app:CHANGE_ME_STRONG_PASSWORD@host.docker.internal:3306/trade?charset=utf8mb4
 STARTUP_DB_CHECK=true
 ```
+
+루트 `.env`로 공용 MySQL bootstrap을 수행했다면, `MYSQL_DATABASE=trade`와 위 `DATABASE_URL`의 DB 이름 `trade`가 서로 일치해야 합니다.
 
 ## 구현된 MVP 범위
 

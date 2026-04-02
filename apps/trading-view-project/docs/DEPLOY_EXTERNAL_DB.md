@@ -18,6 +18,12 @@ Create `backend/.env` from `backend/.env.example` and set:
 - `SECRET_KEY` (required if auth is enabled)
 - `ADMIN_USERNAME` and `ADMIN_PASSWORD` (optional startup bootstrap; set both or neither)
 
+If you provision the DB through the monorepo shared bootstrap, keep `DATABASE_URL` aligned with the root `.env` contract:
+
+- DataBatcher / trading-view default DB name: `trade`
+- Root `.env` creates the DB and account contract
+- `backend/.env` tells the trading-view backend which provisioned DB to use at runtime
+
 Example:
 
 ```env
