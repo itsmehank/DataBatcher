@@ -63,7 +63,7 @@ python apps/ingest-databatcher/scripts/init_db.py
 
 ```env
 MYSQL_ROOT_PASSWORD=YOUR_ROOT_PASSWORD
-MYSQL_DATABASE=market
+MYSQL_DATABASE=trade
 MYSQL_USER=YOUR_DB_USER
 MYSQL_PASSWORD=YOUR_DB_PASSWORD
 MYSQL_PORT=3306
@@ -72,7 +72,7 @@ REAL_ESTATE_TEST_DB_NAME=real_estate_test
 REAL_ESTATE_DB_USER=YOUR_RE_DB_USER
 REAL_ESTATE_DB_PASSWORD=YOUR_RE_DB_PASSWORD
 
-DATABASE_URL=mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4
+DATABASE_URL=mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/trade?charset=utf8mb4
 ```
 
 - `username`: `YOUR_DB_USER` 위치
@@ -84,7 +84,7 @@ DATABASE_URL=mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market
 
 ```yaml
 database:
-  url: mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4
+  url: mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/trade?charset=utf8mb4
 ```
 
 > 보안 권장: 실제 비밀번호 하드코딩 대신 `.env` + `DATABASE_URL` 사용을 권장합니다.
@@ -92,7 +92,7 @@ database:
 ### DB 타겟 전환 예시
 - 운영 DB로 실행:
   ```bash
-  export DATABASE_URL="mysql+pymysql://user:pass@127.0.0.1:3306/market?charset=utf8mb4"
+  export DATABASE_URL="mysql+pymysql://user:pass@127.0.0.1:3306/trade?charset=utf8mb4"
   bash apps/ingest-databatcher/ops/shell/daily_all.sh
   ```
 - 테스트 DB로 실행:
