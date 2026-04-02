@@ -1,29 +1,9 @@
 services:
-  mongodb:
-    image: mongo:7
-    container_name: ${INSIGHT_ARCHIVE_STACK:-insight-archive}-mongodb
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DB}
-      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
-      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
-    volumes:
-      - mongo_data:/data/db
-      - ./mongo-init:/docker-entrypoint-initdb.d:ro
-
   backend:
     build:
       context: ./backend
     container_name: ${INSIGHT_ARCHIVE_STACK:-insight-archive}-backend
     restart: unless-stopped
-    depends_on:
-      - mongodb
-    env_file:
-      - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       BACKEND_PORT: ${BACKEND_PORT}
@@ -39,6 +19,9 @@ services:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:
       - ./backups:/app/backups
+    networks:
+      - default
+      - shared-db
 
   frontend:
     build:
@@ -47,12 +30,12 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    env_file:
-      - .env
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
 
-volumes:
-  mongo_data:
+networks:
+  shared-db:
+    external: true
+    name: databatcher-shared-db
