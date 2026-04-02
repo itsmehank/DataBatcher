@@ -16,17 +16,25 @@ Use this checklist after refactors that touch API, dashboard state flow, or char
 
 ## Dashboard flow
 
-- Region/date/market/category/symbol changes update URL query params correctly
+- Region/date/market/listCategory/symbol changes update URL query params correctly
 - Changing symbol quickly does not flash stale chart data
 - Daily/weekly "load more history" works and does not loop duplicate requests
-- List type toggle in table applies optimistic update and rolls back on API failure
-- JPEG export succeeds and excludes `.no-export` area
+- List type toggle in filtered view updates rows immediately and rolls back on API failure
+- ZIP export succeeds and excludes `.no-export` area
+- File export attempts image + 3 CSV downloads for the active symbol
 
 ## List View flow
 
 - Region/date/listCategory changes update URL query params correctly
+- Selecting a symbol updates the lower chart area without navigating away
 - Row save works for trigger/stop/status/memo fields
 - Invalid update payloads surface API error messages
+
+## Chart View flow
+
+- Region/market/category/symbol changes update URL query params correctly
+- Symbol name box follows the selected ticker
+- Daily/RS/Weekly charts load for the selected ticker
 
 ## API contract spot checks
 

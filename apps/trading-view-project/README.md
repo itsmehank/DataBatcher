@@ -198,12 +198,13 @@ STARTUP_DB_CHECK=true
 ## 구현된 MVP 범위
 
 - US 우선 워크플로우(Region 스위치로 KR도 연동)
-- Date / Market / Category / Ticker 필터링
-- Minervini 통과 종목 테이블
+- Dashboard: Date / Market / List Type 필터 + Minervini 통과 종목 테이블
+- Chart View: Region / Market / Category / Ticker 필터 + 종목명 표시
+- List View: Region / Date / List Category 필터 + 선택 종목 하단 차트
 - 일봉 캔들 + 거래량 + SMA(50/100/150/200)
 - 주봉 캔들 + 거래량 + SMA(20/50/100/200) + EMA(21)
 - 일봉 RS 라인 패널
-- URL 쿼리 동기화 (`region`, `date`, `market`, `category`, `symbol`)
+- Dashboard URL 쿼리 동기화 (`region`, `date`, `market`, `listCategory`, `symbol`)
 
 ## 문서
 
