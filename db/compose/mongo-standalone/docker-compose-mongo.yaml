@@ -1,0 +1,47 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: ${MONGO_PROJECT_NAME:-mongo-standalone}-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_APP_DB_NAME}
+      MONGO_APP_DB_NAME: ${MONGO_APP_DB_NAME}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init/01_create_app_user.sh:/docker-entrypoint-initdb.d/01_create_app_user.sh:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--authenticationDatabase",
+          "admin",
+          "-u",
+          "${MONGO_INITDB_ROOT_USERNAME}",
+          "-p",
+          "${MONGO_INITDB_ROOT_PASSWORD}",
+          "--eval",
+          "db.adminCommand('ping').ok",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${MONGO_PORT}:27017"
+    networks:
+      shared-db:
+        aliases:
+          - shared-mongo
+
+volumes:
+  mongo_data:
+
+networks:
+  shared-db:
+    name: databatcher-shared-db
