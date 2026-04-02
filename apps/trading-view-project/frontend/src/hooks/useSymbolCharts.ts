@@ -18,14 +18,34 @@ type Args = {
   onError: (message: string) => void;
 };
 
+export type SymbolChartUiState = {
+  daily: ChartPayload | null;
+  weekly: ChartPayload | null;
+  dailyHasMoreHistory: boolean;
+  weeklyHasMoreHistory: boolean;
+  dailyLoadingMoreHistory: boolean;
+  weeklyLoadingMoreHistory: boolean;
+  loading: boolean;
+};
+
+export const createSymbolChartUiState = (): SymbolChartUiState => ({
+  daily: null,
+  weekly: null,
+  dailyHasMoreHistory: true,
+  weeklyHasMoreHistory: true,
+  dailyLoadingMoreHistory: false,
+  weeklyLoadingMoreHistory: false,
+  loading: false,
+});
+
 export function useSymbolCharts({ region, symbol, onError }: Args) {
-  const [daily, setDaily] = useState<ChartPayload | null>(null);
-  const [weekly, setWeekly] = useState<ChartPayload | null>(null);
-  const [dailyHasMoreHistory, setDailyHasMoreHistory] = useState(true);
-  const [weeklyHasMoreHistory, setWeeklyHasMoreHistory] = useState(true);
-  const [dailyLoadingMoreHistory, setDailyLoadingMoreHistory] = useState(false);
-  const [weeklyLoadingMoreHistory, setWeeklyLoadingMoreHistory] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [daily, setDaily] = useState<ChartPayload | null>(createSymbolChartUiState().daily);
+  const [weekly, setWeekly] = useState<ChartPayload | null>(createSymbolChartUiState().weekly);
+  const [dailyHasMoreHistory, setDailyHasMoreHistory] = useState(createSymbolChartUiState().dailyHasMoreHistory);
+  const [weeklyHasMoreHistory, setWeeklyHasMoreHistory] = useState(createSymbolChartUiState().weeklyHasMoreHistory);
+  const [dailyLoadingMoreHistory, setDailyLoadingMoreHistory] = useState(createSymbolChartUiState().dailyLoadingMoreHistory);
+  const [weeklyLoadingMoreHistory, setWeeklyLoadingMoreHistory] = useState(createSymbolChartUiState().weeklyLoadingMoreHistory);
+  const [loading, setLoading] = useState(createSymbolChartUiState().loading);
 
   const contextRef = useRef("");
   const initialChartRequestIdRef = useRef(0);
@@ -41,6 +61,23 @@ export function useSymbolCharts({ region, symbol, onError }: Args) {
   const dailyInFlightRef = useRef(false);
   const weeklyInFlightRef = useRef(false);
 
+  const resetChartState = useCallback((nextLoading: boolean) => {
+    const nextState = createSymbolChartUiState();
+    setDaily(nextState.daily);
+    setWeekly(nextState.weekly);
+    setDailyHasMoreHistory(nextState.dailyHasMoreHistory);
+    setWeeklyHasMoreHistory(nextState.weeklyHasMoreHistory);
+    setDailyLoadingMoreHistory(nextState.dailyLoadingMoreHistory);
+    setWeeklyLoadingMoreHistory(nextState.weeklyLoadingMoreHistory);
+    setLoading(nextLoading);
+    dailyCursorFromRef.current = null;
+    weeklyCursorFromRef.current = null;
+    dailyInFlightRef.current = false;
+    weeklyInFlightRef.current = false;
+    dailyLoadAbortRef.current?.abort();
+    weeklyLoadAbortRef.current?.abort();
+  }, []);
+
   useEffect(() => {
     contextRef.current = `${region}:${symbol}`;
   }, [region, symbol]);
@@ -55,9 +92,7 @@ export function useSymbolCharts({ region, symbol, onError }: Args) {
 
   useEffect(() => {
     if (!symbol) {
-      setDaily(null);
-      setWeekly(null);
-      setLoading(false);
+      resetChartState(false);
       return;
     }
 
@@ -69,19 +104,10 @@ export function useSymbolCharts({ region, symbol, onError }: Args) {
 
     initialChartAbortRef.current?.abort();
     initialChartAbortRef.current = controller;
-
-    dailyLoadAbortRef.current?.abort();
-    weeklyLoadAbortRef.current?.abort();
-    dailyInFlightRef.current = false;
-    weeklyInFlightRef.current = false;
+    resetChartState(true);
 
     (async () => {
-      setLoading(true);
       onError("");
-      setDailyHasMoreHistory(true);
-      setWeeklyHasMoreHistory(true);
-      setDailyLoadingMoreHistory(false);
-      setWeeklyLoadingMoreHistory(false);
       const to = toISO(new Date());
       const fromDaily = toISO(new Date(Date.now() - 1000 * 60 * 60 * 24 * 180));
       const fromWeekly = toISO(new Date(Date.now() - 1000 * 60 * 60 * 24 * 365 * 2));
@@ -120,7 +146,7 @@ export function useSymbolCharts({ region, symbol, onError }: Args) {
       mounted = false;
       controller.abort();
     };
-  }, [onError, region, symbol]);
+  }, [onError, region, resetChartState, symbol]);
 
   const loadMoreDailyHistory = useCallback(async () => {
     if (!symbol || !daily || !dailyHasMoreHistory) return;
