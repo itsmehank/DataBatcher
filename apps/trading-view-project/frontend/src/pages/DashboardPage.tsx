@@ -177,7 +177,7 @@ export default function DashboardPage({ themeMode }: Props) {
 
       await new Promise<void>((resolve, reject) => {
         captureReadyRef.current = { symbol: targetSymbol, resolve, reject };
-        setSymbol(targetSymbol);
+        setSymbol(targetSymbol, { syncUrl: false });
       });
     },
     [daily?.symbol, error, loading, setSymbol, symbol, weekly?.symbol]
@@ -356,7 +356,7 @@ export default function DashboardPage({ themeMode }: Props) {
       setExportProgress(null);
       setIsExporting(false);
       if (originalSymbol) {
-        setSymbol(originalSymbol);
+        setSymbol(originalSymbol, { syncUrl: false });
       }
     }
   }, [capturePanelJpeg, checkedKeys, date, isExporting, market, region, rows, setError, setSymbol, symbol, waitForSymbolCaptureReady]);

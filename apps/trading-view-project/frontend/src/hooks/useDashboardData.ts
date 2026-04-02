@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 import { api } from "../api";
+import { applyDashboardListTypeChange, buildDashboardSearchParams, pickDashboardSymbol } from "../lib/dashboardState";
 import { getInitialDashboardState } from "../lib/queryState";
 import type { ListType, MinerviniRow, Region } from "../types";
 import { useSymbolCharts } from "./useSymbolCharts";
@@ -22,7 +23,7 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
   const [date, setDate] = useState(initial.date);
   const [market, setMarket] = useState(initial.market);
   const [listCategory, setListCategory] = useState<ListType | "all">(initial.listCategory);
-  const [symbol, setSymbol] = useState("");
+  const [selectedSymbol, setSelectedSymbol] = useState(initial.symbol);
 
   const [dates, setDates] = useState<string[]>([]);
   const [markets, setMarkets] = useState<string[]>([]);
@@ -32,6 +33,16 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
   const [error, setError] = useState<string>("");
 
   const lastListContextRef = useRef("");
+  const skipNextSymbolSearchSyncRef = useRef(false);
+
+  const setSymbol = useCallback((nextSymbol: string, options?: { syncUrl?: boolean }) => {
+    if (options?.syncUrl === false) {
+      skipNextSymbolSearchSyncRef.current = true;
+    }
+    setSelectedSymbol(nextSymbol);
+  }, []);
+
+  const symbol = selectedSymbol;
 
   const {
     daily,
@@ -46,12 +57,14 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
   } = useSymbolCharts({ region, symbol, onError: setError });
 
   useEffect(() => {
-    const nextParams: Record<string, string> = { region };
-    if (date) nextParams.date = date;
-    if (market) nextParams.market = market;
-    if (listCategory) nextParams.listCategory = listCategory;
+    if (skipNextSymbolSearchSyncRef.current) {
+      skipNextSymbolSearchSyncRef.current = false;
+      return;
+    }
+
+    const nextParams = buildDashboardSearchParams({ region, date, market, listCategory, symbol });
     setSearchParams(nextParams, { replace: true });
-  }, [region, date, market, listCategory, setSearchParams]);
+  }, [region, date, market, listCategory, setSearchParams, symbol]);
 
   useEffect(() => {
     let mounted = true;
@@ -91,17 +104,10 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
         if (!mounted) return;
         setRows(loaded);
 
-        const topTicker = loaded[0]?.ticker ?? "";
-        const isContextChanged = lastListContextRef.current !== currentListContext;
-
-        if (!topTicker) {
-          setSymbol("");
-          lastListContextRef.current = currentListContext;
-          return;
-        }
+         const isContextChanged = lastListContextRef.current !== currentListContext;
 
         if (isContextChanged || !symbol || !loaded.some((r) => r.ticker === symbol)) {
-          setSymbol(topTicker);
+          setSymbol(pickDashboardSymbol(loaded, symbol));
         }
 
         lastListContextRef.current = currentListContext;
@@ -120,23 +126,28 @@ export function useDashboardData({ searchParams, setSearchParams }: Args) {
     async (row: MinerviniRow, nextType: ListType | null) => {
       const rowKey = `${row.ticker}:${row.market}`;
       const previousType = row.list_type;
+      const previousRows = rows;
+      const optimisticRows = applyDashboardListTypeChange(rows, row, nextType, listCategory);
+      const optimisticSymbol = pickDashboardSymbol(optimisticRows, symbol);
+
       setSavingKeys((prev) => ({ ...prev, [rowKey]: true }));
-      setRows((prev) =>
-        prev.map((r) => (r.ticker === row.ticker && r.market === row.market ? { ...r, list_type: nextType } : r))
-      );
+      setRows(optimisticRows);
+      if (optimisticSymbol !== symbol) {
+        setSymbol(optimisticSymbol);
+      }
 
       try {
         await api.updateMinerviniListType(region, date, row.market, row.ticker, nextType);
       } catch (e) {
-        setRows((prev) =>
-          prev.map((r) => (r.ticker === row.ticker && r.market === row.market ? { ...r, list_type: previousType } : r))
-        );
+        const rollbackRows = applyDashboardListTypeChange(previousRows, row, previousType, listCategory);
+        setRows(rollbackRows);
+        setSymbol(pickDashboardSymbol(rollbackRows, symbol));
         setError(e instanceof Error ? e.message : "Failed to update list type");
       } finally {
         setSavingKeys((prev) => ({ ...prev, [rowKey]: false }));
       }
     },
-    [region, date]
+    [date, listCategory, region, rows, setSymbol, symbol]
   );
 
   return {
