@@ -57,6 +57,39 @@ docker compose -f apps/my-insight-archieve/docker-compose.yml --env-file apps/my
 - `INSIGHT_ARCHIVE_STACK` 값을 프로젝트별로 다르게 지정하세요.
   - 예: `INSIGHT_ARCHIVE_STACK=insight-archive-v2`
 
+## 실행 전 설정 파일 가이드
+
+이 프로젝트는 `apps/my-insight-archieve/.env` 하나로 Docker와 로컬 실행 설정을 함께 관리합니다.
+
+준비 방법:
+
+```bash
+cp apps/my-insight-archieve/.env.example apps/my-insight-archieve/.env
+```
+
+필수 값:
+
+- `MONGODB_URI`: 백엔드가 접속할 MongoDB URI
+- `JWT_SECRET`: 백엔드 인증 서명 키
+
+Docker 실행 시 자주 확인할 값:
+
+- `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `MONGO_DB`
+- `MONGO_APP_USERNAME`, `MONGO_APP_PASSWORD`
+- `BACKEND_PORT`, `FRONTEND_PORT`
+- `NEXT_PUBLIC_API_BASE_URL`
+
+운영/관리 기능용 값:
+
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`: 기본 관리자 계정 bootstrap
+- `BACKUP_DIR`, `BACKUP_FILE_NAME`: 백업 저장 경로/이름
+- `CORS_ORIGIN`: 백엔드 허용 Origin
+
+주의:
+
+- `.env.example`의 `MONGODB_URI`는 Docker 기준으로 `mongodb` 호스트를 사용한다.
+- 로컬 비-Docker 실행 시에는 보통 `localhost` 기준 URI로 바꿔야 한다.
+
 ## 로컬 개발 실행 (비 Docker)
 
 > 아래 명령도 **모노레포 루트** 기준입니다.
@@ -78,7 +111,7 @@ npm --prefix apps/my-insight-archieve/backend install
 예시:
 
 ```env
-MONGODB_URI=mongodb://admin:adminpassword@localhost:27017/insight_archive?authSource=admin
+MONGODB_URI=mongodb://insight_app:change-this-app-password@localhost:27017/insight_archive?authSource=insight_archive
 JWT_SECRET=change-this-secret
 ```
 
