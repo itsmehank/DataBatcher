@@ -69,14 +69,14 @@ docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
 
 ```yaml
 database:
-  url: mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4
+  url: mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/trade?charset=utf8mb4
 ```
 
 ### 대안: 현재 PowerShell 세션에만 `DATABASE_URL` 지정
 `apps/ingest-databatcher/config/settings.dev.yaml`을 만들지 않으려면, `init_db.py` 실행 전에 아래를 설정하세요.
 
 ```powershell
-$env:DATABASE_URL="mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/market?charset=utf8mb4"
+$env:DATABASE_URL="mysql+pymysql://YOUR_DB_USER:YOUR_DB_PASSWORD@127.0.0.1:3306/trade?charset=utf8mb4"
 ```
 
 주의:
