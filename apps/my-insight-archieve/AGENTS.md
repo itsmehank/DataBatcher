@@ -14,7 +14,8 @@
 - `frontend/`: Next.js 15 App Router + React 19 + TypeScript.
 - `backend/`: NestJS 10 + Mongoose + TypeScript.
 - `docs/`: API, security, backup, and refactor documentation.
-- `docker-compose.yml`: local multi-service orchestration.
+- `docker-compose.yml`: app-local backend/frontend orchestration.
+- Shared Mongo bootstrap lives under `db/compose/mongo-standalone/`.
 
 ## Toolchain Facts
 - Package manager: npm (lockfiles present in `frontend/` and `backend/`).
@@ -78,7 +79,7 @@
 - Never commit `.env` or secrets.
 - `.gitignore` already excludes `.env`, `.env.*`, `node_modules`, `.next`, `dist`, `backups`.
 - `JWT_SECRET` is mandatory in backend auth modules; startup fails when missing.
-- Docker `.env` example uses `mongodb` hostname; local non-docker runs may need localhost URI.
+- App `.env.example` uses `shared-mongo` hostname for Docker stack execution; local non-docker runs may need localhost URI.
 
 ## Verification Commands
 - Backend health check:
