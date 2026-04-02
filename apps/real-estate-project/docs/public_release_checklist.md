@@ -12,7 +12,7 @@
 
 - [ ] Flask 앱이 `127.0.0.1:5001`에만 바인딩된다.
 - [ ] 외부 트래픽은 Nginx 리버스 프록시를 통해 전달된다.
-- [ ] `FLASK_DEBUG=0` 상태에서 운영한다.
+- [ ] 운영 환경에서 `python -m src.real_estate.cli serve-web`를 `--debug` 없이 실행한다.
 - [ ] `RE_FLASK_SECRET`가 충분히 긴 랜덤 문자열로 설정되어 있다.
 
 ## 3. Database
