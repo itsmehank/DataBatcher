@@ -10,6 +10,12 @@
 - 외부 사용자 요청은 Nginx가 수신
 - Flask 앱은 VM 내부 `127.0.0.1:5001`에만 바인딩
 - DB bootstrap은 루트 `.env` + `db/compose/mysql-standalone/`에서 수행
+- 앱 런타임 연결은 `apps/real-estate-project/.env`의 `RE_DB_*`로 수행
+
+역할 분리:
+
+- 루트 `.env` -> 공용 MySQL bootstrap 계약(`real_estate`, `real_estate_test`, 사용자/권한)
+- 앱 `.env` -> real-estate 런타임 접속 정보(`RE_DB_HOST`, `RE_DB_PORT`, `RE_DB_USER`, `RE_DB_PASSWORD`, `RE_DB_NAME`)
 
 ## Standard Commands
 

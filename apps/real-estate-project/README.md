@@ -71,6 +71,14 @@ set -a && source .env && set +a
 - 루트 `.env`: 공용 MySQL bootstrap용
 - `apps/real-estate-project/.env`: real-estate 런타임용
 
+권장 대응 관계:
+
+- 루트 `.env`의 `REAL_ESTATE_DB_NAME` -> 앱 `.env`의 `RE_DB_NAME`
+- 루트 `.env`의 `REAL_ESTATE_DB_USER` -> 앱 `.env`의 `RE_DB_USER`
+- 루트 `.env`의 `REAL_ESTATE_DB_PASSWORD` -> 앱 `.env`의 `RE_DB_PASSWORD`
+
+즉, 루트 `.env`는 "무엇을 생성할지"를 정하고, 앱 `.env`는 "실행 중인 앱이 어디에 붙을지"를 정합니다.
+
 주의: `.env`에는 실제 키/비밀번호가 들어가므로 커밋하지 마세요.
 
 필수 DB 변수:
