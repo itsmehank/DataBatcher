@@ -27,6 +27,10 @@ This directory is a standalone MySQL project extracted from the original Grafana
    - `MYSQL_PORT` == port in `DATABASE_URL`
    - `REAL_ESTATE_DB_NAME` / `REAL_ESTATE_TEST_DB_NAME` are the dedicated DBs for `apps/real-estate-project`
 
+   Default monorepo contract:
+   - DataBatcher / trading-view bootstrap DB: `trade`
+   - real-estate bootstrap DBs: `real_estate`, `real_estate_test`
+
 3. Start MySQL from project root:
 
    ```bash
@@ -63,6 +67,9 @@ This directory is a standalone MySQL project extracted from the original Grafana
 
 - Data is persisted in the named volume `mysql_data`.
 - This compose and DataBatcher scripts share the same root `.env` values.
+- Root `.env` is the bootstrap contract only. Runtime apps use their own env files:
+  - `apps/trading-view-project/backend/.env` -> `DATABASE_URL` for trading-view runtime
+  - `apps/real-estate-project/.env` -> `RE_DB_*` for real-estate runtime
 - Init scripts run only on first initialization (when volume is empty):
   - `01_schema.sql` creates DataBatcher tables/views.
   - `02_auth_schema.sql` creates the trading-view auth table.
