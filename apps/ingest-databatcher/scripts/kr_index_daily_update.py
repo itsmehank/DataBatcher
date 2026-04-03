@@ -42,6 +42,7 @@ from savers.indicator_saver import IndicatorSaver
 
 # kr_index_prices 테이블에서 조회할 컬럼 (adj_close 없음)
 INDEX_PRICE_COLUMNS = ["date", "open", "high", "low", "close", "volume"]
+INDEX_PRICE_SOURCE_COLUMNS = ["date", "open", "high", "low", "close", "volume", "source"]
 
 
 def build_pipeline(cfg) -> IndicatorPipeline:
@@ -56,6 +57,7 @@ def extract_indicators_for_date(
     outputs: dict,
     pipeline: IndicatorPipeline,
     market: str,
+    source: str,
 ) -> pd.DataFrame:
     """
     계산된 지표(outputs)에서 특정 날짜의 것만 추출하여 long-form으로 변환.
@@ -74,7 +76,7 @@ def extract_indicators_for_date(
     df_long = pipeline.to_long_dataframe(
         symbol=symbol,
         market=market,
-        source="yfinance",
+        source=source,
         outputs=filtered,
         keep_nan=True,
     )
@@ -83,6 +85,18 @@ def extract_indicators_for_date(
         df_long['date'] = pd.to_datetime(df_long['date']).dt.normalize().dt.date
 
     return df_long
+
+
+def resolve_price_source_for_date(df_prices: pd.DataFrame, target_date, default_source: str) -> str:
+    if df_prices is None or df_prices.empty or "source" not in df_prices.columns:
+        return default_source
+
+    target_dt = pd.Timestamp(pd.to_datetime(target_date)).normalize()
+    price_dates = pd.to_datetime(df_prices["date"]).dt.normalize()
+    matched = df_prices.loc[price_dates == target_dt, "source"].dropna()
+    if matched.empty:
+        return default_source
+    return str(matched.iloc[-1])
 
 
 def process_index(
@@ -113,13 +127,16 @@ def process_index(
     start_50 = end_date - timedelta(days=50)
 
     df_new_price = collector.fetch(symbol, start=start_50, end=end_date, market=market)
+    fetch_source = collector.last_fetch_source or "unknown"
+    fetch_note = collector.last_fetch_note
 
     if df_new_price is not None and not df_new_price.empty:
         df_new_price = collector.validate(df_new_price)
 
         if df_new_price is not None and not df_new_price.empty:
             price_rows = collector.save(df_new_price, symbol, mode="insert_only")
-            print(f"{symbol}: 가격 {price_rows}건 처리(insert-only)")
+            note_suffix = f", note={fetch_note}" if fetch_note else ""
+            print(f"{symbol}: 가격 {price_rows}건 처리(insert-only, source={fetch_source}{note_suffix})")
 
     # STEP 2: DB에서 최근 250일 데이터 조회
     start_250 = end_date - timedelta(days=250)
@@ -127,7 +144,7 @@ def process_index(
     df_250 = load_price_data(
         engine, symbol, start_250, end_date,
         table="kr_index_prices",
-        columns=INDEX_PRICE_COLUMNS,
+        columns=INDEX_PRICE_SOURCE_COLUMNS,
     )
 
     if df_250 is None or df_250.empty:
@@ -170,12 +187,15 @@ def process_index(
             print(f"{symbol}: {target_date} 모든 지표 완료 → 중단")
             break
 
+        target_source = resolve_price_source_for_date(df_250, target_date, fetch_source)
+
         df_long_date = extract_indicators_for_date(
             symbol=symbol,
             target_date=target_date,
             outputs=outputs,
             pipeline=pipeline,
             market=market,
+            source=target_source,
         )
 
         if df_long_date is None or df_long_date.empty:
@@ -250,7 +270,7 @@ def main(argv=None):
             sys.exit(2)
 
     # 초기화
-    collector = KRIndexCollector(engine)
+    collector = KRIndexCollector(engine, source_strategy="pykrx_then_yfinance")
     pipeline = build_pipeline(cfg)
     table_long = cfg.get("indicators_kr_index", {}).get("materialization", {}).get("table_long", "kr_index_indicators")
     saver = IndicatorSaver(engine, table_long=table_long)

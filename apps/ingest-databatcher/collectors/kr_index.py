@@ -8,15 +8,21 @@ KOSPI(1001), KOSDAQ(2001) 등 대표 지수의 일봉 OHLCV 데이터를 수집�
 """
 from __future__ import annotations
 
+import logging
+import os
+
 import pandas as pd
 from core.base_collector import BaseCollector
 from core.db_manager import DBManager
+from core.pykrx_adapter import normalize_price_columns, to_pykrx_date
 
 
 YF_INDEX_SYMBOL_MAP = {
     "1001": "^KS11",  # KOSPI
     "2001": "^KQ11",  # KOSDAQ
 }
+
+logger = logging.getLogger(__name__)
 
 
 class KRIndexCollector(BaseCollector):
@@ -34,11 +40,77 @@ class KRIndexCollector(BaseCollector):
 
     category = "kr_index"
 
-    def __init__(self, engine, table: str = "kr_index_prices"):
+    def __init__(
+        self,
+        engine,
+        table: str = "kr_index_prices",
+        source_strategy: str = "yfinance",
+    ):
         self.engine = engine
         self.table = table
+        self.source_strategy = source_strategy
+        self.last_fetch_source: str | None = None
+        self.last_fetch_note: str | None = None
+        self._pykrx_session = None
 
     def fetch(self, symbol: str, start, end, market: str) -> pd.DataFrame:
+        self.last_fetch_source = None
+        self.last_fetch_note = None
+
+        if self.source_strategy == "pykrx_then_yfinance":
+            try:
+                df_pykrx = self._fetch_via_pykrx(symbol, start, end, market)
+                if df_pykrx is not None and not df_pykrx.empty:
+                    validated = self.validate(df_pykrx)
+                    if validated is not None and not validated.empty:
+                        self.last_fetch_source = "pykrx"
+                        return df_pykrx
+                    self.last_fetch_note = "pykrx returned only invalid rows after validation"
+                else:
+                    self.last_fetch_note = "pykrx returned no rows"
+            except Exception as exc:
+                self.last_fetch_note = f"pykrx failed: {exc}"
+
+            logger.warning(
+                "KR index %s: falling back to yfinance (%s)",
+                symbol,
+                self.last_fetch_note,
+            )
+
+        df_yf = self._fetch_via_yfinance(symbol, start, end, market)
+        self.last_fetch_source = "yfinance"
+        return df_yf
+
+    def _fetch_via_pykrx(self, symbol: str, start, end, market: str) -> pd.DataFrame:
+        from pykrx import stock
+
+        self._ensure_pykrx_logged_in()
+
+        df = stock.get_index_ohlcv(
+            to_pykrx_date(pd.to_datetime(start).date()),
+            to_pykrx_date(pd.to_datetime(end).date()),
+            str(symbol),
+            name_display=False,
+        )
+
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        df = df[["시가", "고가", "저가", "종가", "거래량"]].copy()
+        df = normalize_price_columns(df)
+        df = df.reset_index()
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df["symbol"] = symbol
+        df["market"] = market
+        df["source"] = "pykrx"
+
+        expected = [
+            "symbol", "date", "open", "high", "low", "close",
+            "volume", "market", "source",
+        ]
+        return df[expected]
+
+    def _fetch_via_yfinance(self, symbol: str, start, end, market: str) -> pd.DataFrame:
         """
         Fetch index OHLC data from yfinance.
 
@@ -128,6 +200,69 @@ class KRIndexCollector(BaseCollector):
         df = df[expected]
 
         return df
+
+    def _ensure_pykrx_logged_in(self) -> None:
+        if self._pykrx_session is not None:
+            return
+
+        login_id = os.getenv("KRX_LOGIN_ID")
+        login_password = os.getenv("KRX_LOGIN_PASSWORD")
+        if not login_id or not login_password:
+            raise RuntimeError("KRX_LOGIN_ID/KRX_LOGIN_PASSWORD not set")
+
+        import requests
+        from pykrx.website.comm import webio
+
+        session = requests.Session()
+
+        def _session_post_read(self, **params):
+            return session.post(self.url, headers=self.headers, data=params, timeout=15)
+
+        def _session_get_read(self, **params):
+            return session.get(self.url, headers=self.headers, params=params, timeout=15)
+
+        webio.Post.read = _session_post_read
+        webio.Get.read = _session_get_read
+
+        login_page = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001.cmd"
+        login_jsp = "https://data.krx.co.kr/contents/MDC/COMS/client/view/login.jsp?site=mdc"
+        login_url = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
+        user_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        )
+
+        session.get(login_page, headers={"User-Agent": user_agent}, timeout=15)
+        session.get(
+            login_jsp,
+            headers={"User-Agent": user_agent, "Referer": login_page},
+            timeout=15,
+        )
+
+        payload = {
+            "mbrNm": "",
+            "telNo": "",
+            "di": "",
+            "certType": "",
+            "mbrId": login_id,
+            "pw": login_password,
+        }
+        headers = {"User-Agent": user_agent, "Referer": login_page}
+
+        response = session.post(login_url, data=payload, headers=headers, timeout=15)
+        data = response.json()
+        error_code = data.get("_error_code", "")
+
+        if error_code == "CD011":
+            payload["skipDup"] = "Y"
+            response = session.post(login_url, data=payload, headers=headers, timeout=15)
+            data = response.json()
+            error_code = data.get("_error_code", "")
+
+        if error_code != "CD001":
+            raise RuntimeError(f"KRX login failed: {error_code or 'unknown'}")
+
+        self._pykrx_session = session
 
     def save(self, df: pd.DataFrame, symbol: str, mode: str = "upsert") -> int:
         """
