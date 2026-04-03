@@ -308,7 +308,7 @@ CREATE TABLE kr_index_prices (
   close         DECIMAL(18,4),
   volume        BIGINT,
   market        VARCHAR(16) NOT NULL,           -- KOSPI / KOSDAQ
-  source        VARCHAR(16) NOT NULL,           -- pykrx
+  source        VARCHAR(16) NOT NULL,           -- pykrx / yfinance
   etl_loaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (symbol, date),
   KEY idx_date (date),
@@ -316,7 +316,7 @@ CREATE TABLE kr_index_prices (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-**Data Source**: pykrx | **Update Script**: `kr_index_daily_update.py`, `kr_index_bulk_update.py`
+**Data Source**: `kr_index_daily_update.py`는 pykrx(KRX 로그인) 우선, 실패 시 yfinance fallback / `kr_index_bulk_update.py`는 yfinance | **Update Script**: `kr_index_daily_update.py`, `kr_index_bulk_update.py`
 
 ---
 
@@ -1026,7 +1026,7 @@ SELECT * FROM v_crypto_price_weekly_with_ma WHERE symbol = 'BTCUSDT' ORDER BY we
 |--------|-----------|-----------|-----------|
 | `kr_index_sync_master.py` | pykrx API | `kr_index_master` | Weekly |
 | `kr_index_bulk_update.py` | pykrx API, `kr_index_master` | `kr_index_prices`, `kr_index_indicators` | Initial |
-| `kr_index_daily_update.py` | pykrx API, `kr_index_prices` | `kr_index_prices`, `kr_index_indicators` | Daily |
+| `kr_index_daily_update.py` | pykrx API (KRX 로그인) 우선, 실패 시 yfinance fallback, `kr_index_prices` | `kr_index_prices`, `kr_index_indicators` | Daily |
 | `kr_index_bulk_update_weekly.py` | `kr_index_prices` | `kr_index_prices_weekly`, `kr_index_indicators_weekly` | Initial |
 | `kr_index_weekly_update.py` | `kr_index_prices` | `kr_index_prices_weekly`, `kr_index_indicators_weekly` | Weekly |
 
