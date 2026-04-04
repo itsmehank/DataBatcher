@@ -30,7 +30,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 # .env에서 값 수정 (MYSQL_* / DATABASE_URL / REAL_ESTATE_*)
-docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml up -d
+docker compose -f db/compose/mysql-standalone/docker-compose-mysql.yaml --env-file .env up -d
 ```
 
 `db/compose/mysql-standalone/docker-compose-mysql.yaml`은 **루트 `.env`만** 사용해 공용 MySQL 인스턴스와 기본 DB bootstrap을 구성합니다.
@@ -57,6 +57,7 @@ python apps/ingest-databatcher/scripts/init_db.py
 3. `apps/ingest-databatcher/config/settings.yaml`의 `database.url`
 
 즉, **bulk/daily/weekly 모두 현재 프로세스의 `DATABASE_URL` 값이 적재 대상 DB를 결정**합니다.
+Python 스크립트는 `.env`가 있으면 이를 자동 로드하고, 이미 export된 OS 환경변수가 있으면 그 값이 우선합니다.
 
 ### 권장 방식: `.env`에 `DATABASE_URL` 설정
 `.env.example`을 복사해 `.env`를 만들고 값을 채웁니다.
@@ -137,6 +138,11 @@ pytest -q apps/ingest-databatcher/tests apps/ingest-databatcher/scripts/tests
 단일 테스트 예시:
 ```bash
 pytest -q apps/ingest-databatcher/tests/test_pykrx_adapter.py::test_normalize_price_columns_basic
+```
+
+문법 검증 예시:
+```bash
+python -m compileall apps/ingest-databatcher/core apps/ingest-databatcher/collectors apps/ingest-databatcher/indicators apps/ingest-databatcher/savers apps/ingest-databatcher/scripts apps/ingest-databatcher/tests
 ```
 
 테스트 DB 가이드:
