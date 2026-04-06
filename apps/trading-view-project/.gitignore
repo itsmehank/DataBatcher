@@ -7,6 +7,9 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/*.tsbuildinfo
+automation/node_modules/
+automation/output/
+automation/logs/
 
 # backend
 backend/.venv/
@@ -24,6 +27,7 @@ backend/.env
 .env.*
 !.env.example
 !backend/.env.example
+ops/scheduler/windows/scheduler.env
 
 # logs
 *.log
