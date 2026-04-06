@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.databatcher.tradingview.dashboard-download</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/hank.es/PythonProject/DataBatcher/apps/trading-view-project/ops/shell/run_dashboard_download.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/hank.es/PythonProject/DataBatcher/apps/trading-view-project</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>18</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>NODE_BIN</key>
+    <string>/opt/homebrew/bin/node</string>
+    <key>FRONTEND_URL</key>
+    <string>http://127.0.0.1:5173</string>
+    <key>REGION</key>
+    <string>US</string>
+    <key>MARKET</key>
+    <string>REPLACE_ME</string>
+    <key>LIST_CATEGORY</key>
+    <string>all</string>
+    <key>HEADLESS</key>
+    <string>true</string>
+    <key>OUTPUT_DIR</key>
+    <string>/Users/hank.es/PythonProject/DataBatcher/apps/trading-view-project/automation/output</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/hank.es/PythonProject/DataBatcher/apps/trading-view-project/automation/logs/launchd_stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/hank.es/PythonProject/DataBatcher/apps/trading-view-project/automation/logs/launchd_stderr.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
