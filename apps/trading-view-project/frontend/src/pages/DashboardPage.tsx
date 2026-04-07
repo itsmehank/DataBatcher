@@ -8,7 +8,7 @@ import FilterBar from "../components/FilterBar";
 import MinerviniTable from "../components/MinerviniTable";
 import { REGIONS, useDashboardData } from "../hooks/useDashboardData";
 import { buildDailyExportCsv, buildRsExportCsv, buildWeeklyExportCsv } from "../lib/dashboardExport";
-import type { MinerviniRow, ThemeMode } from "../types";
+import type { ChartPayload, MinerviniRow, ThemeMode } from "../types";
 
 const DAILY_SMA_KEYS = ["sma_50", "sma_100", "sma_150", "sma_200"] as const;
 type DailySmaKey = (typeof DAILY_SMA_KEYS)[number];
@@ -25,13 +25,18 @@ type ExportProgress = {
 
 type CaptureReadyWaiter = {
   symbol: string;
-  resolve: () => void;
+  resolve: (payloads: SymbolExportPayloads) => void;
   reject: (error: Error) => void;
 };
 
 type ExportAsset = {
   name: string;
   blob: Blob;
+};
+
+type SymbolExportPayloads = {
+  daily: ChartPayload;
+  weekly: ChartPayload;
 };
 
 const waitFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -83,6 +88,11 @@ export default function DashboardPage({ themeMode }: Props) {
   const [exportSummary, setExportSummary] = useState("");
   const [captureRef, setCaptureRef] = useState<HTMLDivElement | null>(null);
   const captureReadyRef = useRef<CaptureReadyWaiter | null>(null);
+  const latestDailyRef = useRef<ChartPayload | null>(null);
+  const latestWeeklyRef = useRef<ChartPayload | null>(null);
+  const latestSymbolRef = useRef("");
+  const latestLoadingRef = useRef(false);
+  const latestErrorRef = useRef("");
 
   const titleBase = symbol || "-";
   const visibleDailySmaKeys = useMemo(
@@ -124,6 +134,26 @@ export default function DashboardPage({ themeMode }: Props) {
   }, [region, date, market]);
 
   useEffect(() => {
+    latestDailyRef.current = daily;
+  }, [daily]);
+
+  useEffect(() => {
+    latestWeeklyRef.current = weekly;
+  }, [weekly]);
+
+  useEffect(() => {
+    latestSymbolRef.current = symbol;
+  }, [symbol]);
+
+  useEffect(() => {
+    latestLoadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    latestErrorRef.current = error;
+  }, [error]);
+
+  useEffect(() => {
     if (!captureReadyRef.current || loading) return;
 
     const pending = captureReadyRef.current;
@@ -140,12 +170,25 @@ export default function DashboardPage({ themeMode }: Props) {
     }
 
     captureReadyRef.current = null;
+    const payloads: SymbolExportPayloads = { daily, weekly };
     void (async () => {
       await waitFrame();
       await waitFrame();
-      pending.resolve();
+      pending.resolve(payloads);
     })();
   }, [daily, error, loading, symbol, weekly]);
+
+  const getLatestSymbolExportPayloads = useCallback((targetSymbol: string): SymbolExportPayloads => {
+    const currentDaily = latestDailyRef.current;
+    const currentWeekly = latestWeeklyRef.current;
+    if (!currentDaily || !currentWeekly) {
+      throw new Error(`Chart payload not ready for ${targetSymbol}`);
+    }
+    if (currentDaily.symbol !== targetSymbol || currentWeekly.symbol !== targetSymbol) {
+      throw new Error(`Chart payload mismatch for ${targetSymbol}`);
+    }
+    return { daily: currentDaily, weekly: currentWeekly };
+  }, []);
 
   const capturePanelJpeg = useCallback(async () => {
     if (!captureRef) {
@@ -169,18 +212,37 @@ export default function DashboardPage({ themeMode }: Props) {
 
   const waitForSymbolCaptureReady = useCallback(
     async (targetSymbol: string) => {
-      if (symbol === targetSymbol && !loading && daily?.symbol === targetSymbol && weekly?.symbol === targetSymbol && !error) {
+      if (
+        latestSymbolRef.current === targetSymbol &&
+        !latestLoadingRef.current &&
+        latestDailyRef.current?.symbol === targetSymbol &&
+        latestWeeklyRef.current?.symbol === targetSymbol &&
+        !latestErrorRef.current
+      ) {
         await waitFrame();
         await waitFrame();
-        return;
+        return getLatestSymbolExportPayloads(targetSymbol);
       }
 
-      await new Promise<void>((resolve, reject) => {
+      return new Promise<SymbolExportPayloads>((resolve, reject) => {
         captureReadyRef.current = { symbol: targetSymbol, resolve, reject };
         setSymbol(targetSymbol, { syncUrl: false });
       });
     },
-    [daily?.symbol, error, loading, setSymbol, symbol, weekly?.symbol]
+    [getLatestSymbolExportPayloads, setSymbol]
+  );
+
+  const buildCheckedExportAssets = useCallback(
+    async (fileBase: string, payloads: SymbolExportPayloads): Promise<ExportAsset[]> => {
+      const imageBlob = await (await fetch(await capturePanelJpeg())).blob();
+      return [
+        { name: `${fileBase}.jpg`, blob: imageBlob },
+        { name: `${fileBase}-daily-90d.csv`, blob: new Blob([buildDailyExportCsv(payloads.daily)], { type: "text/csv;charset=utf-8" }) },
+        { name: `${fileBase}-weekly-52w.csv`, blob: new Blob([buildWeeklyExportCsv(payloads.weekly)], { type: "text/csv;charset=utf-8" }) },
+        { name: `${fileBase}-rs-90d.csv`, blob: new Blob([buildRsExportCsv(payloads.daily)], { type: "text/csv;charset=utf-8" }) },
+      ];
+    },
+    [capturePanelJpeg]
   );
 
   const onToggleRowChecked = useCallback((row: MinerviniRow) => {
@@ -319,12 +381,10 @@ export default function DashboardPage({ themeMode }: Props) {
         setExportProgress({ current: index + 1, total: targets.length, symbol: targetSymbol });
 
         try {
-          await waitForSymbolCaptureReady(targetSymbol);
-
-          const dataUrl = await capturePanelJpeg();
-          const imageBlob = await (await fetch(dataUrl)).blob();
-          const fileName = `${String(index + 1).padStart(indexWidth, "0")}_${sanitizeFilePart(targetSymbol)}.jpg`;
-          zip.file(fileName, imageBlob);
+          const payloads = await waitForSymbolCaptureReady(targetSymbol);
+          const fileBase = `${String(index + 1).padStart(indexWidth, "0")}_${sanitizeFilePart(targetSymbol)}`;
+          const assets = await buildCheckedExportAssets(fileBase, payloads);
+          assets.forEach((asset) => zip.file(asset.name, asset.blob));
         } catch (e) {
           failures.push(targetSymbol);
           if (e instanceof Error) {
@@ -359,7 +419,7 @@ export default function DashboardPage({ themeMode }: Props) {
         setSymbol(originalSymbol, { syncUrl: false });
       }
     }
-  }, [capturePanelJpeg, checkedKeys, date, isExporting, market, region, rows, setError, setSymbol, symbol, waitForSymbolCaptureReady]);
+  }, [buildCheckedExportAssets, checkedKeys, date, isExporting, market, region, rows, setError, setSymbol, symbol, waitForSymbolCaptureReady]);
 
   return (
     <main className="app-root">
