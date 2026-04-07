@@ -102,6 +102,7 @@ rm -f ~/Library/LaunchAgents/com.databatcher.tradingview.dashboard-download.plis
 - `region`, `market`, `listCategory`, `date`는 URL 쿼리로 전달합니다.
 - 표가 로드되면 `Select all rows for download` 체크박스를 선택합니다.
 - `Download Checked` 버튼을 눌러 ZIP 다운로드를 저장합니다.
+- ZIP 안에는 선택된 각 심볼별 `jpg + daily csv + weekly csv + rs csv`가 함께 들어갑니다.
 
 ## 6) 장애 확인 포인트
 
