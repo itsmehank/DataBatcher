@@ -1,23 +1,28 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+param(
+    [string]$EnvFile = (Join-Path $PSScriptRoot "scheduler.us-nasdaq.env"),
+    [string]$JobName = "US-NASDAQ"
+)
+
 . "$PSScriptRoot\common.ps1"
 
 $projectRoot = Get-ProjectRoot
-$envFile = Join-Path $PSScriptRoot "scheduler.env"
 $logDir = Join-Path $projectRoot "automation\logs"
 Ensure-Directory -Path $logDir
 
 $startAt = Get-Date
-$logFile = Join-Path $logDir ("windows_scheduler_{0}.log" -f $startAt.ToString("yyyyMMdd_HHmmss"))
+$jobSlug = $JobName.ToLower().Replace(" ", "-").Replace("_", "-")
+$logFile = Join-Path $logDir ("windows_scheduler_{0}_{1}.log" -f $jobSlug, $startAt.ToString("yyyyMMdd_HHmmss"))
 $mutex = $null
 
 try {
     Load-SchedulerEnv -EnvFile $envFile
 
-    $mutex = Acquire-SchedulerMutex -Name "Global\DataBatcherTradingViewDashboardDownload"
+    $mutex = Acquire-SchedulerMutex -Name ("Global\DataBatcherTradingViewDashboardDownload-{0}" -f $jobSlug)
     if ($null -eq $mutex) {
-        Write-RunLog -Message "[WINDOWS-SCHEDULER] skipped: another dashboard download job is running" -LogFile $logFile
+        Write-RunLog -Message ("[WINDOWS-SCHEDULER][{0}] skipped: another dashboard download job is running" -f $JobName) -LogFile $logFile
         exit 0
     }
 
@@ -83,20 +88,21 @@ try {
 
     $cmd = "cd $(Convert-ToBashLiteral -Value $projectPosix) && $($envPairs -join ' ') bash $(Convert-ToBashLiteral -Value $scriptPosix)"
 
-    Write-RunLog -Message "[WINDOWS-SCHEDULER] execute: $cmd" -LogFile $logFile
+    Write-RunLog -Message ("[WINDOWS-SCHEDULER][{0}] env_file={1}" -f $JobName, $EnvFile) -LogFile $logFile
+    Write-RunLog -Message ("[WINDOWS-SCHEDULER][{0}] execute: {1}" -f $JobName, $cmd) -LogFile $logFile
     & $gitBash -lc $cmd 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }
     $exitCode = $LASTEXITCODE
     $elapsed = [int]((Get-Date) - $startAt).TotalSeconds
 
     if ($exitCode -eq 0) {
-        Write-RunLog -Message "[WINDOWS-SCHEDULER] completed successfully (${elapsed}s)" -LogFile $logFile
+        Write-RunLog -Message ("[WINDOWS-SCHEDULER][{0}] completed successfully ({1}s)" -f $JobName, $elapsed) -LogFile $logFile
         exit 0
     }
 
-    Write-RunLog -Message "[WINDOWS-SCHEDULER] failed (exit=${exitCode}, ${elapsed}s)" -LogFile $logFile
+    Write-RunLog -Message ("[WINDOWS-SCHEDULER][{0}] failed (exit={1}, {2}s)" -f $JobName, $exitCode, $elapsed) -LogFile $logFile
     exit $exitCode
 } catch {
-    Write-RunLog -Message "[WINDOWS-SCHEDULER] fatal: $($_.Exception.Message)" -LogFile $logFile
+    Write-RunLog -Message ("[WINDOWS-SCHEDULER][{0}] fatal: {1}" -f $JobName, $_.Exception.Message) -LogFile $logFile
     exit 1
 } finally {
     Release-SchedulerMutex -Mutex $mutex

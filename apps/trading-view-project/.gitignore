@@ -28,6 +28,7 @@ backend/.env
 !.env.example
 !backend/.env.example
 ops/scheduler/windows/scheduler.env
+ops/scheduler/windows/scheduler.*.env
 
 # logs
 *.log
