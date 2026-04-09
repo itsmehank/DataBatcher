@@ -50,6 +50,28 @@ def test_us_index_collector_fetch_fdr_normalizes_columns(monkeypatch):
     assert collector.last_fetch_source == "fdr"
 
 
+def test_us_index_collector_clips_rows_outside_requested_range(monkeypatch):
+    sample = pd.DataFrame(
+        {
+            "Open": [5990.0, 6000.0],
+            "High": [6010.0, 6020.0],
+            "Low": [5970.0, 5980.0],
+            "Close": [6000.0, 6010.0],
+            "Volume": [900000, 1000000],
+        },
+        index=pd.to_datetime(["2025-11-30", "2025-12-01"]),
+    )
+
+    fake_fdr = SimpleNamespace(DataReader=lambda symbol, start, end: sample)
+    monkeypatch.setitem(sys.modules, "FinanceDataReader", fake_fdr)
+
+    collector = USIndexCollector(engine=create_engine("sqlite:///:memory:"), source_strategy="fdr")
+    df = collector.fetch("US500", "2025-12-01", "2025-12-10", market="SP500")
+
+    assert len(df) == 1
+    assert str(df.iloc[0]["date"]) == "2025-12-01"
+
+
 def test_us_index_collector_fetch_yfinance_maps_symbol(monkeypatch):
     captured = {}
 

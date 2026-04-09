@@ -52,6 +52,29 @@ def test_us_stock_collector_fetch_fdr_normalizes_columns(monkeypatch):
     assert collector.last_fetch_source == "fdr"
 
 
+def test_us_stock_collector_clips_rows_outside_requested_range(monkeypatch):
+    sample = pd.DataFrame(
+        {
+            "Open": [9.0, 10.0],
+            "High": [10.0, 11.0],
+            "Low": [8.0, 9.0],
+            "Close": [9.5, 10.5],
+            "Adj Close": [9.4, 10.4],
+            "Volume": [900, 1000],
+        },
+        index=pd.to_datetime(["2025-11-30", "2025-12-01"]),
+    )
+
+    fake_fdr = SimpleNamespace(DataReader=lambda symbol, start, end: sample)
+    monkeypatch.setitem(sys.modules, "FinanceDataReader", fake_fdr)
+
+    collector = USStockCollector(engine=create_engine("sqlite:///:memory:"), source_strategy="fdr")
+    df = collector.fetch("AAPL", "2025-12-01", "2025-12-10", market="NASDAQ")
+
+    assert len(df) == 1
+    assert str(df.iloc[0]["date"]) == "2025-12-01"
+
+
 def test_us_stock_collector_fetch_yfinance_flattens_multiindex(monkeypatch):
     columns = pd.MultiIndex.from_tuples(
         [
