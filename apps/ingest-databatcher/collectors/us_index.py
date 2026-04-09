@@ -9,9 +9,20 @@ S&P 500(US500), Dow Jones(DJI), NASDAQ Composite(IXIC) 지수의
 """
 from __future__ import annotations
 
+import logging
+
 import pandas as pd
 from core.base_collector import BaseCollector
 from core.db_manager import DBManager
+
+
+logger = logging.getLogger(__name__)
+
+YF_INDEX_SYMBOL_MAP = {
+    "US500": "^GSPC",
+    "DJI": "^DJI",
+    "IXIC": "^IXIC",
+}
 
 
 class USIndexCollector(BaseCollector):
@@ -28,9 +39,12 @@ class USIndexCollector(BaseCollector):
 
     category = "us_index"
 
-    def __init__(self, engine, table: str = "us_index_prices"):
+    def __init__(self, engine, table: str = "us_index_prices", source_strategy: str = "fdr"):
         self.engine = engine
         self.table = table
+        self.source_strategy = source_strategy.lower()
+        self.last_fetch_source: str | None = None
+        self.last_fetch_note: str | None = None
 
     def fetch(self, symbol: str, start, end, market: str) -> pd.DataFrame:
         """
@@ -47,53 +61,107 @@ class USIndexCollector(BaseCollector):
             - symbol, date, open, high, low, close, volume, market, source
             (adj_close 없음)
         """
+        self.last_fetch_source = None
+        self.last_fetch_note = None
+
+        if self.source_strategy == "fdr_then_yfinance":
+            try:
+                df_fdr = self._fetch_via_fdr(symbol, start, end, market)
+                if df_fdr is not None and not df_fdr.empty:
+                    self.last_fetch_source = "fdr"
+                    return df_fdr
+                self.last_fetch_note = "fdr returned no rows"
+            except Exception as exc:
+                self.last_fetch_note = f"fdr failed: {exc}"
+
+            logger.warning(
+                "US index %s: falling back to yfinance (%s)",
+                symbol,
+                self.last_fetch_note,
+            )
+            df_yf = self._fetch_via_yfinance(symbol, start, end, market)
+            self.last_fetch_source = "yfinance"
+            return df_yf
+
+        if self.source_strategy == "fdr":
+            df_fdr = self._fetch_via_fdr(symbol, start, end, market)
+            self.last_fetch_source = "fdr"
+            return df_fdr
+
+        if self.source_strategy == "yfinance":
+            df_yf = self._fetch_via_yfinance(symbol, start, end, market)
+            self.last_fetch_source = "yfinance"
+            return df_yf
+
+        raise ValueError(f"Unsupported US index source_strategy: {self.source_strategy}")
+
+    def _normalize_price_frame(
+        self,
+        df: pd.DataFrame | None,
+        symbol: str,
+        market: str,
+        source: str,
+    ) -> pd.DataFrame:
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        df = df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [str(col[0]) for col in df.columns]
+
+        df = df.reset_index()
+
+        column_mapping = {
+            "index": "date",
+            "Date": "date",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume",
+        }
+        df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
+
+        keep_cols = ["date", "open", "high", "low", "close", "volume"]
+        df = df[[col for col in keep_cols if col in df.columns]]
+
+        df["symbol"] = symbol
+        df["market"] = market
+        df["source"] = source
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+
+        expected = [
+            "symbol",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "market",
+            "source",
+        ]
+        return df[expected]
+
+    def _fetch_via_fdr(self, symbol: str, start, end, market: str) -> pd.DataFrame:
         import FinanceDataReader as fdr
 
         start_str = str(start) if not isinstance(start, str) else start
         end_str = str(end) if not isinstance(end, str) else end
-
         df = fdr.DataReader(symbol, start=start_str, end=end_str)
+        return self._normalize_price_frame(df, symbol, market, source="fdr")
 
-        if df is None or df.empty:
-            return pd.DataFrame()
+    def _fetch_via_yfinance(self, symbol: str, start, end, market: str) -> pd.DataFrame:
+        import yfinance as yf
 
-        # 인덱스(Date)를 컬럼으로 변환
-        df = df.reset_index()
+        yf_symbol = YF_INDEX_SYMBOL_MAP.get(str(symbol))
+        if not yf_symbol:
+            raise ValueError(f"Unsupported US index symbol for yfinance: {symbol}")
 
-        # 컬럼명 정규화 (FDR → DB 스키마)
-        column_mapping = {
-            'index': 'date',
-            'Date': 'date',
-            'Open': 'open',
-            'High': 'high',
-            'Low': 'low',
-            'Close': 'close',
-            'Volume': 'volume',
-        }
-        df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
-
-        # Adj Close 및 기타 불필요 컬럼 제거
-        keep_cols = ['date', 'open', 'high', 'low', 'close', 'volume']
-        extra_cols = [c for c in df.columns if c not in keep_cols]
-        if extra_cols:
-            df = df.drop(columns=extra_cols)
-
-        # 메타데이터 추가
-        df['symbol'] = symbol
-        df['market'] = market
-        df['source'] = 'fdr'
-
-        # 날짜를 date 타입으로 변환
-        df['date'] = pd.to_datetime(df['date']).dt.date
-
-        # 최종 컬럼 순서
-        expected = [
-            'symbol', 'date', 'open', 'high', 'low', 'close',
-            'volume', 'market', 'source',
-        ]
-        df = df[expected]
-
-        return df
+        start_str = str(start) if not isinstance(start, str) else start
+        end_str = str(end) if not isinstance(end, str) else end
+        df = yf.download(yf_symbol, start=start_str, end=end_str, auto_adjust=False, progress=False)
+        return self._normalize_price_frame(df, symbol, market, source="yfinance")
 
     def save(self, df: pd.DataFrame, symbol: str, mode: str = "upsert") -> int:
         """
