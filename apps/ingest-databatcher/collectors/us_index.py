@@ -143,13 +143,22 @@ class USIndexCollector(BaseCollector):
         ]
         return df[expected]
 
+    def _clip_to_requested_range(self, df: pd.DataFrame, start, end) -> pd.DataFrame:
+        if df is None or df.empty or "date" not in df.columns:
+            return df
+
+        start_d = pd.to_datetime(start).date()
+        end_d = pd.to_datetime(end).date()
+        return df[(df["date"] >= start_d) & (df["date"] <= end_d)].copy()
+
     def _fetch_via_fdr(self, symbol: str, start, end, market: str) -> pd.DataFrame:
         import FinanceDataReader as fdr
 
         start_str = str(start) if not isinstance(start, str) else start
         end_str = str(end) if not isinstance(end, str) else end
         df = fdr.DataReader(symbol, start=start_str, end=end_str)
-        return self._normalize_price_frame(df, symbol, market, source="fdr")
+        df = self._normalize_price_frame(df, symbol, market, source="fdr")
+        return self._clip_to_requested_range(df, start, end)
 
     def _fetch_via_yfinance(self, symbol: str, start, end, market: str) -> pd.DataFrame:
         import yfinance as yf
@@ -161,7 +170,8 @@ class USIndexCollector(BaseCollector):
         start_str = str(start) if not isinstance(start, str) else start
         end_str = str(end) if not isinstance(end, str) else end
         df = yf.download(yf_symbol, start=start_str, end=end_str, auto_adjust=False, progress=False)
-        return self._normalize_price_frame(df, symbol, market, source="yfinance")
+        df = self._normalize_price_frame(df, symbol, market, source="yfinance")
+        return self._clip_to_requested_range(df, start, end)
 
     def save(self, df: pd.DataFrame, symbol: str, mode: str = "upsert") -> int:
         """
