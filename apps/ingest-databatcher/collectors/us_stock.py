@@ -9,11 +9,16 @@ NYSE, NASDAQ, US ETF 종목의 일별 가격 데이터(OHLCV)를 수집합니다
 """
 from __future__ import annotations
 
+import logging
+
 import pandas as pd
 from sqlalchemy.engine import Engine
 
 from core.base_collector import BaseCollector
 from core.db_manager import DBManager
+
+
+logger = logging.getLogger(__name__)
 
 
 class USStockCollector(BaseCollector):
@@ -30,7 +35,12 @@ class USStockCollector(BaseCollector):
 
     category = "us_stock"
 
-    def __init__(self, engine: Engine, table: str = "us_stock_prices"):
+    def __init__(
+        self,
+        engine: Engine,
+        table: str = "us_stock_prices",
+        source_strategy: str = "fdr",
+    ):
         """
         Initialize USStockCollector
 
@@ -40,6 +50,9 @@ class USStockCollector(BaseCollector):
         """
         self.engine = engine
         self.table = table
+        self.source_strategy = source_strategy.lower()
+        self.last_fetch_source: str | None = None
+        self.last_fetch_note: str | None = None
 
     def fetch(self, symbol: str, start, end, market: str = "NYSE") -> pd.DataFrame:
         """
@@ -71,70 +84,108 @@ class USStockCollector(BaseCollector):
             Index(['symbol', 'date', 'open', 'high', 'low', 'close',
                    'adj_close', 'volume', 'market', 'source'], dtype='object')
         """
-        import FinanceDataReader as fdr
+        self.last_fetch_source = None
+        self.last_fetch_note = None
 
-        # 날짜 포맷 변환 (date 객체 → 문자열)
-        start_str = str(start) if not isinstance(start, str) else start
-        end_str = str(end) if not isinstance(end, str) else end
+        if self.source_strategy == "fdr_then_yfinance":
+            try:
+                df_fdr = self._fetch_via_fdr(symbol, start, end, market)
+                if df_fdr is not None and not df_fdr.empty:
+                    self.last_fetch_source = "fdr"
+                    return df_fdr
+                self.last_fetch_note = "fdr returned no rows"
+            except Exception as exc:
+                self.last_fetch_note = f"fdr failed: {exc}"
 
-        # FDR 데이터 수집
-        df = fdr.DataReader(symbol, start=start_str, end=end_str)
+            logger.warning(
+                "US stock %s: falling back to yfinance (%s)",
+                symbol,
+                self.last_fetch_note,
+            )
+            df_yf = self._fetch_via_yfinance(symbol, start, end, market)
+            self.last_fetch_source = "yfinance"
+            return df_yf
 
+        if self.source_strategy == "fdr":
+            df_fdr = self._fetch_via_fdr(symbol, start, end, market)
+            self.last_fetch_source = "fdr"
+            return df_fdr
+
+        if self.source_strategy == "yfinance":
+            df_yf = self._fetch_via_yfinance(symbol, start, end, market)
+            self.last_fetch_source = "yfinance"
+            return df_yf
+
+        raise ValueError(f"Unsupported US stock source_strategy: {self.source_strategy}")
+
+    def _normalize_price_frame(
+        self,
+        df: pd.DataFrame | None,
+        symbol: str,
+        market: str,
+        source: str,
+    ) -> pd.DataFrame:
         if df is None or df.empty:
             return pd.DataFrame()
 
-        # 인덱스(Date)를 컬럼으로 변환
+        df = df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [str(col[0]) for col in df.columns]
+
         df = df.reset_index()
 
-        # 컬럼명 정규화 (FDR → DB 스키마)
-        # FDR 반환: index (reset_index 후), Open, High, Low, Close, Adj Close, Volume
-        # Note: reset_index() 후 인덱스가 'index' 컬럼이 됨 (Date가 아님)
         column_mapping = {
-            'index': 'date',  # reset_index() 후 인덱스명
-            'Date': 'date',   # fallback
-            'Open': 'open',
-            'High': 'high',
-            'Low': 'low',
-            'Close': 'close',
-            'Adj Close': 'adj_close',
-            'Volume': 'volume',
+            "index": "date",
+            "Date": "date",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Adj Close": "adj_close",
+            "Volume": "volume",
         }
-
-        # 컬럼명 변경 (존재하는 컬럼만)
         df = df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns})
 
-        # adj_close가 없는 경우 close로 대체
-        if 'adj_close' not in df.columns and 'close' in df.columns:
-            df['adj_close'] = df['close']
+        if "adj_close" not in df.columns and "close" in df.columns:
+            df["adj_close"] = df["close"]
 
-        # 메타데이터 추가
-        df['symbol'] = symbol
-        df['market'] = market
-        df['source'] = 'fdr'
+        df["symbol"] = symbol
+        df["market"] = market
+        df["source"] = source
 
-        # 날짜를 date 타입으로 변환
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date']).dt.date
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"]).dt.date
 
-        # 최종 컬럼 순서
         expected = [
-            'symbol',
-            'date',
-            'open',
-            'high',
-            'low',
-            'close',
-            'adj_close',
-            'volume',
-            'market',
-            'source',
+            "symbol",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "adj_close",
+            "volume",
+            "market",
+            "source",
         ]
-
-        # 존재하는 컬럼만 선택 (누락된 컬럼 방지)
         available = [col for col in expected if col in df.columns]
-        df = df[available]
+        return df[available]
 
-        return df
+    def _fetch_via_fdr(self, symbol: str, start, end, market: str) -> pd.DataFrame:
+        import FinanceDataReader as fdr
+
+        start_str = str(start) if not isinstance(start, str) else start
+        end_str = str(end) if not isinstance(end, str) else end
+        df = fdr.DataReader(symbol, start=start_str, end=end_str)
+        return self._normalize_price_frame(df, symbol, market, source="fdr")
+
+    def _fetch_via_yfinance(self, symbol: str, start, end, market: str) -> pd.DataFrame:
+        import yfinance as yf
+
+        start_str = str(start) if not isinstance(start, str) else start
+        end_str = str(end) if not isinstance(end, str) else end
+        df = yf.download(symbol, start=start_str, end=end_str, auto_adjust=False, progress=False)
+        return self._normalize_price_frame(df, symbol, market, source="yfinance")
 
     def save(self, df: pd.DataFrame, symbol: str, mode: str = "upsert") -> int:
         """
