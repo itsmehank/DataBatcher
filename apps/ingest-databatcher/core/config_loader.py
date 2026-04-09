@@ -5,6 +5,9 @@ from pathlib import Path
 import yaml
 from typing import Any, Dict, Optional, Callable
 
+
+VALID_SOURCE_STRATEGIES = ("fdr", "yfinance", "fdr_then_yfinance")
+
 # .env 자동 로드(선택)
 try:
     from dotenv import load_dotenv as _load_dotenv  # type: ignore
@@ -93,3 +96,27 @@ def load_settings() -> Dict[str, Any]:
         cfg["database"]["url"] = db_url
 
     return cfg
+
+
+def resolve_source_strategy(
+    cfg: Dict[str, Any],
+    cli_value: Optional[str],
+    collector_key: str,
+    default: str = "fdr",
+) -> str:
+    configured = cfg.get("collectors", {}).get(collector_key, {}).get("source_strategy", default)
+    strategy = (cli_value or configured or default).lower()
+    if strategy not in VALID_SOURCE_STRATEGIES:
+        raise ValueError(
+            f"Unsupported source_strategy: {strategy}. "
+            f"Expected one of {', '.join(VALID_SOURCE_STRATEGIES)}"
+        )
+    return strategy
+
+
+def resolve_indicator_source(collector: Any, default: str = "fdr") -> str:
+    return str(
+        getattr(collector, "last_fetch_source", None)
+        or getattr(collector, "source_strategy", None)
+        or default
+    )

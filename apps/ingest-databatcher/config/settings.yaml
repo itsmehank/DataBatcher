@@ -26,6 +26,12 @@ markets:
   safe_delay_minutes: 30
   us_daily_cutoff: "18:00"
 
+collectors:
+  us_stock:
+    source_strategy: fdr
+  us_index:
+    source_strategy: fdr
+
 indicators:
   materialization:
     mode: long      # long | wide | none | hybrid

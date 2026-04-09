@@ -34,7 +34,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from collectors.us_stock import USStockCollector
-from core.config_loader import load_settings
+from core.config_loader import (
+    load_settings,
+    resolve_indicator_source,
+    resolve_source_strategy,
+    VALID_SOURCE_STRATEGIES,
+)
 from core.db_manager import DBManager, DBConfig
 from core.us_symbol_loader import load_us_symbols_with_details
 from core.date_utils import default_end_date_us_eastern_cutoff
@@ -67,6 +72,8 @@ def parse_args(argv=None):
                    help="YYYY-MM-DD (US Eastern 기준). default: ET 18:00 cutoff 규칙")
     p.add_argument("--with-indicators", action="store_true",
                    help="지표 계산 포함")
+    p.add_argument("--source-strategy", choices=VALID_SOURCE_STRATEGIES, default=None,
+                   help="가격 수집 소스 전략 override (fdr/yfinance/fdr_then_yfinance)")
     return p.parse_args(argv)
 
 
@@ -82,7 +89,8 @@ def extract_indicators_for_date(
     target_date,  # date object
     outputs: dict,  # {key: pd.Series}
     pipeline: IndicatorPipeline,
-    market: str
+    market: str,
+    source: str,
 ) -> pd.DataFrame:
     """
     계산된 지표(outputs)에서 특정 날짜의 것만 추출하여 long-form으로 변환.
@@ -115,7 +123,7 @@ def extract_indicators_for_date(
     df_long = pipeline.to_long_dataframe(
         symbol=symbol,
         market=market,
-        source="fdr",
+        source=source,
         outputs=filtered,
         keep_nan=True,
     )
@@ -176,6 +184,8 @@ def process_symbol(
         new_rows = DBManager.upsert_dataframe(engine, df_new_price, table="us_stock_prices", mode="insert_only")
         print(f"  {symbol}: 가격 {new_rows}건 처리(insert-only)")
 
+    indicator_source = resolve_indicator_source(collector)
+
     # ========================================
     # STEP 2: DB에서 최근 250일 데이터 조회
     # ========================================
@@ -233,7 +243,8 @@ def process_symbol(
             target_date=target_date,
             outputs=outputs,
             pipeline=pipeline,
-            market=market
+            market=market,
+            source=indicator_source,
         )
 
         if df_long_date is None or df_long_date.empty:
@@ -261,6 +272,7 @@ def main(argv=None) -> int:
 
     cfg = load_settings()
     engine = DBManager.get_engine(DBConfig(**cfg["database"]))
+    source_strategy = resolve_source_strategy(cfg, args.source_strategy, "us_stock")
 
     # 대상 심볼 결정
     if args.all:
@@ -308,9 +320,10 @@ def main(argv=None) -> int:
     print(f"[us_daily_update] targets={len(symbols)} source={source_desc}")
     print(f"[us_daily_update] end_date={end_d} ({end_desc})")
     print(f"[us_daily_update] range={start_d}..{end_d} days={LOOKBACK_DAYS} (fixed)")
+    print(f"[us_daily_update] source_strategy={source_strategy}")
 
     # 초기화
-    collector = USStockCollector(engine)
+    collector = USStockCollector(engine, source_strategy=source_strategy)
     pipeline = build_us_pipeline(cfg) if args.with_indicators else None
     saver = None
     checker = None

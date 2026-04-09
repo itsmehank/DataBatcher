@@ -26,7 +26,12 @@ from sqlalchemy.engine import Engine
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from core.config_loader import load_settings
+from core.config_loader import (
+    load_settings,
+    resolve_indicator_source,
+    resolve_source_strategy,
+    VALID_SOURCE_STRATEGIES,
+)
 from core.db_manager import DBManager, DBConfig
 from core.us_index_symbol_loader import load_us_index_symbols_with_details
 from core.indicator_checker import IndicatorChecker
@@ -57,6 +62,7 @@ def extract_indicators_for_date(
     outputs: dict,
     pipeline: IndicatorPipeline,
     market: str,
+    source: str,
 ) -> pd.DataFrame:
     """
     계산된 지표(outputs)에서 특정 날짜의 것만 추출하여 long-form으로 변환.
@@ -75,7 +81,7 @@ def extract_indicators_for_date(
     df_long = pipeline.to_long_dataframe(
         symbol=symbol,
         market=market,
-        source="fdr",
+        source=source,
         outputs=filtered,
         keep_nan=True,
     )
@@ -126,6 +132,8 @@ def process_index(
         if df_new_price is not None and not df_new_price.empty:
             price_rows = collector.save(df_new_price, symbol, mode="insert_only")
             print(f"{symbol}: 가격 {price_rows}건 처리(insert-only)")
+
+    indicator_source = resolve_indicator_source(collector)
 
     # STEP 2: DB에서 최근 250일 데이터 조회
     start_250 = end_date - timedelta(days=250)
@@ -182,6 +190,7 @@ def process_index(
             outputs=outputs,
             pipeline=pipeline,
             market=market,
+            source=indicator_source,
         )
 
         if df_long_date is None or df_long_date.empty:
@@ -203,7 +212,9 @@ def parse_args(argv=None):
     p.add_argument("--all", action="store_true",
                    help="us_index_master의 모든 ACTIVE 지수 수집")
     p.add_argument("--market", choices=["SP500", "DJI", "IXIC", "ALL"],
-                   default="ALL", help="수집할 마켓 (default: ALL, --all과 함께 사용)")
+                    default="ALL", help="수집할 마켓 (default: ALL, --all과 함께 사용)")
+    p.add_argument("--source-strategy", choices=VALID_SOURCE_STRATEGIES, default=None,
+                   help="가격 수집 소스 전략 override (fdr/yfinance/fdr_then_yfinance)")
 
     return p.parse_args(argv)
 
@@ -221,6 +232,7 @@ def main(argv=None):
     cfg = load_settings()
     db_cfg = DBConfig(**cfg.get("database", {}))
     engine = DBManager.get_engine(db_cfg)
+    source_strategy = resolve_source_strategy(cfg, args.source_strategy, "us_index")
 
     # 종료일 계산
     cutoff_hhmm = cfg.get("markets", {}).get("us_daily_cutoff", "18:00")
@@ -252,7 +264,8 @@ def main(argv=None):
             sys.exit(2)
 
     # 초기화
-    collector = USIndexCollector(engine)
+    print(f"[us_index_daily_update] source_strategy={source_strategy}")
+    collector = USIndexCollector(engine, source_strategy=source_strategy)
     pipeline = build_pipeline(cfg)
     table_long = cfg.get("indicators_us_index", {}).get("materialization", {}).get("table_long", "us_index_indicators")
     saver = IndicatorSaver(engine, table_long=table_long)
