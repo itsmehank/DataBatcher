@@ -171,6 +171,30 @@ class USStockCollector(BaseCollector):
         available = [col for col in expected if col in df.columns]
         return df[available]
 
+    def _is_valid_yfinance_response(self, df: pd.DataFrame | None, symbol: str) -> tuple[bool, str | None]:
+        if df is None or df.empty:
+            return True, None
+
+        if isinstance(df.columns, pd.MultiIndex):
+            level_values = [str(v) for v in df.columns.get_level_values(-1).unique().tolist()]
+            if len(level_values) > 1:
+                return False, f"yfinance returned multi-ticker columns: {level_values}"
+
+        working = df.copy()
+        if isinstance(working.columns, pd.MultiIndex):
+            working.columns = [str(col[0]) for col in working.columns]
+
+        duplicate_columns = working.columns[working.columns.duplicated()].tolist()
+        if duplicate_columns:
+            return False, f"yfinance returned duplicate columns: {duplicate_columns}"
+
+        required = ["Open", "High", "Low", "Close", "Volume"]
+        missing = [col for col in required if col not in working.columns]
+        if missing:
+            return False, f"yfinance missing required columns: {missing}"
+
+        return True, None
+
     def _clip_to_requested_range(self, df: pd.DataFrame, start, end) -> pd.DataFrame:
         if df is None or df.empty or "date" not in df.columns:
             return df
@@ -194,6 +218,11 @@ class USStockCollector(BaseCollector):
         start_str = str(start) if not isinstance(start, str) else start
         end_str = str(end) if not isinstance(end, str) else end
         df = yf.download(symbol, start=start_str, end=end_str, auto_adjust=False, progress=False)
+        is_valid, reason = self._is_valid_yfinance_response(df, symbol)
+        if not is_valid:
+            self.last_fetch_note = reason
+            logger.warning("US stock %s: skipping invalid yfinance response (%s)", symbol, reason)
+            return pd.DataFrame()
         df = self._normalize_price_frame(df, symbol, market, source="yfinance")
         return self._clip_to_requested_range(df, start, end)
 
