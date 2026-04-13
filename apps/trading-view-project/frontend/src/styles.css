@@ -1,4 +1,6 @@
 :root {
+  --shell-x: 1.2rem;
+  --shell-x-wide: 1.8rem;
   --bg: #051224;
   --bg-grad-a: #0b2746;
   --bg-grad-b: #10345a;
@@ -110,15 +112,15 @@ body {
 }
 
 .app-root {
-  max-width: 1400px;
   margin: 0 auto;
-  padding: 1rem;
+  width: 100%;
+  padding: 1rem var(--shell-x);
 }
 
 .main-nav {
-  max-width: 1400px;
-  margin: 0.75rem auto 0;
-  padding: 0 1rem;
+  margin: 0.75rem 0 0;
+  width: 100%;
+  padding: 0 var(--shell-x);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -574,7 +576,7 @@ tbody tr.active {
 }
 
 .two-col {
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr);
 }
 
 .one-col {
@@ -675,5 +677,13 @@ tbody tr.active {
   .theme-switcher {
     width: 100%;
     justify-content: space-between;
+  }
+}
+
+@media (min-width: 1440px) {
+  .app-root,
+  .main-nav {
+    padding-left: var(--shell-x-wide);
+    padding-right: var(--shell-x-wide);
   }
 }
