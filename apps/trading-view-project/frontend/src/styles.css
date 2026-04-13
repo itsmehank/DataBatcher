@@ -109,7 +109,7 @@ body {
     radial-gradient(circle at 100% 0, var(--bg-grad-b) 0, transparent 36%),
     var(--bg);
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-  font-size: 18.5px;
+  font-size: 14.5px;
 }
 
 .app-root {
@@ -141,7 +141,7 @@ body {
   background: var(--nav-chip);
   border-radius: 999px;
   padding: 0.3rem 0.8rem;
-  font-size: 1rem;
+  font-size: 0.88rem;
 }
 
 .main-nav a.active {
@@ -163,14 +163,14 @@ body {
   background: var(--nav-chip);
   border-radius: 999px;
   padding: 0.3rem 0.8rem;
-  font-size: 1rem;
+  font-size: 0.88rem;
 }
 
 .auth-status {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 1rem;
+  font-size: 0.88rem;
 }
 
 .auth-username {
@@ -183,7 +183,7 @@ body {
   color: var(--accent-strong);
   border-radius: 999px;
   padding: 0.25rem 0.65rem;
-  font-size: 0.96rem;
+  font-size: 0.82rem;
   cursor: pointer;
 }
 
@@ -203,7 +203,7 @@ body {
   color: var(--muted);
   border-radius: 999px;
   padding: 0.28rem 0.62rem;
-  font-size: 0.94rem;
+  font-size: 0.8rem;
   cursor: pointer;
 }
 
@@ -229,7 +229,7 @@ body {
 
 .topbar h1 {
   margin: 0;
-  font-size: 1.52rem;
+  font-size: 1.22rem;
   letter-spacing: 0.01em;
 }
 
@@ -237,7 +237,7 @@ body {
   background: var(--accent);
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
-  font-size: 0.98rem;
+  font-size: 0.84rem;
   color: var(--accent-text);
 }
 
@@ -247,7 +247,7 @@ body {
   color: var(--text);
   border-radius: 0.42rem;
   padding: 0.28rem 0.62rem;
-  font-size: 0.98rem;
+  font-size: 0.84rem;
   cursor: pointer;
 }
 
@@ -282,18 +282,18 @@ body {
 .filter-item {
   display: grid;
   gap: 0.35rem;
-  font-size: 1.08rem;
+  font-size: 0.92rem;
   color: var(--muted);
 }
 
 .filter-item span {
-  font-size: 0.96rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
 .filter-item select {
   font: inherit;
-  font-size: 1.08rem;
+  font-size: 0.92rem;
   font-weight: 600;
   background: var(--panel);
   color: var(--text);
@@ -341,7 +341,7 @@ body {
 
 .chart-toolbar-title {
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.86rem;
   font-weight: 600;
 }
 
@@ -364,7 +364,7 @@ body {
   padding: 0.38rem 0.72rem;
   min-height: 2rem;
   font: inherit;
-  font-size: 0.98rem;
+  font-size: 0.84rem;
   cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
@@ -413,12 +413,12 @@ body {
 
 .panel-header h2 {
   margin: 0;
-  font-size: 1.16rem;
+  font-size: 0.98rem;
 }
 
 .panel-header span {
   color: var(--muted);
-  font-size: 0.98rem;
+  font-size: 0.82rem;
 }
 
 .panel-meta {
@@ -436,7 +436,7 @@ body {
   border-radius: 0.42rem;
   background: var(--surface-soft);
   color: var(--text);
-  font-size: 0.94rem;
+  font-size: 0.78rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -447,7 +447,7 @@ body {
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
   background: var(--rs-badge-bg);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .table-panel {
@@ -462,7 +462,7 @@ body {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 1.06rem;
+  font-size: 0.9rem;
 }
 
 th,
@@ -593,7 +593,7 @@ tbody tr.active {
 
 .excess-return-card strong {
   display: block;
-  font-size: 1.7rem;
+  font-size: 1.28rem;
   margin: 0.25rem 0 0.35rem;
 }
 
@@ -601,11 +601,11 @@ tbody tr.active {
 .quick-list-help {
   margin: 0;
   color: var(--muted);
-  font-size: 1.04rem;
+  font-size: 0.88rem;
 }
 
 .period-label {
-  font-size: 0.98rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -636,7 +636,7 @@ tbody tr.active {
 
 .quick-list-label {
   color: var(--muted);
-  font-size: 0.94rem;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -709,7 +709,7 @@ tbody tr.active {
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--text);
-  font-size: 0.94rem;
+  font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.2;
   pointer-events: none;
@@ -737,7 +737,7 @@ tbody tr.active {
   position: absolute;
   bottom: 2px;
   transform: translateX(-50%);
-  font-size: 0.84rem;
+  font-size: 0.7rem;
   color: var(--rs-date-text);
   background: var(--rs-date-bg);
   border: 1px solid rgba(251, 191, 36, 0.55);
