@@ -394,7 +394,7 @@ body {
 }
 
 .table-wrap {
-  max-height: 240px;
+  max-height: 164px;
   overflow: auto;
 }
 
@@ -473,6 +473,104 @@ tbody tr.active {
   display: grid;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.ticker-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.ticker-pager-button,
+.quick-list-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--accent-strong);
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ticker-pager-button:disabled,
+.quick-list-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.excess-return-panel {
+  margin-bottom: 1rem;
+}
+
+.excess-return-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.excess-return-card {
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--panel-2);
+}
+
+.excess-return-card.positive {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.excess-return-card.negative {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.excess-return-card.neutral {
+  background: var(--panel-2);
+}
+
+.excess-return-card strong {
+  display: block;
+  font-size: 1.35rem;
+  margin: 0.25rem 0 0.35rem;
+}
+
+.excess-return-card p,
+.quick-list-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.period-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.quick-list-bar {
+  margin-top: 1rem;
+}
+
+.quick-list-content {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.quick-list-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.quick-list-button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .two-col {
