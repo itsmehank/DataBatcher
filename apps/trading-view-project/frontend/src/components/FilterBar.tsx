@@ -5,6 +5,7 @@ type Props = {
   date: string;
   market: string;
   listCategory: ListType | "all";
+  className?: string;
   disabled?: boolean;
   regions: Region[];
   dates: string[];
@@ -40,8 +41,9 @@ function SelectField({
 }
 
 export default function FilterBar(props: Props) {
+  const className = props.className ? `filter-bar ${props.className}` : "filter-bar";
   return (
-    <section className="filter-bar">
+    <section className={className}>
       <SelectField
         label="Region"
         value={props.region}
