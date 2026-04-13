@@ -36,12 +36,16 @@ minervini-lwc-dashboard/
 
 ## 실행 전 설정 파일 가이드
 
-실행 전 확인할 파일은 `apps/trading-view-project/backend/.env` 하나다.
+실행 전 확인할 파일은 아래 두 개다.
+
+- `apps/trading-view-project/backend/.env`
+- `apps/trading-view-project/frontend/.env` (선택: export CSV 기간 조정용)
 
 준비 방법:
 
 ```bash
 cp apps/trading-view-project/backend/.env.example apps/trading-view-project/backend/.env
+cp apps/trading-view-project/frontend/.env.example apps/trading-view-project/frontend/.env
 ```
 
 필수 값:
@@ -145,6 +149,27 @@ npm install
 npm run dev
 ```
 
+프론트엔드 선택 설정 파일:
+
+```bash
+cd apps/trading-view-project/frontend
+cp .env.example .env
+```
+
+지원 값:
+
+- `VITE_EXPORT_DAILY_DAYS`: daily CSV에 포함할 최근 거래일 수 (기본 `90`)
+- `VITE_EXPORT_WEEKLY_WEEKS`: weekly CSV에 포함할 최근 주 수 (기본 `52`)
+- `VITE_EXPORT_RS_DAYS`: RS CSV에 포함할 최근 거래일 수 (기본 `90`)
+
+예시:
+
+```env
+VITE_EXPORT_DAILY_DAYS=120
+VITE_EXPORT_WEEKLY_WEEKS=78
+VITE_EXPORT_RS_DAYS=120
+```
+
 프론트엔드는 `http://localhost:5173`에서 실행되며 `/api` 요청을 백엔드(`http://localhost:8000`)로 프록시합니다.
 
 프론트엔드 검증 실행:
@@ -157,6 +182,12 @@ npm run build
 ```
 
 ## 환경 변수
+
+### Frontend (`frontend/.env`)
+
+- `VITE_EXPORT_DAILY_DAYS`: ZIP/Files export의 daily CSV 기간
+- `VITE_EXPORT_WEEKLY_WEEKS`: ZIP/Files export의 weekly CSV 기간
+- `VITE_EXPORT_RS_DAYS`: ZIP/Files export의 RS CSV 기간
 
 `backend/.env.example` 기준:
 

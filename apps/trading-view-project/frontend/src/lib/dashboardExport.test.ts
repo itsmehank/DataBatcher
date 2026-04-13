@@ -29,7 +29,7 @@ const payload: ChartPayload = {
 
 describe("dashboard export helpers", () => {
   it("builds daily csv with latest 90 rows", () => {
-    const csv = buildDailyExportCsv(payload);
+    const csv = buildDailyExportCsv(payload, 90);
     const lines = csv.split("\n");
     expect(lines).toHaveLength(91);
     expect(lines[0]).toBe("time,open,high,low,close,volume");
@@ -38,7 +38,7 @@ describe("dashboard export helpers", () => {
   });
 
   it("builds weekly csv with latest 52 rows", () => {
-    const csv = buildWeeklyExportCsv(payload);
+    const csv = buildWeeklyExportCsv(payload, 52);
     const lines = csv.split("\n");
     expect(lines).toHaveLength(53);
     expect(lines[0]).toBe("time,open,high,low,close,volume");
@@ -46,7 +46,7 @@ describe("dashboard export helpers", () => {
   });
 
   it("builds rs csv with latest 90 rows", () => {
-    const csv = buildRsExportCsv(payload);
+    const csv = buildRsExportCsv(payload, 90);
     const lines = csv.split("\n");
     expect(lines).toHaveLength(91);
     expect(lines[0]).toBe("time,rs_line");
