@@ -4,10 +4,16 @@ import { useSearchParams } from "react-router-dom";
 import { toJpeg } from "html-to-image";
 
 import ChartPanel from "../components/ChartPanel";
+import ExcessReturnSummary from "../components/ExcessReturnSummary";
 import FilterBar from "../components/FilterBar";
 import MinerviniTable from "../components/MinerviniTable";
+import QuickListTypeBar from "../components/QuickListTypeBar";
+import TickerPager from "../components/TickerPager";
 import { REGIONS, useDashboardData } from "../hooks/useDashboardData";
+import { EXPORT_CONFIG } from "../lib/dashboardConfig";
 import { buildDailyExportCsv, buildRsExportCsv, buildWeeklyExportCsv } from "../lib/dashboardExport";
+import { buildExcessReturnCards } from "../lib/excessReturns";
+import { getDashboardTickerNeighbors, getSelectedDashboardRow } from "../lib/dashboardState";
 import type { ChartPayload, MinerviniRow, ThemeMode } from "../types";
 
 const DAILY_SMA_KEYS = ["sma_50", "sma_100", "sma_150", "sma_200"] as const;
@@ -120,6 +126,11 @@ export default function DashboardPage({ themeMode }: Props) {
     () => rows.reduce((count, row) => count + (checkedKeys[getRowKey(row)] ? 1 : 0), 0),
     [checkedKeys, rows]
   );
+  const selectedRow = useMemo(() => getSelectedDashboardRow(rows, symbol), [rows, symbol]);
+  const { previousTicker, nextTicker } = useMemo(() => getDashboardTickerNeighbors(rows, symbol), [rows, symbol]);
+  const selectedRowKey = selectedRow ? getRowKey(selectedRow) : "";
+  const selectedRowSaving = selectedRowKey ? Boolean(savingKeys[selectedRowKey]) : false;
+  const excessReturnCards = useMemo(() => buildExcessReturnCards(region, daily), [daily, region]);
   const areAllRowsChecked = rows.length > 0 && rows.every((row) => checkedKeys[getRowKey(row)]);
   const areSomeRowsChecked = rows.some((row) => checkedKeys[getRowKey(row)]) && !areAllRowsChecked;
   const batchButtonLabel = exportProgress
@@ -237,9 +248,18 @@ export default function DashboardPage({ themeMode }: Props) {
       const imageBlob = await (await fetch(await capturePanelJpeg())).blob();
       return [
         { name: `${fileBase}.jpg`, blob: imageBlob },
-        { name: `${fileBase}-daily-90d.csv`, blob: new Blob([buildDailyExportCsv(payloads.daily)], { type: "text/csv;charset=utf-8" }) },
-        { name: `${fileBase}-weekly-52w.csv`, blob: new Blob([buildWeeklyExportCsv(payloads.weekly)], { type: "text/csv;charset=utf-8" }) },
-        { name: `${fileBase}-rs-90d.csv`, blob: new Blob([buildRsExportCsv(payloads.daily)], { type: "text/csv;charset=utf-8" }) },
+        {
+          name: `${fileBase}-daily-${EXPORT_CONFIG.dailyDays}d.csv`,
+          blob: new Blob([buildDailyExportCsv(payloads.daily)], { type: "text/csv;charset=utf-8" }),
+        },
+        {
+          name: `${fileBase}-weekly-${EXPORT_CONFIG.weeklyWeeks}w.csv`,
+          blob: new Blob([buildWeeklyExportCsv(payloads.weekly)], { type: "text/csv;charset=utf-8" }),
+        },
+        {
+          name: `${fileBase}-rs-${EXPORT_CONFIG.rsDays}d.csv`,
+          blob: new Blob([buildRsExportCsv(payloads.daily)], { type: "text/csv;charset=utf-8" }),
+        },
       ];
     },
     [capturePanelJpeg]
@@ -278,9 +298,18 @@ export default function DashboardPage({ themeMode }: Props) {
       const imageBlob = await (await fetch(await capturePanelJpeg())).blob();
       return [
         { name: `${fileBase}.jpeg`, blob: imageBlob },
-        { name: `${fileBase}-daily-90d.csv`, blob: new Blob([buildDailyExportCsv(daily)], { type: "text/csv;charset=utf-8" }) },
-        { name: `${fileBase}-weekly-52w.csv`, blob: new Blob([buildWeeklyExportCsv(weekly)], { type: "text/csv;charset=utf-8" }) },
-        { name: `${fileBase}-rs-90d.csv`, blob: new Blob([buildRsExportCsv(daily)], { type: "text/csv;charset=utf-8" }) },
+        {
+          name: `${fileBase}-daily-${EXPORT_CONFIG.dailyDays}d.csv`,
+          blob: new Blob([buildDailyExportCsv(daily)], { type: "text/csv;charset=utf-8" }),
+        },
+        {
+          name: `${fileBase}-weekly-${EXPORT_CONFIG.weeklyWeeks}w.csv`,
+          blob: new Blob([buildWeeklyExportCsv(weekly)], { type: "text/csv;charset=utf-8" }),
+        },
+        {
+          name: `${fileBase}-rs-${EXPORT_CONFIG.rsDays}d.csv`,
+          blob: new Blob([buildRsExportCsv(daily)], { type: "text/csv;charset=utf-8" }),
+        },
       ];
     };
 
@@ -485,6 +514,8 @@ export default function DashboardPage({ themeMode }: Props) {
           </label>
         </section>
 
+        <ExcessReturnSummary cards={excessReturnCards} />
+
         <div className="no-export">
           <MinerviniTable
             rows={rows}
@@ -500,6 +531,13 @@ export default function DashboardPage({ themeMode }: Props) {
             disableSelection={isExporting}
           />
         </div>
+
+        <TickerPager
+          previousTicker={previousTicker}
+          nextTicker={nextTicker}
+          disabled={loading || isExporting}
+          onSelectTicker={setSymbol}
+        />
 
         <div className="chart-grid two-col">
           <ChartPanel
@@ -534,6 +572,13 @@ export default function DashboardPage({ themeMode }: Props) {
             isLoadingMoreHistory={weeklyLoadingMoreHistory}
           />
         </div>
+
+        <QuickListTypeBar
+          row={selectedRow}
+          saving={selectedRowSaving}
+          disabled={loading || isExporting}
+          onChangeListType={onChangeListType}
+        />
       </div>
     </main>
   );
