@@ -109,7 +109,7 @@ export function useSymbolCharts({ region, symbol, onError }: Args) {
     (async () => {
       onError("");
       const to = toISO(new Date());
-      const fromDaily = toISO(new Date(Date.now() - 1000 * 60 * 60 * 24 * 180));
+      const fromDaily = toISO(new Date(Date.now() - 1000 * 60 * 60 * 24 * 220));
       const fromWeekly = toISO(new Date(Date.now() - 1000 * 60 * 60 * 24 * 365 * 2));
       try {
         const [d, b, w] = await Promise.all([
