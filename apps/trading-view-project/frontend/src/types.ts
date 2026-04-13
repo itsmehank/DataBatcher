@@ -2,6 +2,7 @@ export type Region = "US" | "KR";
 export type ListType = "focus" | "action" | "pass";
 export type ThemeMode = "ocean" | "slate" | "paper";
 export type UserRole = "viewer" | "editor";
+export type TimeRangePreset = "1W" | "1M" | "3M" | "1Y" | "ALL";
 export type AuthUser = { username: string; role: UserRole };
 
 export type MinerviniRow = {

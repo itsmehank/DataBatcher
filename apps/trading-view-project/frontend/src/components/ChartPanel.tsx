@@ -13,7 +13,8 @@ import {
   type SeriesType,
   type Time,
 } from "lightweight-charts";
-import type { ChartPayload, ThemeMode } from "../types";
+import { buildVisibleTimeRange } from "../lib/chartRange";
+import type { ChartPayload, ThemeMode, TimeRangePreset } from "../types";
 
 type Mode = "candles" | "line";
 
@@ -33,6 +34,7 @@ type Props = {
   onNeedMoreHistory?: () => void;
   canLoadMoreHistory?: boolean;
   isLoadingMoreHistory?: boolean;
+  rangePreset?: TimeRangePreset | null;
 };
 
 const lineColors: Record<string, string> = {
@@ -100,6 +102,7 @@ export default function ChartPanel({
   onNeedMoreHistory,
   canLoadMoreHistory = false,
   isLoadingMoreHistory = false,
+  rangePreset = null,
 }: Props) {
   type CandlestickSeries = ISeriesApi<"Candlestick", Time>;
   type LineSeries = ISeriesApi<"Line", Time>;
@@ -112,6 +115,7 @@ export default function ChartPanel({
   const lastHistoryRequestAtRef = useRef(0);
   const lastVisibleFromRef = useRef<number | null>(null);
   const fittedContextKeyRef = useRef<string>("");
+  const rangePresetKeyRef = useRef<string>("");
   const isChartDisposedRef = useRef(false);
   const candleSeriesRef = useRef<CandlestickSeries | null>(null);
   const benchmarkSeriesRef = useRef<LineSeries | null>(null);
@@ -353,12 +357,28 @@ export default function ChartPanel({
     }
 
     const fitKey = `${payload.symbol}:${payload.timeframe}`;
-    if (fittedContextKeyRef.current !== fitKey) {
-      try {
-        chart.timeScale().fitContent();
-      } catch {
-        // chart may be disposed while route changes
+    const rangeKey = `${fitKey}:${rangePreset ?? "ALL"}`;
+    if (rangePreset === "ALL" || rangePreset === null) {
+      if (rangePresetKeyRef.current !== rangeKey) {
+        try {
+          chart.timeScale().fitContent();
+        } catch {
+          // chart may be disposed while route changes
+        }
+        rangePresetKeyRef.current = rangeKey;
+        fittedContextKeyRef.current = fitKey;
+        lastVisibleFromRef.current = null;
       }
+    } else if (rangePresetKeyRef.current !== rangeKey) {
+      const visibleRange = buildVisibleTimeRange(payload, rangePreset);
+      if (visibleRange) {
+        try {
+          chart.timeScale().setVisibleRange(visibleRange);
+        } catch {
+          // chart may be disposed while route changes
+        }
+      }
+      rangePresetKeyRef.current = rangeKey;
       fittedContextKeyRef.current = fitKey;
       lastVisibleFromRef.current = null;
     }
@@ -385,7 +405,7 @@ export default function ChartPanel({
       clearAxisHover();
       setOhlcHover(null);
     };
-  }, [mode, payload, lineKey, overlayKeys, leftScaleKeys, leftScaleMargins, volumeOverlayKeys]);
+  }, [mode, payload, lineKey, overlayKeys, leftScaleKeys, leftScaleMargins, volumeOverlayKeys, rangePreset]);
 
   useEffect(() => {
     const chart = chartRef.current;
