@@ -33,11 +33,33 @@ export default function MinerviniTable({
 }: Props) {
   const { isEditor } = useAuth();
   const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const activeRowRef = useRef<HTMLTableRowElement | null>(null);
 
   useEffect(() => {
     if (!headerCheckboxRef.current) return;
     headerCheckboxRef.current.indeterminate = areSomeRowsChecked;
   }, [areSomeRowsChecked]);
+
+  useEffect(() => {
+    if (!selectedSymbol || !tableWrapRef.current || !activeRowRef.current) return;
+
+    const wrapper = tableWrapRef.current;
+    const row = activeRowRef.current;
+    const rowTop = row.offsetTop;
+    const rowBottom = rowTop + row.offsetHeight;
+    const viewTop = wrapper.scrollTop;
+    const viewBottom = viewTop + wrapper.clientHeight;
+
+    if (rowTop < viewTop) {
+      wrapper.scrollTo({ top: rowTop, behavior: "smooth" });
+      return;
+    }
+
+    if (rowBottom > viewBottom) {
+      wrapper.scrollTo({ top: rowBottom - wrapper.clientHeight, behavior: "smooth" });
+    }
+  }, [selectedSymbol, rows]);
 
   return (
     <section className="panel table-panel">
@@ -45,7 +67,7 @@ export default function MinerviniTable({
         <h2>Minervini Template List</h2>
         <span>{rows.length} rows</span>
       </div>
-      <div className="table-wrap">
+      <div ref={tableWrapRef} className="table-wrap">
         <table>
           <thead>
             <tr>
@@ -70,7 +92,11 @@ export default function MinerviniTable({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={`${row.ticker}-${row.market}`} className={row.ticker === selectedSymbol ? "active" : ""}>
+              <tr
+                key={`${row.ticker}-${row.market}`}
+                ref={row.ticker === selectedSymbol ? activeRowRef : null}
+                className={row.ticker === selectedSymbol ? "active" : ""}
+              >
                 <td className="checkbox-cell">
                   <input
                     type="checkbox"
