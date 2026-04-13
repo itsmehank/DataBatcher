@@ -20,15 +20,14 @@ export default function QuickListTypeBar({ row, saving, disabled = false, onChan
   const canEdit = checked && isEditor && Boolean(row) && !disabled && !saving;
 
   return (
-    <section className="panel quick-list-bar no-export" aria-label="Quick list type actions">
-      <div className="panel-header">
-        <h2>Quick List Type</h2>
-        <span>{row ? `${row.ticker} · ${row.market}` : "No symbol selected"}</span>
-      </div>
-      <div className="quick-list-content">
-        <p className="quick-list-help">
-          {row ? `Selected: ${row.ticker} (${row.name ?? "-"})` : "Select a ticker from the Minervini list."}
-        </p>
+    <section className="quick-list-bar no-export" aria-label="Quick list type actions">
+      <div className="quick-list-shell">
+        <div className="quick-list-meta">
+          <span className="quick-list-label">Quick List Type</span>
+          <p className="quick-list-help">
+            {row ? `Selected: ${row.ticker} · ${row.market} · ${row.name ?? "-"}` : "Select a ticker from the Minervini list."}
+          </p>
+        </div>
         <div className="quick-list-buttons">
           {OPTIONS.map((option) => {
             const isActive = (row?.list_type ?? null) === option.value;
