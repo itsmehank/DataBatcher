@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { toJpeg } from "html-to-image";
 
 import ChartPanel from "../components/ChartPanel";
+import ChartToolbar from "../components/ChartToolbar";
 import ExcessReturnSummary from "../components/ExcessReturnSummary";
 import FilterBar from "../components/FilterBar";
 import MinerviniTable from "../components/MinerviniTable";
@@ -14,9 +15,10 @@ import { EXPORT_CONFIG } from "../lib/dashboardConfig";
 import { buildDailyExportCsv, buildRsExportCsv, buildWeeklyExportCsv } from "../lib/dashboardExport";
 import { buildExcessReturnCards } from "../lib/excessReturns";
 import { getDashboardTickerNeighbors, getSelectedDashboardRow } from "../lib/dashboardState";
-import type { ChartPayload, MinerviniRow, ThemeMode } from "../types";
+import type { ChartPayload, MinerviniRow, ThemeMode, TimeRangePreset } from "../types";
 
 const DAILY_SMA_KEYS = ["sma_50", "sma_100", "sma_150", "sma_200"] as const;
+const DAILY_PRESETS: readonly TimeRangePreset[] = ["1W", "1M", "3M", "1Y", "ALL"] as const;
 type DailySmaKey = (typeof DAILY_SMA_KEYS)[number];
 
 type Props = {
@@ -88,6 +90,7 @@ export default function DashboardPage({ themeMode }: Props) {
   });
   const [showWeeklySma10, setShowWeeklySma10] = useState(true);
   const [showBenchmark, setShowBenchmark] = useState(true);
+  const [dailyRangePreset, setDailyRangePreset] = useState<TimeRangePreset>("ALL");
   const [isExporting, setIsExporting] = useState(false);
   const [checkedKeys, setCheckedKeys] = useState<Record<string, boolean>>({});
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
@@ -473,6 +476,7 @@ export default function DashboardPage({ themeMode }: Props) {
 
       <div ref={setCaptureRef}>
         <FilterBar
+          className="dashboard-filters"
           region={region}
           date={date}
           market={market}
@@ -488,31 +492,6 @@ export default function DashboardPage({ themeMode }: Props) {
             if (key === "listCategory") setListCategory(value as "all" | "focus" | "action" | "pass");
           }}
         />
-
-        <section className="sma-toggle-bar">
-          <span>Daily SMA</span>
-          {DAILY_SMA_KEYS.map((key) => (
-            <label key={key}>
-              <input
-                type="checkbox"
-                checked={dailySmaVisibility[key]}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setDailySmaVisibility((prev) => ({ ...prev, [key]: checked }));
-                }}
-              />
-              {key.replace("sma_", "SMA ")}
-            </label>
-          ))}
-          <label>
-            <input type="checkbox" checked={showWeeklySma10} onChange={(e) => setShowWeeklySma10(e.target.checked)} />
-            Weekly 10W SMA
-          </label>
-          <label>
-            <input type="checkbox" checked={showBenchmark} onChange={(e) => setShowBenchmark(e.target.checked)} />
-            Benchmark Index
-          </label>
-        </section>
 
         <ExcessReturnSummary cards={excessReturnCards} />
 
@@ -539,11 +518,31 @@ export default function DashboardPage({ themeMode }: Props) {
           onSelectTicker={setSymbol}
         />
 
+        <ChartToolbar
+          title="Daily Chart Controls"
+          presets={DAILY_PRESETS}
+          activePreset={dailyRangePreset}
+          onSelectPreset={setDailyRangePreset}
+          toggles={[
+            ...DAILY_SMA_KEYS.map((key) => ({
+              label: key.replace("sma_", "MA"),
+              active: dailySmaVisibility[key],
+              onToggle: () => setDailySmaVisibility((prev) => ({ ...prev, [key]: !prev[key] })),
+            })),
+            {
+              label: "Benchmark",
+              active: showBenchmark,
+              onToggle: () => setShowBenchmark((prev) => !prev),
+            },
+          ]}
+        />
+
         <div className="chart-grid two-col">
           <ChartPanel
             title={`${titleBase} Daily (Price + SMA + Benchmark + Volume)`}
             mode="candles"
             themeMode={themeMode}
+            height={440}
             singleAxisHover
             showOhlcOnHover
             payload={daily}
@@ -554,15 +553,36 @@ export default function DashboardPage({ themeMode }: Props) {
             onNeedMoreHistory={loadMoreDailyHistory}
             canLoadMoreHistory={dailyHasMoreHistory}
             isLoadingMoreHistory={dailyLoadingMoreHistory}
+            rangePreset={dailyRangePreset}
           />
-          <ChartPanel title={`${titleBase} Daily RS Line`} mode="line" themeMode={themeMode} payload={daily} lineKey="rs_line" />
+          <ChartPanel
+            title={`${titleBase} Daily RS Line`}
+            mode="line"
+            themeMode={themeMode}
+            height={400}
+            payload={daily}
+            lineKey="rs_line"
+            rangePreset={dailyRangePreset}
+          />
         </div>
+
+        <ChartToolbar
+          title="Weekly Chart Controls"
+          toggles={[
+            {
+              label: "10W MA",
+              active: showWeeklySma10,
+              onToggle: () => setShowWeeklySma10((prev) => !prev),
+            },
+          ]}
+        />
 
         <div className="chart-grid one-col">
           <ChartPanel
             title={`${titleBase} Weekly (Price + SMA/EMA + Volume)`}
             mode="candles"
             themeMode={themeMode}
+            height={440}
             showOhlcOnHover
             payload={weekly}
             overlayKeys={weeklyOverlayKeys}
