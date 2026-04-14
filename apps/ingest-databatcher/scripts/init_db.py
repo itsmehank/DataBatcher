@@ -91,7 +91,8 @@ def read_sql_statements(sql_path: Path) -> List[str]:
 def apply_schema(engine: Engine, sql_stmts: List[str]) -> None:
     with engine.begin() as conn:
         for stmt in sql_stmts:
-            conn.exec_driver_sql(stmt)
+            driver_safe_stmt = stmt.replace("%", "%%")
+            conn.exec_driver_sql(driver_safe_stmt)
 
 
 def main():
