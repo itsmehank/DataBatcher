@@ -1,12 +1,12 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 param(
     [string]$KrDailyAt = "18:00",
     [string]$UsDailyAt = "08:00",
     [string]$WeeklyAt = "08:00",
     [string]$CleanupAt = "03:30"
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\common.ps1"
 

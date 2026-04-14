@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function Get-RepoRoot {
-    return (Resolve-Path (Join-Path $PSScriptRoot "..\.."))
+    return (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\.."))
 }
 
 function Ensure-Directory {
@@ -18,12 +18,12 @@ function Ensure-Directory {
 function Write-RunLog {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Message,
+        [object]$Message,
         [Parameter(Mandatory = $true)]
         [string]$LogFile
     )
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $line = "[$timestamp] $Message"
+    $line = "[$timestamp] $([string]$Message)"
     Write-Host $line
     Add-Content -Path $LogFile -Value $line
 }
@@ -177,5 +177,90 @@ function Send-AppriseNotification {
         Write-RunLog -Message "Notification sent via Apprise." -LogFile $LogFile
     } catch {
         Write-RunLog -Message "Notification failed: $($_.Exception.Message)" -LogFile $LogFile
+    }
+}
+
+function Invoke-LoggedProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(Mandatory = $false)]
+        [string[]]$ArgumentList = @(),
+        [Parameter(Mandatory = $true)]
+        [string]$LogFile,
+        [Parameter(Mandatory = $false)]
+        [string]$WorkingDirectory = ""
+    )
+
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+
+    try {
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $quotedArgs = @()
+        foreach ($arg in $ArgumentList) {
+            if ($null -eq $arg) {
+                $quotedArgs += '""'
+            } else {
+                $escaped = ([string]$arg).Replace('"', '\"')
+                if ($escaped.IndexOfAny([char[]]' "') -ge 0) {
+                    $quotedArgs += ('"{0}"' -f $escaped)
+                } else {
+                    $quotedArgs += $escaped
+                }
+            }
+        }
+        $startInfo.Arguments = ($quotedArgs -join ' ')
+        if ($WorkingDirectory) {
+            $startInfo.WorkingDirectory = $WorkingDirectory
+        }
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        $stdoutWriter = [System.IO.StreamWriter]::new($stdoutPath, $false, [System.Text.Encoding]::UTF8)
+        $stderrWriter = [System.IO.StreamWriter]::new($stderrPath, $false, [System.Text.Encoding]::UTF8)
+
+        try {
+            $process.Start() | Out-Null
+            while (-not $process.HasExited) {
+                while (-not $process.StandardOutput.EndOfStream) {
+                    $line = $process.StandardOutput.ReadLine()
+                    $stdoutWriter.WriteLine($line)
+                    Write-RunLog -Message $line -LogFile $LogFile
+                }
+                while (-not $process.StandardError.EndOfStream) {
+                    $line = $process.StandardError.ReadLine()
+                    $stderrWriter.WriteLine($line)
+                    Write-RunLog -Message $line -LogFile $LogFile
+                }
+                Start-Sleep -Milliseconds 100
+            }
+
+            while (-not $process.StandardOutput.EndOfStream) {
+                $line = $process.StandardOutput.ReadLine()
+                $stdoutWriter.WriteLine($line)
+                Write-RunLog -Message $line -LogFile $LogFile
+            }
+            while (-not $process.StandardError.EndOfStream) {
+                $line = $process.StandardError.ReadLine()
+                $stderrWriter.WriteLine($line)
+                Write-RunLog -Message $line -LogFile $LogFile
+            }
+
+            $process.WaitForExit()
+            return $process.ExitCode
+        } finally {
+            $stdoutWriter.Dispose()
+            $stderrWriter.Dispose()
+            $process.Dispose()
+        }
+    } finally {
+        Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
