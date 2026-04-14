@@ -579,7 +579,7 @@ def main():
 
         # 6. 결과 출력
         elapsed = (datetime.now() - start_time).total_seconds()
-        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ✅ Sync completed successfully!")
+        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Sync completed successfully!")
         print(f"Summary:")
         print(f"  - Added: {stats['added']} symbols")
         print(f"  - Updated: {stats['updated']} symbols")
@@ -602,7 +602,7 @@ def main():
                 print(f"  ... and {len(delisted_set) - 10} more")
 
     except Exception as e:
-        print(f"\n❌ Error during sync: {e}", file=sys.stderr)
+        print(f"\nError during sync: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         sys.exit(1)
