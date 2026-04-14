@@ -25,7 +25,8 @@ import yaml
 from sqlalchemy import create_engine, text
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_FILE = ROOT / "docker" / "mysql" / "init" / "01_schema.sql"
+REPO_ROOT = ROOT.parents[1]
+SCHEMA_FILE = REPO_ROOT / "db" / "init" / "01_schema.sql"
 
 
 def load_base_database_url() -> str:

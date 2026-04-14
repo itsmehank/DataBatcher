@@ -2,6 +2,7 @@ finance-datareader>=0.9.90
 pandas>=2.1.0
 SQLAlchemy>=2.0.0
 PyMySQL>=1.0.2
+cryptography>=43.0.0
 pandas_market_calendars>=4.3
 PyYAML>=6.0
 pytz>=2023.3
