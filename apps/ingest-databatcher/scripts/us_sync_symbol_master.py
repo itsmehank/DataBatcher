@@ -20,6 +20,7 @@ FDR을 사용하여 NYSE, NASDAQ, ETF 종목 목록을 가져와 us_symbol_maste
 from __future__ import annotations
 import argparse
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Tuple, Set
@@ -315,9 +316,11 @@ def enrich_sectors_yfinance(engine: Engine, rate_limit: float = 2.0,
     limiter = RateLimiter(requests_per_second=rate_limit)
     stats = {"enriched": 0, "failed": 0, "skipped": 0}
 
+    use_tqdm = False
     try:
         from tqdm import tqdm
-        iterator = tqdm(symbols, desc="  yfinance", unit="sym")
+        use_tqdm = sys.stderr.isatty()
+        iterator = tqdm(symbols, desc="  yfinance", unit="sym") if use_tqdm else symbols
     except ImportError:
         iterator = symbols
 
@@ -334,8 +337,11 @@ def enrich_sectors_yfinance(engine: Engine, rate_limit: float = 2.0,
         WHERE symbol = :symbol
     """)
 
+    progress_log_interval_sec = 600
+    last_progress_log_at = time.monotonic()
+
     with engine.begin() as conn:
-        for sym in iterator:
+        for idx, sym in enumerate(iterator, start=1):
             limiter.acquire()
             try:
                 ticker = yf.Ticker(sym)
@@ -354,6 +360,13 @@ def enrich_sectors_yfinance(engine: Engine, rate_limit: float = 2.0,
                     stats['skipped'] += 1
             except Exception:
                 stats['failed'] += 1
+
+            if (not use_tqdm) and ((time.monotonic() - last_progress_log_at) >= progress_log_interval_sec):
+                print(
+                    f"  yfinance progress: {idx}/{len(symbols)} "
+                    f"(enriched={stats['enriched']}, failed={stats['failed']}, skipped={stats['skipped']})"
+                )
+                last_progress_log_at = time.monotonic()
 
     print(f"  yfinance results: enriched={stats['enriched']}, "
           f"failed={stats['failed']}, skipped={stats['skipped']}")
@@ -441,7 +454,7 @@ def main(argv=None):
 
         # 7. 결과 출력
         elapsed = (datetime.now() - start_time).total_seconds()
-        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ✅ Sync completed successfully!")
+        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Sync completed successfully!")
         print(f"Summary:")
         print(f"  - Added: {stats['added']} symbols")
         print(f"  - Updated: {stats['updated']} symbols")
@@ -466,7 +479,7 @@ def main(argv=None):
                 print(f"  ... and {len(delisted_set) - 10} more")
 
     except Exception as e:
-        print(f"\n❌ Error during sync: {e}", file=sys.stderr)
+        print(f"\nError during sync: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         sys.exit(1)
