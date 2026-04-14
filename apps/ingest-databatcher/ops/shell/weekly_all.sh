@@ -63,7 +63,8 @@ print_phase_header() {
 print_phase_header "Phase 0: 종목 마스터 동기화 (Symbol Master Sync)"
 
 run_step "0-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/sync_symbol_master.py
-run_step "0-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_sync_symbol_master.py
+US_SYNC_SYMBOL_MASTER_EXTRA_ARGS=${US_SYNC_SYMBOL_MASTER_EXTRA_ARGS:-}
+run_step "0-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_sync_symbol_master.py ${US_SYNC_SYMBOL_MASTER_EXTRA_ARGS}
 run_step "0-3" "$PYTHON_BIN" apps/ingest-databatcher/scripts/crypto_sync_symbol_master.py --all
 run_step "0-4" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_index_sync_master.py
 run_step "0-5" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_index_sync_master.py
@@ -73,30 +74,36 @@ run_step "0-5" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_index_sync_maste
 # ==============================================================================
 print_phase_header "Phase 0.5: KR DELIST Probe (14d pykrx)"
 
-run_step "0-6" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_delist_probe.py --lookback-days 14 --min-success-count 50 --min-success-ratio 0.05
+KR_DELIST_PROBE_EXTRA_ARGS=${KR_DELIST_PROBE_EXTRA_ARGS:-}
+run_step "0-6" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_delist_probe.py --lookback-days 14 --min-success-count 50 --min-success-ratio 0.05 ${KR_DELIST_PROBE_EXTRA_ARGS}
 
 # ==============================================================================
 # Phase 1: 지수 주봉
 # ==============================================================================
 print_phase_header "Phase 1: 지수 주봉 (Index Weekly)"
 
-run_step "1-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_index_weekly_update.py --all
-run_step "1-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_index_weekly_update.py --all
+KR_INDEX_WEEKLY_ARGS=${KR_INDEX_WEEKLY_ARGS:---all}
+US_INDEX_WEEKLY_ARGS=${US_INDEX_WEEKLY_ARGS:---all}
+run_step "1-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/kr_index_weekly_update.py ${KR_INDEX_WEEKLY_ARGS}
+run_step "1-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_index_weekly_update.py ${US_INDEX_WEEKLY_ARGS}
 
 # ==============================================================================
 # Phase 2: 주식 주봉
 # ==============================================================================
 print_phase_header "Phase 2: 주식 주봉 (Stock Weekly)"
 
-run_step "2-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/weekly_update.py --all
-run_step "2-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_weekly_update.py --all
+KR_STOCK_WEEKLY_ARGS=${KR_STOCK_WEEKLY_ARGS:---all}
+US_STOCK_WEEKLY_ARGS=${US_STOCK_WEEKLY_ARGS:---all}
+run_step "2-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/weekly_update.py ${KR_STOCK_WEEKLY_ARGS}
+run_step "2-2" "$PYTHON_BIN" apps/ingest-databatcher/scripts/us_weekly_update.py ${US_STOCK_WEEKLY_ARGS}
 
 # ==============================================================================
 # Phase 3: Crypto 주봉
 # ==============================================================================
 print_phase_header "Phase 3: Crypto 주봉 (Crypto Weekly)"
 
-run_step "3-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/crypto_weekly_update.py --all --with-indicators
+CRYPTO_WEEKLY_ARGS=${CRYPTO_WEEKLY_ARGS:---all --with-indicators}
+run_step "3-1" "$PYTHON_BIN" apps/ingest-databatcher/scripts/crypto_weekly_update.py ${CRYPTO_WEEKLY_ARGS}
 
 # ==============================================================================
 # 최종 결과

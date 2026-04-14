@@ -145,9 +145,16 @@ def main(argv=None) -> int:
 
     for sym in symbols:
         sym_u = sym.upper().strip()
-        print(f"[crypto_weekly_update] symbol={sym_u}")
+        stdout_encoding = sys.stdout.encoding or "utf-8"
+        display_sym = sym_u.encode(stdout_encoding, errors="replace").decode(stdout_encoding, errors="replace")
+        print(f"[crypto_weekly_update] symbol={display_sym}")
 
-        df_weekly = collector.fetch_klines_1w(sym_u, start=start_d, end=end_d)
+        try:
+            df_weekly = collector.fetch_klines_1w(sym_u, start=start_d, end=end_d)
+        except Exception as e:
+            print(f"  -> fetch error, skip: {e}")
+            continue
+
         if df_weekly is None or df_weekly.empty:
             print("  -> no weekly price data")
             continue

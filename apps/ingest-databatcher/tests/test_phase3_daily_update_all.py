@@ -107,8 +107,7 @@ def test_phase3():
         "--all",
         "--top", "5",
         "--start", start_date.strftime("%Y-%m-%d"),
-        "--end", end_date.strftime("%Y-%m-%d"),
-        "--force"
+        "--end", end_date.strftime("%Y-%m-%d")
     ], capture_output=True, text=True, env=env)
 
     print(proc_result.stdout)
