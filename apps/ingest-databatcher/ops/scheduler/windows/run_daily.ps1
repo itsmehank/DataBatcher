@@ -1,10 +1,10 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 param(
     [ValidateSet("KR", "US")]
     [string]$Target = "KR"
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\common.ps1"
 
@@ -46,15 +46,15 @@ try {
         exit 1
     }
 
-    $healthcheckScript = Join-Path $repoRoot "scripts\healthcheck_db.py"
+    $healthcheckScript = Join-Path $repoRoot "apps\ingest-databatcher\scripts\healthcheck_db.py"
     if (-not (Test-Path -LiteralPath $healthcheckScript)) {
         throw "Missing script: $healthcheckScript"
     }
     Write-RunLog -Message "[DAILY-$Target] DB healthcheck start" -LogFile $logFile
-    & $batchPython $healthcheckScript 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }
-    if ($LASTEXITCODE -ne 0) {
-        Write-RunLog -Message "[DAILY-$Target] DB healthcheck failed (exit=$LASTEXITCODE)" -LogFile $logFile
-        Send-AppriseNotification -Title "$titlePrefix FAILED" -Body "DB healthcheck failed (exit=$LASTEXITCODE).`nLog: $logFile" -LogFile $logFile
+    $healthExit = Invoke-LoggedProcess -FilePath $batchPython -ArgumentList @($healthcheckScript) -LogFile $logFile -WorkingDirectory $repoRoot
+    if ($healthExit -ne 0) {
+        Write-RunLog -Message "[DAILY-$Target] DB healthcheck failed (exit=$healthExit)" -LogFile $logFile
+        Send-AppriseNotification -Title "$titlePrefix FAILED" -Body "DB healthcheck failed (exit=$healthExit).`nLog: $logFile" -LogFile $logFile
         exit 1
     }
 
@@ -67,14 +67,15 @@ try {
     }
 
     $repoPosix = Convert-ToPosixPath -WindowsPath $repoRoot
+    $logFilePosix = Convert-ToPosixPath -WindowsPath $logFile
     $pythonForBash = $batchPython
     if (Test-Path -LiteralPath $batchPython) {
         $pythonForBash = Convert-ToPosixPath -WindowsPath $batchPython
     }
-    $cmd = "cd '$repoPosix' && PYTHON_BIN='$pythonForBash' bash $targetScript"
+    $cmd = "cd '$repoPosix' && PYTHON_BIN='$pythonForBash' bash $targetScript >> '$logFilePosix' 2>&1"
     Write-RunLog -Message "[DAILY-$Target] execute: $cmd" -LogFile $logFile
 
-    & $gitBash -lc $cmd 2>&1 | ForEach-Object { Write-RunLog -Message $_ -LogFile $logFile }
+    & $gitBash -lc $cmd
     $exitCode = $LASTEXITCODE
     $elapsed = [int]((Get-Date) - $startAt).TotalSeconds
 
