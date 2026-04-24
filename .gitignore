@@ -28,6 +28,7 @@ ENV/
 .env
 .env.*
 !.env.example
+!apps/stock-alert-engine/.env.phase0.example
 apps/ingest-databatcher/config/settings.dev.yaml
 apps/ingest-databatcher/ops/scheduler/windows/scheduler.env
 !apps/ingest-databatcher/ops/scheduler/windows/scheduler.env.example
@@ -38,6 +39,9 @@ logs/
 
 # Local backup artifacts
 backups/
+
+# 임시 문서
+temp_doc/
 
 # Build artifacts
 build/

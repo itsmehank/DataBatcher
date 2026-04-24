@@ -13,7 +13,7 @@ DataBatcher is a multi-market stock data collection and technical indicator calc
 
 **Core Pipeline**: Data Collection (collectors) → Indicator Calculation (indicators) → Database Storage (savers)
 
-**Monorepo**: `apps/ingest-databatcher/` is the main app. Other apps (`apps/trading-view-project/`, `apps/my-insight-archieve/`) are independently deployed.
+**Monorepo**: `apps/ingest-databatcher/` is the main app. Other apps (`apps/trading-view-project/`, `apps/my-insight-archieve/`, `apps/real-estate-project/`) are independently deployed.
 
 ## Development Commands
 
@@ -89,6 +89,7 @@ python apps/ingest-databatcher/scripts/us_sync_symbol_master.py --market NASDAQ 
 
 # Bulk / daily / weekly
 python apps/ingest-databatcher/scripts/us_bulk_update.py --start 2024-01-01 --end 2024-12-31 --workers 4 --with-indicators
+python apps/ingest-databatcher/scripts/us_bulk_update_weekly.py
 python apps/ingest-databatcher/scripts/us_daily_update.py --all --with-indicators
 python apps/ingest-databatcher/scripts/us_weekly_update.py --all
 
@@ -131,6 +132,7 @@ bash apps/ingest-databatcher/ops/shell/daily_us.sh
 bash apps/ingest-databatcher/ops/shell/daily_crypto.sh
 bash apps/ingest-databatcher/ops/shell/weekly_all.sh
 bash apps/ingest-databatcher/ops/shell/bulk_all.sh         # Full bulk collection (~2-3 hours)
+bash apps/ingest-databatcher/ops/shell/bulk_all_test.sh    # Bulk collection test run
 bash apps/ingest-databatcher/ops/shell/bulk_all_except_symbols.sh
 bash apps/ingest-databatcher/ops/shell/refresh_kr_sector_snapshot.sh
 bash apps/ingest-databatcher/ops/shell/db_backup_monthly.sh
@@ -158,6 +160,15 @@ python apps/ingest-databatcher/scripts/probes/fdr_stock_probe.py --symbol 005930
 python apps/ingest-databatcher/scripts/probes/fdr_us_stock_probe.py --symbol AAPL --start 2024-01-01 --end 2024-01-31
 python apps/ingest-databatcher/scripts/probes/fdr_us_index_probe.py
 python apps/ingest-databatcher/scripts/probes/pykrx_index_probe.py
+python apps/ingest-databatcher/scripts/probes/yfinance_us_stock_probe.py   # yfinance column/format check
+python apps/ingest-databatcher/scripts/probes/yfinance_us_index_probe.py   # yfinance index ticker mapping check
+
+# KR delist / symbol verification
+python apps/ingest-databatcher/scripts/kr_delist_probe.py          # pykrx-based delist detection
+python apps/ingest-databatcher/scripts/verify_krx_symbols.py       # verify symbols exist in FDR KRX listing
+
+# US FDR freshness monitor
+python apps/ingest-databatcher/scripts/monitor_us_fdr_freshness.py  # check FDR data lag vs market calendar
 
 # Integration / unit tests (in scripts/tests/)
 python apps/ingest-databatcher/scripts/tests/test_weekly_aggregation_unit.py
@@ -166,6 +177,13 @@ python apps/ingest-databatcher/scripts/tests/test_us_weekly_update_idempotency.p
 # DB assertion scripts (verify table state)
 python apps/ingest-databatcher/scripts/tests/db_crypto_assert_counts.py
 python apps/ingest-databatcher/scripts/tests/db_us_assert_weekly_counts.py
+
+# Phase-based integration test suite (apps/ingest-databatcher/tests/)
+python apps/ingest-databatcher/tests/run_all_tests.py               # runs Phase 1-3 sequentially
+python apps/ingest-databatcher/tests/test_phase1_sync_symbol_master.py
+python apps/ingest-databatcher/tests/test_phase2_bulk_update.py
+python apps/ingest-databatcher/tests/test_phase3_daily_update_all.py
+python apps/ingest-databatcher/tests/test_phase4_weekly_update.py
 ```
 
 ## High-Level Architecture
@@ -220,10 +238,18 @@ Indicators must be imported to register. Example in `daily_update.py`:
 from indicators.common import sma as _reg_sma  # noqa: F401
 ```
 
+### Savers (`savers/`)
+- **`IndicatorSaver`** (`savers/indicator_saver.py`): Wraps `DBManager.upsert_dataframe()` for indicator long-form storage. Currently supports long mode only (`save_long(df_long, mode)`). Used by daily/weekly update scripts after `IndicatorPipeline` produces results.
+
 ### Symbol Master System
 Each market has a `*_symbol_master` table. Sync scripts (run weekly) compare FDR listing against DB, adding `ACTIVE` symbols and marking delisted as `DELISTED`.
 
-Symbol loaders (`core/symbol_loader.py`, `core/us_symbol_loader.py`, etc.) provide `load_symbols_from_master()` — supports filtering by market and `--top N` by market cap.
+Symbol loaders (`core/symbol_loader.py`, `core/us_symbol_loader.py`, `core/us_index_symbol_loader.py`, `core/kr_index_symbol_loader.py`, `core/crypto_symbol_loader.py`) provide `load_symbols_from_master()` — supports filtering by market and `--top N` by market cap.
+
+### Core Utilities
+- **`core/pykrx_adapter.py`**: Converts pykrx Korean-column responses (한글) to DataBatcher standard English format. Also handles date format conversion (YYYY-MM-DD ↔ YYYYMMDD).
+- **`core/date_utils.py`**: Market calendar utilities (`DateUtils` class). Uses `pandas_market_calendars` for trading day calculations.
+- **`core/fdr_sector_loader.py`**: Loads KRX-DESC sector/industry data from FDR `StockListing('KRX-DESC')`. Provides `sector_detail` (~162 subcategories) and `industry` fields for KR stocks.
 
 ### Weekly Aggregation (`core/weekly_aggregation.py`)
 **Important contract**: `week_start` is the **first trading day** of the week, NOT a fixed Monday. `week_end` is the last trading day. Week key uses `date.to_period('W-FRI')`.
