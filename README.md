@@ -1,5 +1,19 @@
 # DataBatcher
 
+> **프로젝트 거버넌스 (Minervini Trading System)**  
+> 본 저장소는 단순 데이터 배치 수집기를 넘어 **미너비니 반자동 트레이딩 보조 시스템**으로 확장 중이다.  
+> Phase 0 (데이터 적재·인디케이터·기본 대시보드)은 완료, 현재 Phase 1 (LLM 분석 레이어) 착수 준비 단계다.
+>
+> **먼저 읽어야 할 문서**:
+> - 절대 원칙: [`_meta/00_CONSTITUTION.md`](_meta/00_CONSTITUTION.md)
+> - 아키텍처: [`_meta/01_ARCHITECTURE.md`](_meta/01_ARCHITECTURE.md)
+> - 로드맵: [`_meta/03_ROADMAP.md`](_meta/03_ROADMAP.md)
+> - 현재 상태: [`_meta/06_CURRENT_STATE.md`](_meta/06_CURRENT_STATE.md)
+>
+> 거버넌스 운영 방식은 [`_meta/04_DECISIONS.md`](_meta/04_DECISIONS.md)의 ADR-005 참조.
+
+---
+
 KR/US/Crypto 데이터 배치 수집기와 보조 웹앱들을 함께 관리하는 모노레포입니다.
 
 ## 무엇을 하는 프로젝트인가

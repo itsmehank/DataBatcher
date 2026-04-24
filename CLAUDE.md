@@ -2,6 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## 🚨 GOVERNANCE: READ FIRST (Highest Priority)
+
+This repository is the **Phase 0 foundation of the Minervini semi-automated trading system**.
+All work must be done under the governance defined in the `_meta/` folder.
+
+**Before starting ANY task, read these in order:**
+
+1. **[`_meta/06_CURRENT_STATE.md`](_meta/06_CURRENT_STATE.md)** — Where we are right now (what Phase, what's done, what's pending).
+2. **[`_meta/00_CONSTITUTION.md`](_meta/00_CONSTITUTION.md)** — Inviolable principles. Violation = stop work.
+3. **If a Phase is in progress**: `_meta/phases/phaseN_brief.md` — the active work plan.
+
+These documents **override any guidance in this CLAUDE.md** where they conflict. In practice, they are complementary: governance docs say "what to build and why", this CLAUDE.md says "how the existing code works".
+
+### Role Separation (see `_meta/04_DECISIONS.md` ADR-005)
+
+| Role | Where | Responsibility |
+|---|---|---|
+| **Architect** | Web Claude (claude.ai, not this CLI) | Phase briefs, major design decisions, audits |
+| **Builder** | **This Claude Code CLI** | Actual code writing, testing, commits |
+| **Auditor** | Web Claude (separate session) | End-of-phase constitutional review |
+
+### What Builder (this CLI) may and may not modify in `_meta/`
+
+- ✅ **May write freely**: `_meta/phases/phaseN_progress.md` (progress log of current phase)
+- ❌ **Must not modify directly**: `00_CONSTITUTION.md`, `01_ARCHITECTURE.md`, `02_SCENARIO.md`, `03_ROADMAP.md`, `04_DECISIONS.md`, `05_GLOSSARY.md`, `06_CURRENT_STATE.md`, existing `phaseN_brief.md` / `phaseN_audit.md`
+
+If any of the "must not modify" documents appear outdated or inconsistent with reality during work, **stop and report to the user**. The user will decide whether to update them via the Architect session. Do not self-correct these files.
+
+### Single Source of Truth
+
+The **local Git repository is the single source of truth**. Copies on the web Claude project are read-only snapshots, re-uploaded manually by the user after changes are committed locally.
+
+---
+
 ## Project Overview
 
 DataBatcher is a multi-market stock data collection and technical indicator calculation system. It supports Korean (KRX), US (NYSE/NASDAQ), and Crypto (Binance) markets. It fetches price data from various sources (pykrx, FinanceDataReader, Binance API), computes technical indicators (SMA, EMA, etc.), and stores everything in MySQL for analysis and trading strategy backtesting.
