@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -162,7 +163,7 @@ def main(argv=None) -> int:
 
     # 4. 미너비니 스크리닝 실행
     print("[us_minervini_update] 미너비니 트렌드 템플릿 스크리닝 실행...")
-    pass_mask, _ = screen_minervini_trend_template(
+    pass_mask, _, conditions = screen_minervini_trend_template(
         prices_wide=prices_wide,
         rs_rating_wide=rs_rating_wide,
         blue_dot_wide=blue_dot_wide,
@@ -242,8 +243,24 @@ def main(argv=None) -> int:
     melted["screen_config_hash"] = screen_hash
     melted["failed_reason"] = None
 
+    # conditions_met: 각 (symbol, date) 쌍에 대해 8개 조건 pass/fail JSON 생성
+    def _build_conditions_met(symbol: str, date_val, conds: dict) -> str:
+        result = {}
+        for key, mask_df in conds.items():
+            try:
+                val = mask_df.at[pd.Timestamp(date_val), symbol]
+                result[key] = False if pd.isna(val) else bool(val)
+            except KeyError:
+                result[key] = False
+        return json.dumps(result)
+
+    melted["conditions_met"] = melted.apply(
+        lambda row: _build_conditions_met(row["symbol"], row["date"], conditions),
+        axis=1,
+    )
+
     # 컬럼 순서 정리
-    result_df = melted[["symbol", "date", "market", "rs_rating", "is_blue_dot", "screen_config_hash", "failed_reason"]]
+    result_df = melted[["symbol", "date", "market", "rs_rating", "is_blue_dot", "conditions_met", "screen_config_hash", "failed_reason"]]
 
     print(f"[us_minervini_update] 저장할 레코드 수: {len(result_df)}")
 
