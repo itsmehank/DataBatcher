@@ -527,5 +527,161 @@ P0.5 스크리너 개편 작업 중 Builder가 다음 세 가지 구조적 문�
 
 ---
 
+
+## ADR-011: Phase 1 LLM 호출 — Max 플랜 + Claude Code CLI를 기본 백엔드로 (ADR-003의 조건부 예외)
+
+- **날짜**: 2026-04-24
+- **상태**: Accepted (조건부)
+- **결정자**: 사용자 + Architect 협의
+- **관련 ADR**: ADR-003 (Supersede 아닌 **조건부 예외**로 보완), ADR-009
+
+### 컨텍스트
+
+ADR-003은 "프로덕션 LLM 호출은 모두 Anthropic API를 사용한다. Claude Code CLI는 개발·실험·프롬프트 튜닝 용도로만 사용한다"고 결정했다. 이 결정 시점에는 비용 추정치를 월 $20~40로 잡았다.
+
+Phase 1 brief 작성 중 입력 페이로드의 실제 크기를 산정한 결과, 비용 추정치가 **월 $120~150** 수준으로 상향되었다 (Sonnet + 60일 일봉 + 52주 주봉 기준). 옵션 D(Haiku + 입력 다이어트)로 낮춰도 월 $20~30이지만 분석 품질 검증이 필요하다.
+
+한편 사용자는 다음 사정에 있다:
+- 개인 비상업 사용
+- Claude Max 플랜을 개발 도구로 이미 가입 예정
+- Phase 1은 헌법 §3.3에 따라 점진적·실험적 단계
+- 비용 부담 최소화 선호
+
+이 상황에서 ADR-003을 그대로 따르면 사용자가 결제할 의사가 있던 Max 플랜의 자원이 활용되지 않고, 별도로 API 비용이 발생한다. 합리적 대안 검토가 필요하다.
+
+### 결정
+
+**Phase 1 LLM 호출(모듈 (5)와 (6))의 기본 백엔드를 Claude Code CLI + Max 플랜으로 한다. 단 다음 조건을 모두 충족한다.**
+
+#### 1. 사용 시점의 명시적 트리거
+
+운영 환경의 daily cron 스케줄러가 무인으로 LLM 호출을 시작하지 않는다. 호출은 다음 중 하나의 방식으로 트리거된다:
+
+- (a) 사용자가 대시보드 UI 또는 CLI에서 명시적으로 실행
+- (b) 사용자가 매일 PC에 직접 접속해 수동 실행
+- (c) 또는 사용자가 격일·평일 등 자기 스케줄에 맞춰 운영
+
+요컨대 "사용자 의도가 매 호출 세트마다 개입"되어야 한다. 24/7 무인 자동화는 본 ADR의 적용 범위 밖이다.
+
+#### 2. 백엔드 추상화 의무
+
+`apps/llm-analysis/core/anthropic_client.py`는 다음 인터페이스를 갖는다:
+
+```python
+class LLMBackend(Protocol):
+    def call(self, prompt: str, model: str, max_tokens: int) -> LLMResponse: ...
+
+class ClaudeCodeCLIBackend: ...   # CLI 호출
+class AnthropicAPIBackend: ...    # 공식 API 호출
+```
+
+호출자는 백엔드 구현을 알지 못한다. `settings.yaml`의 `llm_analysis.backend` 값에 따라 런타임에 선택:
+
+```yaml
+llm_analysis:
+  backend: "cli"   # "cli" | "api"
+```
+
+이 추상화는 미래의 백엔드 전환 시 호출자 코드를 건드리지 않게 한다. 추상화 작성을 게을리하고 CLI에 직접 의존하는 코드는 ADR 위반.
+
+#### 3. 헌법 §2.5 — LLM 호출 영구 보존
+
+CLI 백엔드도 모든 호출을 `llm_calls` 테이블에 기록한다. 단, 다음 필드는 CLI 모드에서 NULL 또는 추정값 허용:
+
+| 필드 | API 모드 | CLI 모드 |
+|---|---|---|
+| `model` | API 응답에서 정확 | CLI 호출 시 설정값 그대로 |
+| `prompt_tokens` | API 응답에서 정확 | tiktoken 또는 추정 |
+| `completion_tokens` | API 응답에서 정확 | tiktoken 또는 추정 |
+| `cost_usd` | 정확 계산 | NULL (Max 플랜은 정액제) |
+| `request_payload` | 정확 | 정확 (CLI에 전달한 프롬프트) |
+| `response_payload` | 정확 (구조화 JSON) | CLI stdout 캡처 (마크다운 펜스 등 후처리) |
+| `duration_ms` | 정확 | 정확 (subprocess wall time) |
+| `error` | 정확 | stderr 캡처 또는 파싱 실패 메시지 |
+
+추정 토큰 수를 사용한 경우 별도 컬럼이 아니라 `request_payload` JSON 안에 메타로 기록 (`{"prompt_tokens_estimated": true}`).
+
+#### 4. 약관 위험 인식
+
+본 ADR은 Claude Pro/Max 플랜의 약관에 대한 회색 지대 운영임을 명시한다. 사용자는 다음을 인지한다:
+
+- Anthropic이 자동화·프로그래매틱 사용을 제한해왔으며, 정책은 시간에 따라 변할 수 있다
+- "사용자 명시적 트리거"는 자동화로 해석되지 않을 가능성이 높지만 보장은 아니다
+- 만에 하나 정책 위반으로 판정되면 Max 플랜 정지 위험이 있다 (법적 문제는 아닐 가능성 높음)
+
+이 위험을 받아들이는 대신 비용을 절감한다는 것이 본 결정의 본질이다.
+
+#### 5. 재검토 시점 (강제)
+
+본 결정은 **항구적이지 않다**. 다음 시점에 강제로 재검토하고, 재검토 결과를 새 ADR로 기록한다:
+
+- (a) Phase 5 백테스트 결과 — 시스템이 가치를 입증하면 API 전환 검토
+- (b) 본 ADR 채택 후 6개월 시점 (2026-10-24) — 도달 시 Architect 세션에서 재평가
+- (c) Anthropic 약관 또는 사용량 한도 정책의 의미 있는 변경 시 — 즉시 재검토
+- (d) 사용자가 "API로 전환할 시점이다"라고 판단 — 즉시 재검토
+
+위 (d) 항목이 사용자가 요청한 "내가 원하는 시점까지 CLI 기본"의 명문화다. 사용자 결정에 따라 언제든 백엔드 전환 가능.
+
+#### 6. 전환 시 절차
+
+CLI → API 전환 시:
+
+1. 새 ADR 작성 (예: ADR-NNN "Phase X LLM 백엔드 API 전환")
+2. `settings.yaml`의 `llm_analysis.backend`를 `"api"`로 변경
+3. ANTHROPIC_API_KEY 환경 변수 셋업
+4. 첫 호출 검증 (1~3종목)
+5. 운영 큐 항목으로 등록 → 운영 환경 적용
+6. `06_CURRENT_STATE.md` 갱신
+
+코드 변경은 거의 없어야 한다 (백엔드 추상화 덕분).
+
+### 사유
+
+**ADR-003을 supersede하지 않고 "조건부 예외"로 두는 이유**:
+- ADR-003의 원칙(API 우선)은 여전히 유효하다. 24/7 무인 자동화 단계(Phase 6 자동 주문 등)에서는 API가 맞다.
+- 본 ADR은 Phase 1의 실험적 단계에 한정된 예외다. 모든 시기에 적용되지 않는다.
+- ADR-003을 supersede하면 미래의 자동화 Phase에서도 CLI를 쓰는 듯한 인상을 준다. "조건부 예외"가 더 정확.
+
+**추상화 의무가 핵심인 이유**:
+- 백엔드 의존을 분리하지 않으면 미래 전환 시 곳곳을 고쳐야 한다.
+- Phase 1에서 `LLMBackend` 인터페이스를 잘 짜두면, 단 한 줄(`backend: "api"`)로 전환 가능.
+- 추가 작업 1~2일이지만, Phase 5 또는 그 이후의 전환을 단순화한다.
+
+**약관 위험을 명시하는 이유**:
+- 거버넌스의 정직성. 헌법 §4.2 "이해" 원칙 — 사용자가 위험을 인지하고 결정한 것임을 기록.
+- 만약 정책 변경으로 문제가 생기면, 본 ADR을 보고 즉시 옵션 ①로 전환할 근거가 됨.
+
+### 결과 / 영향
+
+**Phase 1 brief 변경**:
+- §5 디렉토리 구조: `core/anthropic_client.py`를 백엔드 추상화로 설계
+- §7 비용 정책: CLI 모드의 `cost_usd` NULL 허용
+- §8 배치 통합: 자동 cron 진입점이 아닌 사용자 트리거 진입점 우선 설계
+- 1.1 단계: Haiku vs Sonnet 비교는 **API 비용 시뮬레이션**이 주 목적이었으므로 우선순위 하향. CLI 모드에서는 Max 플랜 한 모델 안에서 운영.
+
+**ANTHROPIC_API_KEY**:
+- 본 결정 시점에는 필수 아님 (CLI 모드).
+- 단, 백엔드 추상화의 API 구현체는 Phase 1 안에 작성·테스트 (전환 대비). 이때는 API 키 필요.
+
+**Builder의 추가 책임**:
+- `LLMBackend` 인터페이스가 깔끔히 분리되었는지 self-check
+- CLI 호출 시 약관 회색 지대 인식 (예: 5시간 윈도우 한도 초과 시 합리적 백오프)
+- `llm_calls` 테이블 채움 정책을 백엔드별로 정확히 구현
+
+**Auditor의 새 책임**:
+- Phase 1 종료 감사 시 `LLMBackend` 추상화의 적절성 평가
+- CLI 모드 운영 중 약관 위반 징후(계정 경고, 한도 초과 빈발) 검토
+
+**환경 변수 변경**:
+- `apps/llm-analysis/.env.example`에 `ANTHROPIC_API_KEY=optional` 명시
+- Builder가 README에 "본 Phase는 CLI 백엔드 기본, API는 옵션"임을 명시
+
+**연관 문서 갱신 필요**:
+- `_meta/05_GLOSSARY.md` Part C "외부 API 인터페이스 / Anthropic API"에 백엔드 선택지 명시
+- `_meta/06_CURRENT_STATE.md`에 본 ADR 추가 + 재검토 일정(2026-10-24) 기록
+- `_meta/01_ARCHITECTURE.md` 외부 의존성 표에 "Anthropic API or Claude Code CLI (선택)" 표기
+
+---
+
 *새로운 결정이 있을 때마다 ADR-010, ADR-011... 형태로 추가한다.*
 

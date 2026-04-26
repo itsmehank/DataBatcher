@@ -79,6 +79,7 @@
 - ADR-007: OHLCV·스크리닝 결과 시장별 분리 (소급)
 - ADR-008: `screen_config_hash`로 스크리너 설정 버전 관리 (소급)
 - ADR-009: `daily_analysis` 시장별 분리 + 스크리너 `conditions_met` 추가 + `llm_calls` 신설 → **P0.5에서 스크리너 개편 부분 실행 완료**
+- ADR-011: Phase 1은 Max 플랜 + Claude Code CLI를 기본 백엔드로 (ADR-003 조건부 예외, 2026-10-24 재검토)
 
 전체 ADR은 `04_DECISIONS.md` 참조.
 
@@ -148,6 +149,19 @@
 ### D. `watchlist_items` vs `minervini_list_selection` (Phase 6 예정)
 
 전자는 legacy(미사용), 후자가 현역. Phase 6에서 `order_reservations` 설계 시 `watchlist_items` 제거 검토.
+
+
+### E. ADR-011 재검토 일정 (2026-10-24 또는 사용자 판단 시점)
+
+**현상**: Phase 1 LLM 백엔드를 Claude Code CLI(Max 플랜)로 운영. 약관 회색 지대 + 비용 메트릭 부실 등 트레이드오프 수용.
+
+**재검토 트리거**:
+- (a) Phase 5 백테스트 결과
+- (b) 2026-10-24 시점 도달
+- (c) Anthropic 정책 변경
+- (d) 사용자 판단
+
+재검토 결과는 새 ADR로 기록.
 
 ---
 

@@ -458,11 +458,21 @@ def calculate_risk_metrics() -> dict
 
 ## Part C: 외부 API 인터페이스
 
-### Anthropic API
-- **모델**: 사용 시점의 최신 Sonnet 또는 Opus
-- **temperature**: 0 (분석 모듈), 0.7 (Q&A 에이전트)
-- **출력 강제**: tool use 또는 JSON mode
-- **모든 호출은 `llm_calls` 테이블에 기록** (헌법 §2.5)
+### Anthropic LLM 백엔드
+
+본 시스템은 두 가지 백엔드를 추상화 인터페이스(`LLMBackend`) 뒤에 둔다.
+런타임에 `apps/llm-analysis/config/settings.yaml`의 `llm_analysis.backend` 값으로 선택.
+
+| 백엔드 | 용도 | 활성 시점 |
+|---|---|---|
+| `cli` | Claude Code CLI + Max 플랜 | Phase 1 기본 (ADR-011) |
+| `api` | Anthropic API | ADR-011 전환 시점 또는 자동화 Phase |
+
+공통 설정:
+- temperature: 0 (분석 모듈), 0.7 (Q&A 에이전트)
+- 출력 강제: tool use / JSON mode (API), 프롬프트 강제 (CLI)
+- 모든 호출은 `llm_calls` 테이블에 기록 (헌법 §2.5)
+
 
 ### 증권사 API
 - **선정**: Phase 6 진입 시 결정 (별도 ADR로 기록)
