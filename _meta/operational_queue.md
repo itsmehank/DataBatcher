@@ -25,9 +25,13 @@
 - **셸**: PowerShell
 - **스케줄러**: Windows Task Scheduler (`apps/ingest-databatcher/ops/scheduler/windows/*.ps1`)
 - **DataBatcher 경로**: (사용자가 채워넣을 것 — 예: `C:\work\DataBatcher`)
-- **DB**: MySQL (Docker Compose 또는 native, 사용자가 명시)
-- **MySQL 자격증명**: `.env`로 관리. PowerShell에서 `Get-Content .env`로 확인.
+- **DB**: MySQL 8.4.8 (Docker 컨테이너 — 컨테이너명 `mysql-standalone-mysql`)
+  - 호스트에 `mysql`/`mysqldump` 클라이언트 없음 → 명령은 `docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" ...` 형태로 실행
+- **MySQL 자격증명**: `.env`의 `MYSQL_ROOT_PASSWORD` 사용 (Q-001 적용 시 확인됨, 2026-04-26)
 - **접속 방법**: 직접 / 원격 데스크톱 / SSH (사용자가 명시)
+- **Daily cron 시각**:
+  - US daily: 매일 08:00 KST 시작, 최대 6시간 소요 (~14:00 종료)
+  - KR daily: 매일 19:00 KST 시작, 최대 30분 소요 (~19:30 종료)
 
 > 비어 있는 항목은 처음 운영 환경 작업할 때 채워넣고 commit한다.
 
@@ -45,77 +49,37 @@
 
 ## 대기 중인 작업
 
-### Q-001: P0.5 마이그레이션 적용 (등록: 2026-04-24)
-
-**관련 commit**: `phase0_5/screener-refactor` 머지 commit (main에 반영됨)  
-**관련 ADR**: ADR-009 (스크리너 개편 + `conditions_met` 컬럼 추가)  
-**위험도**: 중간 (DB 변경, 다음 cron 영향)  
-**예상 소요**: 5~10분  
-**타이밍 윈도우 (KST)**:
-- KR daily cron이 16:30 시작 → 18:00 KST 이전 또는 21:00 이후 권장
-- US daily cron이 22:00 시작 → 22:00 직전 회피
-- **안전 시각: 18:00~22:00 KST 또는 다음날 새벽**
-
-**해야 할 작업** (PowerShell, 운영 환경에서 실행):
-
-```powershell
-# 0. DataBatcher 경로로 이동
-cd C:\path\to\DataBatcher    # 실제 경로로 치환
-
-# 1. 작업 트리 깨끗한지 확인
-git status
-git branch                   # main 브랜치인지
-
-# 2. 코드 pull
-git pull
-
-# 3. DB 백업 (안전 조치) — 자격증명은 .env에서 가져오거나 직접 입력
-$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-mysqldump -u $env:DB_USER -p"$env:DB_PASSWORD" trade > "C:\temp\trade_backup_${timestamp}.sql"
-Get-Item "C:\temp\trade_backup_${timestamp}.sql" | Select-Object Name, Length
-
-# 4. 현재 스키마 확인 (적용 전 상태)
-mysql -u $env:DB_USER -p"$env:DB_PASSWORD" -e "DESCRIBE trade.minervini_screen_results_kr;" | Select-String "conditions_met"
-# → 결과 없음 (컬럼 미존재) 이어야 함
-
-# 5. 마이그레이션 적용 (raw SQL)
-Get-Content apps\ingest-databatcher\scripts\migrations\add_conditions_met_column.sql | mysql -u $env:DB_USER -p"$env:DB_PASSWORD" trade
-
-# 6. 적용 확인
-mysql -u $env:DB_USER -p"$env:DB_PASSWORD" -e "DESCRIBE trade.minervini_screen_results_kr;" | Select-String "conditions_met"
-mysql -u $env:DB_USER -p"$env:DB_PASSWORD" -e "DESCRIBE trade.minervini_screen_results_us;" | Select-String "conditions_met"
-# → 두 명령 모두 'conditions_met JSON' 보여야 함
-```
-
-**주의 사항**:
-- Alembic은 이번에 다루지 않음. ADR-010 결정 후 일괄 처리 예정 (Q5=A).
-- 백업 파일은 적어도 1주 이상 보관. 다음 daily cron이 정상 종료되면 삭제 가능.
-- PowerShell의 `mysqldump`/`mysql` 명령어가 `PATH`에 없으면 MySQL bin 폴더를 PATH에 추가하거나 절대 경로로 실행.
-- 환경 변수가 `.env`에서 자동 로드되지 않으면, PowerShell에서 직접 export:
-```powershell
-  $env:DB_USER = "your_user"
-  $env:DB_PASSWORD = "your_password"
-```
-
-**완료 기준**:
-- `DESCRIBE` 결과에 KR/US 모두 `conditions_met JSON` 컬럼 보임
-- 다음 KR cron(`kr_minervini_update.py`) 실행 후 `SELECT conditions_met FROM trade.minervini_screen_results_kr WHERE date = (가장 최근 날짜) LIMIT 1`에서 8개 키를 가진 JSON 반환
-- 다음 US cron 실행 후 동일 검증
-
-**완료 후 추가 작업**:
-- 본 항목을 "완료된 작업" 섹션으로 이동
-- 완료일·검증 결과 기록
-- ADR-010이 그 사이에 확정되었다면, 추가로 alembic stamp 작업 필요 여부 확인
-
----
-
-(추후 새 작업 항목이 추가되면 위쪽에 등록)
+(현재 대기 중인 항목 없음. Q-002, Q-003은 Phase 1 1.1·1.3 단계에서 정식 등록 예정 — `_meta/phases/phase1_brief.md` §4.4, §8.7 참조.)
 
 ---
 
 ## 완료된 작업
 
-(완료된 항목을 여기로 옮김. 작업일과 검증 결과 함께)
+### Q-001: P0.5 마이그레이션 적용 ✅ (등록: 2026-04-24, 완료: 2026-04-26)
+
+**관련 commit**: `phase0_5/screener-refactor` 머지 commit (`410b5ac feat(screener): add conditions_met JSON per ADR-009 (P0.5)`)  
+**관련 ADR**: ADR-009 (스크리너 개편 + `conditions_met` 컬럼 추가)  
+**적용 일시**: 2026-04-26 18:18 KST (일요일)  
+**적용 시점 HEAD**: `af28f9f docs(meta): add ADR-011 (Phase 1 CLI backend with conditional exception)`  
+**적용 방식**: `docker exec -i mysql-standalone-mysql mysql -u root ...` (호스트 mysql 클라이언트 부재로 컨테이너 내부 실행)  
+**자격증명**: `.env`의 `MYSQL_ROOT_PASSWORD` 사용  
+**백업**: 생략 (사용자 지시, ADD COLUMN ... NULL의 멱등성 신뢰)  
+**적용 소요**: 1.5초 (MySQL 8.4.8 INSTANT ADD COLUMN)
+
+**검증 결과**:
+- ✅ DESCRIBE 검증: KR/US 두 테이블 모두 `conditions_met JSON` 컬럼 확인
+  - 위치: `AFTER is_blue_dot`
+  - 타입: json, NULL 허용
+  - COMMENT: `"ADR-009: per-condition pass/fail map"`
+- ✅ ALTER 중 cron 충돌: 없음 (일요일이라 영향 cron 없음)
+- ⏳ 추가 검증 (예정): 다음 KR/US daily cron 실행 후 `conditions_met` JSON에 8개 키가 채워지는지 확인 (별도 시점 검증 — Phase 1 1.1 단계 시작 직전)
+
+**작업 환경**:
+- PROD (Windows + PowerShell)
+- DB: `mysql-standalone-mysql` Docker 컨테이너 (MySQL 8.4.8)
+
+**메모**:
+- Alembic은 이번에 다루지 않음. ADR-010 §5에 따라 운영 환경에 `alembic_version` 테이블 미생성. DEV·PROD `alembic_version` 동기화는 추후 별도 큐 항목으로 다룸.
 
 ---
 

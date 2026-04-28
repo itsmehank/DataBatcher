@@ -531,9 +531,9 @@ P0.5 스크리너 개편 작업 중 Builder가 다음 세 가지 구조적 문�
 ## ADR-011: Phase 1 LLM 호출 — Max 플랜 + Claude Code CLI를 기본 백엔드로 (ADR-003의 조건부 예외)
 
 - **날짜**: 2026-04-24
-- **상태**: Accepted (조건부)
+- **상태**: Accepted (조건부, §1은 ADR-012로 부분 개정됨 — 2026-04-26)
 - **결정자**: 사용자 + Architect 협의
-- **관련 ADR**: ADR-003 (Supersede 아닌 **조건부 예외**로 보완), ADR-009
+- **관련 ADR**: ADR-003 (Supersede 아닌 **조건부 예외**로 보완), ADR-009, ADR-012 (§1 부분 개정)
 
 ### 컨텍스트
 
@@ -680,6 +680,225 @@ CLI → API 전환 시:
 - `_meta/05_GLOSSARY.md` Part C "외부 API 인터페이스 / Anthropic API"에 백엔드 선택지 명시
 - `_meta/06_CURRENT_STATE.md`에 본 ADR 추가 + 재검토 일정(2026-10-24) 기록
 - `_meta/01_ARCHITECTURE.md` 외부 의존성 표에 "Anthropic API or Claude Code CLI (선택)" 표기
+
+---
+
+## ADR-012: Phase 1 LLM 분석 자동 트리거 허용 (ADR-011 §1 부분 개정)
+
+- **날짜**: 2026-04-26
+- **상태**: Accepted (조건부, ADR-011과 함께 운영)
+- **결정자**: 사용자 + Architect 협의
+- **관련 ADR**: ADR-003, ADR-004, ADR-011 (§1 부분 supersede)
+
+### 컨텍스트
+
+ADR-011 §1은 "운영 환경의 daily cron 스케줄러가 무인으로 LLM 호출을 시작하지 않는다"고 결정했고, 사용자 명시적 트리거(대시보드 클릭, 수동 PowerShell 실행 등)만 허용했다. 이 결정의 의도는:
+- Anthropic Pro/Max 플랜의 자동화 사용 제한 정책에 대한 회색 지대 회피
+- 헌법 §4.1(통제권) 정신 — 자동화의 편의보다 의식적 검토
+
+Phase 1 brief 마무리 단계에서 사용자가 다음을 검토했다:
+
+1. **운영 현실**: 사용자가 매일 운영 환경(집 PC) 앞에 앉아 PowerShell을 직접 실행하는 시나리오는 비현실적. 출장·여행·바쁜 일정에서 분석이 자주 누락되면 7거래일 누적 검증(Phase 1 종료 조건)이 어렵다.
+
+2. **Task Scheduler 자동화의 본질**: Windows Task Scheduler 등록은 사용자가 의식적으로 한 번 결정한 후 매일 같은 시각에 같은 작업을 반복시키는 행위다. 이는 cron 자동화이지만, "사용자가 한 번도 의도를 가진 적 없는 무인 자동화"와는 성격이 다르다.
+
+3. **약관 위험 트레이드오프**: ADR-011 §4에서 이미 "약관 회색 지대" 위험을 인지하고 받아들였다. Task Scheduler 자동화가 이 위험을 의미 있게 증가시키는지가 핵심 질문. 결론은 "증가시키지만, 모니터링 강화로 보완 가능한 수준"이라고 판단.
+
+4. **운영 큐 절차의 적용**: ADR-010이 정한 운영 작업 큐 절차에 따라 Task Scheduler 등록 자체가 사용자의 의식적 승인 행위(Q-NNN 항목 처리)로 기록된다. "한 번도 결정한 적 없는 자동화"가 아니다.
+
+### 결정
+
+**ADR-011 §1을 다음과 같이 부분 개정한다.**
+
+#### 1. ADR-011 §1 개정 (자동 트리거 허용)
+
+ADR-011 §1의 "운영 환경의 daily cron 스케줄러가 무인으로 LLM 호출을 시작하지 않는다" 조항을 다음으로 대체:
+
+> 운영 환경에서 Windows Task Scheduler를 통한 LLM 분석 자동 트리거를 허용한다. 단 다음 조건을 모두 충족한다:
+> - (a) Task Scheduler 등록 자체가 사용자의 의식적 승인 행위로 운영 작업 큐(Q-NNN)에 기록된다
+> - (b) 본 ADR §3의 모니터링·안전장치가 모두 가동된다
+> - (c) 사용자는 Task Scheduler 작업을 언제든 disable·삭제할 수 있다 (헌법 §4.1 통제권)
+> - (d) 약관 위반 징후 발생 시 §4 절차에 따라 즉시 API 백엔드로 전환한다
+
+ADR-011 §2(백엔드 추상화)·§3(llm_calls 영구 보존)·§4(약관 위험 인식)·§5(재검토 시점)·§6(전환 절차)는 **그대로 유효하다**. 본 ADR은 §1만 부분 개정한다.
+
+#### 2. 자동 트리거 시각
+
+운영 환경의 daily cron 스케줄과 +1h30m 안전 마진 원칙(시각 정시 보정 포함)에 따라 다음 시각을 권장 기본값으로 정한다.
+
+| Region | 트리거 시각 (KST) | 산정 근거 |
+|---|---|---|
+| US | **16:00** | US daily 08:00 시작, 최대 14:00 종료 + 미너비니 ~14:10 + ~1h50m 안전 마진 (정시 보정) |
+| KR | **21:00** | KR daily 19:00 시작, 최대 19:30 종료 + 미너비니 ~19:40 + ~1h20m 안전 마진 (정시 보정) |
+
+**권장값과 SSoT의 관계**:
+- 본 ADR과 `apps/llm-analysis/config/settings.yaml`에 위 권장값을 명시한다 (운영 의도 문서화 목적).
+- 그러나 **실제 트리거 시각의 SSoT는 Windows Task Scheduler에 등록된 값**이다. Python 프로세스는 시작 시 settings.yaml을 읽지 않으며(시각 트리거가 아니라 즉시 분석 실행이 목적), settings.yaml의 시각 필드는 사람이 운영 의도를 추적하기 위한 문서다.
+- 운영 중 시각 변경 시 ① Task Scheduler 등록 갱신 ② settings.yaml 갱신 ③ 큰 변경이면 ADR 후속 수정 — 세 가지를 함께 수행한다. 절차는 운영 큐 항목으로 등록.
+
+`settings.yaml` 표기 형식:
+
+```yaml
+analysis_trigger:
+  kr:
+    recommended_time_kst: "21:00"
+    rationale: "KR daily(19:00 시작, 최대 19:30 종료) + 미너비니(~19:40) + ~1h20m 안전 마진 (정시 보정)"
+  us:
+    recommended_time_kst: "16:00"
+    rationale: "US daily(08:00 시작, 최대 14:00 종료) + 미너비니(~14:10) + ~1h50m 안전 마진 (정시 보정)"
+```
+
+#### 3. 모니터링·안전장치 (필수)
+
+자동 트리거를 허용하는 대가로, 다음 모니터링·안전장치를 모두 가동한다.
+
+##### 3.1 일일 호출 상한 (강제)
+
+- `settings.yaml`의 `daily_call_limits` (KR 50건, US 50건)을 **반드시 enabled: true 로 운영**.
+- `hard_stop_on_exceed: true`로 설정 — 한도 초과 시 즉시 중단, 나머지 종목 스킵.
+- 자동 트리거 환경에서 한도 초과는 약관 위반 징후일 가능성이 높으므로 hard stop이 안전.
+
+##### 3.2 실패·이상 알림 (sync_log 기록)
+
+다음 이벤트는 모두 `sync_log`에 `WARN` 또는 `ERROR` 상태로 기록:
+- 일일 호출 상한 초과
+- 비용 알림 임계값 초과 (CLI 모드는 추정값)
+- LLM 호출 실패율이 한 region 안에서 30% 이상
+- Max 플랜 5시간 윈도우 한도 초과 (CLI 백엔드)
+- 응답 파싱 실패율이 한 region 안에서 20% 이상
+- Task Scheduler 작업이 예정 시각에 시작되지 못함 (작업 자체 실패는 Task Scheduler의 last run result로 별도 추적)
+
+Phase 2 메일 발송 도입 후 위 알림은 메일로도 전송. 본 Phase에서는 sync_log 기록까지.
+
+##### 3.3 약관 위반 징후 즉시 중단
+
+다음 징후 중 하나라도 관측되면 자동 트리거를 즉시 비활성화하고 ADR-011 §6 절차로 API 백엔드로 전환한다:
+- Anthropic으로부터 계정 경고 또는 정지 통보
+- Max 플랜 사용량 한도 초과가 한 주 안에 3회 이상 반복
+- CLI 백엔드 호출 실패가 약관 관련 사유로 명시적으로 거부됨
+
+전환은 새 ADR(예: ADR-013)로 기록. 본 ADR-012는 "Superseded by ADR-013"으로 표시.
+
+##### 3.4 호출 로그 주간 점검
+
+매주 일요일 등 사용자가 정한 시점에 다음 쿼리로 LLM 호출 패턴을 점검:
+
+```sql
+-- 일별 호출 수 / 실패율
+SELECT DATE(timestamp) AS d,
+       module,
+       COUNT(*) AS calls,
+       SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) AS errors
+FROM trade.llm_calls
+WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY d, module
+ORDER BY d DESC, module;
+```
+
+이 쿼리 결과를 `phase1_progress.md`의 "주간 운영 메모" 섹션(Builder 세션에서 작성)에 첨부.
+
+#### 4. 약관 위반 징후 시 즉시 API 전환
+
+ADR-011 §6의 전환 절차를 그대로 사용. 단 자동 트리거 환경이므로 다음을 추가:
+- Task Scheduler 작업 disable (즉시)
+- `settings.yaml`의 `llm_analysis.backend`를 `"api"`로 변경
+- `ANTHROPIC_API_KEY` 환경 변수 셋업 (운영 환경)
+- 운영 큐 Q-NNN 등록 (전환 적용 절차)
+- 새 ADR로 사실 기록 (이때 ADR-012는 Superseded)
+
+#### 5. 헌법 §4.1 통제권 충족 방식
+
+자동 트리거를 허용해도 통제권은 보존됨을 다음으로 보장:
+
+- **언제든 비활성화 가능**: 사용자는 Windows Task Scheduler에서 작업을 disable·삭제할 수 있음.
+- **킬 스위치**: `settings.yaml`의 `modules.analyze_chart: false` 설정으로 (5)·(6) 호출 자체를 차단 가능.
+- **부분 비활성화**: `analyze_chart: true, calculate_entry_params: false`로 (5)만 돌리고 (6) 차단 가능.
+- **결과 검토 후 매매 실행 게이트**: LLM 분석 결과는 `daily_analysis_kr/us`에 저장될 뿐, 실제 매매로 이어지는 경로는 없음 (Phase 6까지). 헌법 §2.1 위배 없음.
+
+#### 6. 재검토 시점
+
+ADR-011 §5의 재검토 트리거를 그대로 상속한다:
+- (a) Phase 5 백테스트 결과
+- (b) 2026-10-24 시점 도달 (ADR-011 채택 후 6개월)
+- (c) Anthropic 약관 또는 정책의 의미 있는 변경 시
+- (d) 사용자 판단 시
+
+추가로 본 ADR 고유 트리거:
+- (e) §3.3의 약관 위반 징후 관측 시 — 즉시 재검토 + API 전환
+
+### 사유
+
+**왜 ADR-011을 supersede하지 않고 §1만 부분 개정하는가**:
+- ADR-011의 §2~§6은 여전히 정확하다 (백엔드 추상화, llm_calls 보존, 약관 위험 인식 등). 전체 supersede는 과잉.
+- §1만 정확히 갱신하는 게 이력 추적 측면에서 명확.
+- ADR 거버넌스 관점에서 "ADR-N의 §X절을 ADR-M이 부분 개정함"이라는 패턴은 표준적이고 깨끗하다.
+
+**왜 자동 트리거를 허용하기로 했는가**:
+- ADR-011 §1의 원래 의도("사용자 의도 매번 개입")는 약관 회색 지대 보호였다. Task Scheduler 등록은 "한 번 결정한 사용자 의도가 매일 반복 적용되는 것"으로, 정신적으로는 같은 결정.
+- 매일 수동 PowerShell 실행은 비현실적이며, 7거래일 누적 검증(Phase 1 종료 조건)을 어렵게 만든다.
+- 모니터링 강화(§3)로 약관 위반 징후를 빠르게 잡을 수 있다.
+- 헌법 §4.1 통제권은 "Task Scheduler를 언제든 끌 수 있다"로 충족된다.
+
+**왜 모니터링을 ADR로 명시하는가**:
+- 자동 트리거를 단순 허용만 하면 위험. 모니터링 의무를 ADR 본문에 기록해서 Builder가 누락 없이 구현하게 만든다.
+- Auditor가 Phase 1 종료 감사 시 §3의 각 항목이 실제로 가동되는지 점검할 수 있다.
+
+**왜 settings.yaml과 Task Scheduler 사이의 SSoT를 Task Scheduler로 두는가**:
+- settings.yaml은 Python 프로세스가 시작된 후 분석 동작을 결정하는 설정이지, 시각 스케줄링 자체를 결정하지 않는다.
+- Task Scheduler가 실제로 매일 그 시각에 Python 프로세스를 띄우는 주체.
+- settings.yaml의 시각 필드는 운영 의도(왜 그 시각인가)를 사람이 추적할 수 있게 하는 문서적 역할.
+- 둘이 어긋나면 Task Scheduler 등록값이 진실이며, settings.yaml은 따라가야 함.
+
+**왜 ADR-011 §6을 그대로 상속하는가 (전환 절차)**:
+- 약관 위반 징후 시 전환 절차는 그대로 유효하고, ADR-012는 거기에 "Task Scheduler disable" 한 단계를 추가할 뿐.
+- ADR-011의 결과 부담을 두 ADR이 나눠 짊어지지 않고 ADR-011에 일관되게 둠.
+
+### 결과 / 영향
+
+#### Phase 1 brief 변경 (필수)
+
+본 ADR 채택과 동시에 `_meta/phases/phase1_brief.md`를 갱신:
+
+- **헤더의 "관련 ADR"**에 ADR-011, ADR-012 추가
+- **§7.2 일일 호출 상한**: "자동 트리거 환경에서 약관 위험 보완용으로 hard stop 강제" 한 문단 추가
+- **§8 배치 통합 방식 전면 재작성**:
+  - §8.1 트리거 옵션 비교 — Task Scheduler 자동 트리거를 채택으로 변경
+  - §8.2 자동 트리거 시각 — US 16:00 / KR 21:00
+  - §8.3 운영 환경 자동 트리거 등록 절차 (Task Scheduler 등록 + 일시 중단·재개·삭제 명령)
+  - §8.4 모니터링·안전장치 (본 ADR §3 내용 요약 + 구체 구현 가이드)
+  - §8.5 통제권 메커니즘 (본 ADR §5 표 정리)
+  - §8.6 사용자 경험 흐름 갱신
+  - §8.7 운영 큐 항목 — Q-002(DB 마이그레이션) + Q-003(Task Scheduler 등록 + 첫 실행 검증)
+
+#### Builder의 새 책임
+
+- Task Scheduler 등록 절차를 PowerShell 스크립트로 작성 (`apps/llm-analysis/ops/scheduler/windows/install_task.ps1` 등)
+- §3.1 일일 상한 hard stop 정확 구현
+- §3.2 sync_log 기록 정책 누락 없이 구현
+- §3.3 약관 위반 징후 감지 로직 구현 (Max 플랜 한도 초과 카운터, 주간 임계값)
+- §3.4 호출 로그 점검 쿼리를 `apps/llm-analysis/scripts/show_cost_summary.py`에 통합
+
+#### Auditor의 새 책임
+
+- Phase 1 종료 감사 시 §3의 각 항목이 실제로 가동되는지 표본 검증
+- 자동 트리거가 실제로 작동했는지(7거래일 누적 데이터 분포로) 확인
+- 약관 위반 징후가 관측되지 않았는지 sync_log·llm_calls 점검
+
+#### 운영 큐 영향
+
+- 본 ADR 채택과 동시에 Q-001(P0.5)는 이미 완료(2026-04-26).
+- Q-002(daily_analysis + llm_calls 마이그레이션)는 Phase 1 1.1 단계에서 등록.
+- Q-003(Task Scheduler 등록 + 첫 실행 검증)은 Phase 1 1.3 단계에서 등록.
+
+#### 환경 인벤토리 영향
+
+ADR-010의 환경 인벤토리(DEV·PROD)는 변경 없음. PROD 환경에 Task Scheduler 사용이 명시적으로 추가되는 것은 본 ADR과 Q-003에서 다룬다.
+
+#### 연관 문서 갱신 필요
+
+- `_meta/01_ARCHITECTURE.md` 외부 의존성 표 — Anthropic API/CLI 표기 그대로, 본 ADR은 별도 변경 없음
+- `_meta/06_CURRENT_STATE.md` — ADR-012 추가, 미해결 이슈 §E(ADR-011 재검토 일정)에 ADR-012 내용 반영
+- `_meta/05_GLOSSARY.md` Part C — 변경 없음
 
 ---
 
