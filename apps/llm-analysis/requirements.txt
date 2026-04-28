@@ -1,0 +1,7 @@
+# Phase 1.1 골격 단계 의존성. 버전은 minimum 기준이며 추후 정확화.
+pydantic>=2.0
+PyYAML>=6.0
+anthropic>=0.40        # API 백엔드용 (1.1.6에서 검증)
+SQLAlchemy>=2.0        # DB 접근
+PyMySQL>=1.1
+python-dotenv>=1.0
