@@ -19,14 +19,14 @@
 | 1.1.5 CLI 백엔드 구현 | ✅ 완료 | ClaudeCodeCLIBackend. cwd=tempfile.gettempdir(). |
 | 1.1.6 API 백엔드 구현 | ✅ 완료 | AnthropicAPIBackend (84줄). 단위 테스트(mock) 통과. 실제 SDK 호출 미수행 — 사용자 결정. |
 | 1.1.7 llm_calls 기록 wrapper | ✅ 완료 | core/llm_call_recorder.py. 재시도 + INSERT. daily_call_limits hook placeholder 포함. |
-| 1.1.8 (5) 프롬프트 v1 작성 | ⏳ 대기 | prompts/analyze_chart_v1.md |
-| 1.1.9 data_loader.py 구현 | ⏳ 대기 | |
-| 1.1.10 prompt_builder.py 구현 | ⏳ 대기 | |
-| 1.1.11 result_parser.py + AnalysisResult 모델 | ⏳ 대기 | |
-| 1.1.12 run_single_symbol.py CLI | ⏳ 대기 | |
-| 1.1.13 단일 종목 검증 (CLI 백엔드, 5종목) | ⏳ 대기 | |
-| 1.1.14 단일 종목 검증 (API 백엔드, 1회) | ⏳ 대기 | |
-| 1.1.15 프롬프트 튜닝 + v1 확정 | ⏳ 대기 | |
+| 1.1.8 (5) 프롬프트 v1 작성 | ✅ 완료 | prompts/analyze_chart_v1.md. brief §6.2 본문 그대로. |
+| 1.1.9 data_loader.py 구현 | ✅ 완료 | core/data_loader.py. 일봉 60행 + 주봉 52주 + 인디케이터 + conditions_met(NULL 허용). |
+| 1.1.10 prompt_builder.py 구현 | ✅ 완료 | core/prompt_builder.py. 템플릿 로드 + JSON 페이로드 결합. |
+| 1.1.11 result_parser.py + AnalysisResult 모델 | ✅ 완료 | core/result_parser.py + models/analysis_result.py. 단위 테스트 13/13 통과. |
+| 1.1.12 run_single_symbol.py CLI | ✅ 완료 | scripts/run_single_symbol.py. --symbol/--region/--date/--backend/--dry-run/--force-recompute 지원. |
+| 1.1.13 단일 종목 검증 (CLI 백엔드, 5종목) | ✅ 완료 | AAOI/ABVX/ADV/BWET/CLSM (US) 5종목 실호출 성공. daily_analysis_us 5행 + llm_calls 기록 확인. |
+| 1.1.14 단일 종목 검증 (API 백엔드, 1회) | ⏸ 연기 | 1.1.4-c 결정 그대로 유지. CLI가 운영 백엔드. |
+| 1.1.15 프롬프트 튜닝 + v1 확정 | ⏳ 사용자 검토 대기 | 5종목 응답 품질 사용자 확인 후 v1 확정 또는 튜닝 진행. |
 
 ---
 
@@ -169,6 +169,39 @@ CLI sanity check 및 CLAUDE.md 탐색 범위 진단 결과:
 - ClaudeCodeCLIBackend의 `cwd=tempfile.gettempdir()`로 CLAUDE.md/메모리 로드 차단.
 - CLAUDE.md 로드 상태에서 단발성 66,873 토큰 사고 1회 발생 (auto-memory 변동 추정). 재현 불가.
 - **후속 (1.1.7 wrapper 시점)**: 프롬프트 토큰 폭증 감지 — input_data 추정 대비 2배 이상 시 sync_log WARN. ADR-012 §3.2 항목.
+
+## 1.1.8~1.1.13 완료 메모 (2026-04-28)
+
+### 구현 파일
+- `prompts/analyze_chart_v1.md`: brief §6.2 프롬프트 본문. "## Input Payload" 섹션으로 끝남 — prompt_builder가 JSON을 이어붙임.
+- `models/analysis_result.py`: `AnalysisResult` Pydantic 모델. `classification`, `confidence`, `pattern`, `risk_flags` 화이트리스트 검증 포함.
+- `core/result_parser.py`: `parse_analysis_result()` + `ParseError`. markdown fence 재제거 + JSON 파싱 + Pydantic 검증.
+- `core/data_loader.py`: `load_symbol_payload()` + `get_screened_symbols()`. 일봉 60행 / 주봉 52주 / 인디케이터 pivot / 52주 고가·저가·volume_ma20 계산. `conditions_met` NULL 허용(P0.5 이전 데이터 대응).
+- `core/prompt_builder.py`: `build_analyze_chart_prompt()` + `build_entry_params_prompt()`. 템플릿 로드 + JSON 직렬화 결합.
+- `scripts/run_single_symbol.py`: 완전한 CLI. --symbol/--region/--date/--backend/--dry-run/--force-recompute. ParseError 발생 시 1회 LLM 재호출.
+
+### 데이터 수정 사항
+- `us_symbol_master`에 `sector_detail` 열 없음 → `sector, industry` 쿼리로 수정 (KR/US 공통).
+
+### 1.1.13 검증 결과 (2026-04-28, DEV DB, US 5종목)
+
+| symbol | classification | confidence | pattern | risk_flags |
+|---|---|---|---|---|
+| AAOI | ignore | 0.95 | none | high_rs_rating, extended_from_ma50 |
+| ABVX | ignore | 0.80 | cup_handle | high_rs_rating, low_volume |
+| ADV | ignore | 0.95 | none | high_rs_rating, thin_base, low_volume |
+| BWET | ignore | 0.95 | none | high_rs_rating, extended_from_ma50, thin_base |
+| CLSM | entry | 0.72 | flat_base | high_rs_rating |
+
+- 응답 품질: 각 종목의 클라이맥스 런·리버스스플릿·베이스 패턴을 정확히 식별. CLSM은 22주 flat base + 브레이크아웃 직후를 `entry`로 올바르게 판단.
+- 토큰: 약 21,000 input / 1,400~2,100 output. 프롬프트 길이 ~30,700자.
+- 비용: 호출당 $0.05~$0.12 (cli 모드, Max 플랜 참고값 — 실제 청구는 Max 구독료).
+- `daily_analysis_us` 5행, `llm_calls` 7행 (기존 1행 포함) DEV DB에 기록 확인.
+
+### 1.1.15 사용자 검토 포인트
+- 응답 품질이 이미 안정적이면 → v1 확정 + 1.2로 이동.
+- 추가 튜닝 필요 시 → `prompts/analyze_chart_v1.md` 수정 후 `--force-recompute`로 재검증. 큰 변경만 v2.
+- 1.1.13 결과에서 주목할 점: `ignore` 4건 / `entry` 1건. 상위 RS 종목이 과열된 2026-04 시장 상황 반영. 정상.
 
 ## 주간 운영 메모
 
