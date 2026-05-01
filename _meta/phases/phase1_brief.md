@@ -1216,8 +1216,8 @@ Phase 1에서는 검토 단계가 mysql 직접 쿼리. Phase 3에서 대시보�
 - [ ] Q-002 운영 큐 항목이 등록됨 (운영 환경 적용은 1.3 단계로 미뤄도 됨)
 - [ ] `apps/llm-analysis/` 디렉토리 구조가 §5.2와 일치
 - [ ] `LLMBackend` 인터페이스가 정의됨 (`ClaudeCodeCLIBackend`, `AnthropicAPIBackend` 두 구현체 존재)
-- [ ] 표본 5종목에 대해 CLI 백엔드로 (5) 호출 성공 (실패 ≤ 1건)
-- [ ] 표본 1종목에 대해 API 백엔드로 (5) 호출 성공 (추상화 검증)
+- [ ] CLI 백엔드: 표본 5종목 호출 검증 (필수, 실패 ≤ 1건)
+- [ ] API 백엔드: 단위 테스트(mock)로 추상화 검증 완료. 실제 SDK 호출은 (a) Phase 1 후반 사용자 결정 시 (b) ADR-012 §3.3 약관 위반 징후 시 또는 (c) ADR-013 백엔드 전환 결정 시 수행 (Phase 1.1.4-c, 2026-04-29 결정)
 - [ ] 응답이 `AnalysisResult` 스키마 준수
 - [ ] `llm_calls` 테이블에 호출 로그 기록 (CLI는 cost_usd NULL OK)
 - [ ] `daily_analysis_kr` 또는 `daily_analysis_us`에 결과 행 생성
@@ -1370,11 +1370,12 @@ phase1_brief.md §3.1의 작업 항목 1.1.1~1.1.15를 순서대로 수행한다
 
 phase1_brief.md §9.1의 1.1 게이트 체크리스트를 모두 통과해야 1.1 종료. 특히:
 
-- [ ] CLI/API 양 백엔드로 같은 종목 호출 검증 (추상화 작동 입증)
-- [ ] llm_calls 테이블에 호출 로그 기록 (CLI는 cost_usd NULL OK)
+- [ ] CLI 백엔드로 표본 5종목 호출 검증 (실패 ≤ 1건)
+- [ ] API 백엔드는 단위 테스트(mock)로 추상화 검증 (실제 SDK 호출은 Phase 1.1.4-c 결정으로 미룸)
+- [ ] llm_calls 테이블에 호출 로그 기록 (CLI는 cost_usd NULL OK 또는 참고값 저장)
 - [ ] daily_analysis_kr 또는 daily_analysis_us에 결과 행 생성
 - [ ] AnalysisResult Pydantic 스키마 준수 (classification, confidence, reasoning, pattern, risk_flags)
-- [ ] 프롬프트 v1 commit (prompts/analyze_chart_v1.md)
+- [ ] 프롬프트 production version commit (prompts/analyze_chart_v*.md)
 - [ ] phase1_progress.md에 1.1 종료 보고
 
 ## 4. 1.1 종료 후

@@ -8,17 +8,32 @@
 
 ## 현재 위치
 
-**완료된 Phase**: Phase 0 + P0 정합성 검토 + **P0.5 스크리너 개편**
+**완료된 Phase**: Phase 0 + P0 정합성 검토 + P0.5 스크리너 개편 + **Phase 1 — 1.1 단계 완료**
 
-**진행 중인 Phase**: 없음 (**Phase 1 brief 작성 완료, Builder 세션 진입 대기**)
+**진행 중인 Phase**: Phase 1 (1.1 종료, **1.2 진입 대기**)
 
-**다음 시작할 Phase**: **Phase 1 — LLM 분석 레이어 구축**
+**다음 시작할 단계**: **Phase 1.2 — `calculate_entry_params()` 구현**
 
-**Phase 1 시작 조건**:
-1. ✅ `_meta/phases/phase1_brief.md` 작성 완료 (Architect 세션, 2026-04-26)
-2. ✅ ADR-011, ADR-012 확정 (CLI 백엔드 + 자동 트리거)
-3. ✅ 운영 환경 Q-001 적용 완료 (P0.5 마이그레이션, 2026-04-26 18:18 KST)
-4. ⏳ 사용자가 Phase 1 brief 최종 검토 후 Builder 세션 시작 (DEV 환경, Mac)
+**Phase 1.1 종료 시점 (2026-05-02)**:
+1. ✅ `daily_analysis_kr/us`, `llm_calls` 테이블 DEV 생성 (Alembic + raw SQL + Q-002 큐 등록)
+2. ✅ `apps/llm-analysis/` 골격 + `LLMBackend` 추상화 (CLI/API 두 구현체)
+3. ✅ 분석 LLM 프롬프트 v2 production lock (`prompts/analyze_chart_v2.md`)
+4. ✅ 외부 평가(Web Claude Minervini Evaluator 프로젝트, Opus 4.7) production-ready 판정
+5. ✅ 1.1 게이트 10/11 통과 (API 실 SDK 호출 1건은 사용자 결정으로 mock 검증으로 대체)
+6. ✅ commit `f0d6f57` 봉인
+7. ✅ Architect 인계 작업 8건 처리 (2026-05-02 본 세션):
+   - ARCHITECTURE.md §5·§6 갱신 (LLM 백엔드 ADR-011 반영)
+   - ADR-010 §1·§6 갱신 (raw SQL 위치, alembic.ini 자격증명 결정)
+   - ADR-011 §3 갱신 (cost_usd CLI 참고값 저장 가능)
+   - phase1_brief.md §9.1 갱신 (1.1 게이트 API 백엔드 항목)
+   - operational_queue.md Q-002 정식 등록
+   - **ADR-013 신설** (ETF 스크리너 제외 정책)
+
+**Phase 1.2 시작 조건**:
+- [ ] 위 Architect 인계 작업 commit + push (사용자가 Mac에서 진행)
+- [ ] Q-002 운영 환경 적용 (PROD에 daily_analysis_kr/us, llm_calls 테이블 생성, 사용자 결정)
+- [ ] ADR-013 구현 (ETF 스크리너 제외 — 1.2 시작 직후 또는 1.2 중 처리)
+- [ ] 1.2 시작 프롬프트 작성 (Architect 세션)
 
 ---
 
@@ -83,6 +98,7 @@
 - ADR-010: 마이그레이션 일원화 + 운영 작업 큐 도입
 - ADR-011: Phase 1은 Max 플랜 + Claude Code CLI를 기본 백엔드로 (ADR-003 조건부 예외, §1은 ADR-012로 부분 개정, 2026-10-24 재검토)
 - ADR-012: Phase 1 LLM 분석 자동 트리거 허용 (Windows Task Scheduler, US 16:00 / KR 21:00 KST, 모니터링 4종 가동)
+- ADR-013: 미너비니 스크리너에서 ETF 제외 (사용자 정책 명문화, Phase 1.1.15 외부 평가 반영, 2026-05-02)
 
 전체 ADR은 `04_DECISIONS.md` 참조.
 
@@ -111,14 +127,18 @@
 - [x] 새 앱 디렉토리: `apps/llm-analysis/` (brief §5)
 - [x] 배치 통합 방식: Windows Task Scheduler 자동 트리거, US 16:00 / KR 21:00 KST (brief §8, ADR-012)
 
-### Phase 1 Builder 세션 첫 작업 (1.1 단계)
-- [ ] Q-002 등록 + 적용 (`daily_analysis_kr/us`, `llm_calls` 테이블 마이그레이션 3종 산출물: Alembic + raw SQL + 운영 큐)
-- [ ] `apps/llm-analysis/` 디렉토리 골격 (brief §5.2 구조)
-- [ ] `LLMBackend` 추상화 + CLI/API 두 구현체 (ADR-011 §2)
-- [ ] `analyze_chart()` 구현 + 프롬프트 v1 튜닝 + 단일 종목 검증
-- [ ] 1.1 게이트 체크리스트 통과 (brief §9.1)
+### Phase 1 Builder 세션 첫 작업 (1.1 단계) — 모두 완료
+- [x] Q-002 등록 (마이그레이션 3종 산출물 작성, 운영 큐 등록 — Architect 세션 2026-05-02)
+- [x] `apps/llm-analysis/` 디렉토리 골격 (brief §5.2 구조)
+- [x] `LLMBackend` 추상화 + CLI/API 두 구현체 (ADR-011 §2)
+- [x] `analyze_chart()` 구현 + 프롬프트 v2 production lock (외부 평가 production-ready 판정)
+- [x] 1.1 게이트 10/11 통과 (API 실 SDK 호출 1건은 mock 검증으로 대체)
+- [x] commit `f0d6f57`로 1.1 봉인
 
 ### Phase 1 Builder 세션 후속 (1.2, 1.3 단계)
+- [ ] **ADR-013 구현** (ETF 스크리너 제외 — 1.2 시작 직후 또는 1.2 중)
+- [ ] **alembic.ini 자격증명 변경** (env 참조 방식, ADR-010 §6 — Phase 1.2 또는 별도 시점)
+- [ ] Q-002 운영 환경 적용 (PROD에 daily_analysis_kr/us, llm_calls 테이블 생성 — 사용자 결정 시점)
 - [ ] 1.2: `calculate_entry_params()` 구현 + EntryParams Pydantic + 정량 검증
 - [ ] 1.3: `run_daily_analysis.py` 메인 진입점 + 모니터링·안전장치 구현 (ADR-012 §3) + Q-003 등록·적용 (Task Scheduler) + 7거래일 누적 검증
 
@@ -189,7 +209,28 @@
 
 **영향**: 향후 Q-002 (Phase 1 마이그레이션) 적용 시 PROD에 `alembic_version`을 어떻게 도입할지 결정 필요.
 
-**처리**: Phase 1 1.1 단계 Q-002 등록 시점에 함께 결정. 새 큐 항목으로 분리 가능.
+**처리**: Q-002 적용도 raw SQL 직접 실행 방식 유지(이슈 §G 미해결 그대로). 동기화는 Phase 1.2 또는 별도 시점에 결정. 추가로 ADR-010 §6에서 alembic.ini 자격증명을 env 참조 방식으로 단일화하기로 결정 (코드 변경은 별도 작업).
+
+### H. 1.1.15 외부 평가 후속 작업 (1.3 검증 시점에 처리)
+
+**배경**: Phase 1.1.15 외부 평가(Web Claude Minervini Evaluator 프로젝트)에서 v2 production-ready 판정과 함께 다음 5가지 후속 검증 항목이 도출됨.
+
+**항목**:
+1. AAOI reverse_split 누락 — price_data_notes의 split 정보를 deterministic하게 소비하도록 v3 prompt 보강 검토
+2. completion 토큰 폭증 (v1 평균 ~1,800 → v2 평균 ~3,000, 60% 증가) — ignore 케이스용 "tight reasoning" 지시 검토
+3. entry 후보 5~10종목 별도 검증 배치로 pivot/breakout 정확도 (약점 F) 검증 — 1.3 누적 데이터 활용
+4. reasoning 사실 정확성 sanity check — 구체 숫자(volume, % 수치)가 source data와 일치하는지 자동 비교
+5. 추가 taxonomy 후보: `late_stage_base`, `distribution_days`, `reversal_off_high` (평가 LLM 제안)
+
+**처리**: 1.3 단계 진입 시점 또는 1.3 누적 검증 결과 검토 시 우선순위 평가. v2.1 또는 v3로 일괄 처리.
+
+### I. daily_analysis 테이블의 prompt_version 컬럼 추가 검토 (ADR 후보)
+
+**현상**: Phase 1.1.15에서 v1 → v2 force-recompute 시 DELETE+INSERT 방식으로 v1 결과가 overwrite됨. 비교 검증을 위해 v1 결과를 별도 백업 파일과 llm_calls 테이블에 의존.
+
+**개선안**: `daily_analysis_kr/us`에 `prompt_version` 컬럼 추가 + PK를 (symbol, date, prompt_version)로 확장. v1/v2 결과 동시 보존 가능.
+
+**처리**: Phase 1 게이트 통과 후 Architect 세션에서 운영 부담 vs 가치 판단. 운영 부담 작으면 현행 유지(eval_input.json + llm_calls로 복원 가능). ADR 후보.
 
 ---
 
@@ -236,4 +277,4 @@
 
 ---
 
-*마지막 업데이트: 2026-04-26 (Phase 1 brief 작성 완료, ADR-012 채택, Q-001 운영 환경 적용 완료, Builder 세션 진입 대기)*
+*마지막 업데이트: 2026-05-02 (Phase 1.1 완료, v2 prompt production lock, ADR-013 ETF 스크리너 제외 결정, Architect 인계 8건 처리, Phase 1.2 진입 대기)*
