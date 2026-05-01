@@ -16,7 +16,7 @@ anthropic:
   model_entry: "claude-sonnet-4-5"      # (6) 진입 파라미터용
   temperature: 0
   max_tokens: 2000
-  timeout_seconds: 60
+  timeout_seconds: 120
 
   # 재시도 정책
   retry:
@@ -53,7 +53,7 @@ modules:
 
 # 프롬프트 버전 — 버전 변경 시 새 파일 생성 + ADR 기록 (brief §6.4)
 prompts:
-  analyze_chart: "v1"
+  analyze_chart: "v2"
   calculate_entry_params: "v1"
 
 # 입력 데이터 범위

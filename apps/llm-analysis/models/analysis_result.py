@@ -1,19 +1,27 @@
-"""AnalysisResult Pydantic 모델 — analyze_chart() LLM 응답 검증."""
+"""AnalysisResult Pydantic 모델 — analyze_chart() LLM 응답 검증 (v2 taxonomy)."""
 from __future__ import annotations
 
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-VALID_PATTERNS: frozenset[str] = frozenset({"flat_base", "VCP", "cup_handle", "double_bottom", "none"})
+VALID_PATTERNS: frozenset[str] = frozenset({
+    "flat_base", "cup_with_handle", "vcp", "double_bottom", "none",
+})
+
 VALID_RISK_FLAGS: frozenset[str] = frozenset({
-    "high_rs_rating",
-    "extended_from_ma50",
-    "low_volume",
-    "thin_base",
-    "earnings_imminent",
-    "market_weakness",
-    "sector_overconcentration",
+    "climax_run",
+    "late_stage_base",
+    "extended_from_ma",
+    "faulty_pivot",
+    "low_volume_breakout",
+    "narrow_base",
+    "wide_and_loose",
+    "thin_liquidity_us_only",
+    "prior_uptrend_insufficient",
+    "volume_contraction_on_advance",
+    "reverse_split_distortion",
+    "etf_methodology_mismatch",
 })
 
 

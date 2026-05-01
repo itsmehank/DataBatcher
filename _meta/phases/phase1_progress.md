@@ -26,7 +26,7 @@
 | 1.1.12 run_single_symbol.py CLI | ✅ 완료 | scripts/run_single_symbol.py. --symbol/--region/--date/--backend/--dry-run/--force-recompute 지원. |
 | 1.1.13 단일 종목 검증 (CLI 백엔드, 5종목) | ✅ 완료 | AAOI/ABVX/ADV/BWET/CLSM (US) 5종목 실호출 성공. daily_analysis_us 5행 + llm_calls 기록 확인. |
 | 1.1.14 단일 종목 검증 (API 백엔드, 1회) | ⏸ 연기 | 1.1.4-c 결정 그대로 유지. CLI가 운영 백엔드. |
-| 1.1.15 프롬프트 튜닝 + v1 확정 | ⏳ 사용자 검토 대기 | 5종목 응답 품질 사용자 확인 후 v1 확정 또는 튜닝 진행. |
+| 1.1.15 프롬프트 튜닝 + v1 확정 | 🔄 진행 중 | 외부 평가 완료. 약점 7가지 진단. v2 작성 + Pydantic 갱신 + 테스트 25/25. 5종목 재호출 승인 대기. |
 
 ---
 
@@ -59,6 +59,30 @@
   근거: Phase 1.1.4-b 진단에서 CLAUDE.md auto-load 변동으로 66,873 토큰 단발 사고 확인 (정상 ~8,000).
   구현: settings.yaml input_data 추정 토큰 대비 2배 이상 시 sync_log WARN 기록.
   위치: core/llm_call_recorder.py (call_and_record 내 또는 cost_tracker와 함께, 1.3 구현 시점).
+
+- [HIGH / ADR 후보] 미너비니 스크리너에서 ETF 제외 필요.
+  근거: 1.1.13 표본 5종목 중 2개(BWET, CLSM)가 ETF(market='ETF')였음.
+  문제: 스크리너가 ETF를 거르지 않으면 분석 LLM이 매일 ETF에 대해 호출되어 비용·한도 낭비.
+  v1에서 CLSM(ETF)을 "entry"로 분류하는 사용자 정책 위반이 발생함.
+  해결 방향: minervini_screen_results_us 집계 시 us_symbol_master.symbol_type = 'ETF' 행 제외 (JOIN 조건 추가),
+  또는 run_daily_analysis.py 호출 목록에서 ETF 필터링. ADR로 설계 결정 기록 필요.
+
+- [ADR 후보] daily_analysis 테이블에 prompt_version 컬럼 추가 + PK 확장 검토.
+  근거: v2 force-recompute 시 DELETE+INSERT 방식으로 v1 결과가 overwrite됨.
+  개선안: (symbol, date, prompt_version)을 PK로 확장하면 v1/v2 행을 동시에 보존 가능.
+  현재 우회: eval_input.json + llm_calls 테이블로 v1 결과 보존. 운영 부담 없으면 현행 유지도 가능.
+  Phase 1 게이트 통과 후 Architect 세션에서 판단.
+
+[1.3 검증 시 우선순위 항목]
+- [v2.1 후보] AAOI reverse_split 누락 — price_data_notes의 split 정보를 deterministic하게 소비하도록 v3 prompt 보강 검토.
+  평가 LLM 지적: "작은 ratio(~1.65:1) + 오래된 split도 일관되게 flag되어야 함."
+  현재 v2는 split ratio threshold에 암묵적 의존. 명시적 조건 추가 시 개선 가능.
+- [1.3 모니터링] completion 토큰 폭증 (v1 평균 ~1,800 → v2 평균 ~3,000, 60% 증가).
+  ignore 케이스용 "tight reasoning" 지시 검토. ADR-012 §3.4 호출 로그 점검에서 cost 영향 확인.
+- [1.3 검증 배치] entry 후보 5~10종목 별도 검증으로 pivot/breakout 정확도 (약점 F) 검증.
+  현재 표본 5종목은 all-ignore/ETF라 F 항목이 untestable. 1.3 누적 데이터 활용.
+- [1.3 자동화] reasoning 사실 정확성 sanity check — reasoning의 구체 숫자(volume, % 수치)가 source data와 일치하는지 자동 비교.
+- [1.3 taxonomy 검토] 추가 flag 후보: `late_stage_base`, `distribution_days`, `reversal_off_high` (평가 LLM 제안). 1.3 운영 빈도 확인 후 추가 결정.
 
 
 ---
@@ -202,6 +226,165 @@ CLI sanity check 및 CLAUDE.md 탐색 범위 진단 결과:
 - 응답 품질이 이미 안정적이면 → v1 확정 + 1.2로 이동.
 - 추가 튜닝 필요 시 → `prompts/analyze_chart_v1.md` 수정 후 `--force-recompute`로 재검증. 큰 변경만 v2.
 - 1.1.13 결과에서 주목할 점: `ignore` 4건 / `entry` 1건. 상위 RS 종목이 과열된 2026-04 시장 상황 반영. 정상.
+
+## 1.1.15 v2 작성 메모 (2026-05-01)
+
+### v1 결과 백업 현황
+
+`_save_result()`는 DELETE+INSERT 방식 — `--force-recompute` 실행 시 `daily_analysis_us`의 v1 행이 overwrite됨.
+v1 결과 보존 경로:
+- `/tmp/eval_export/*.json` + `/Users/hank.es/Downloads/` (eval_input.json 5종목)
+- `llm_calls` 테이블 (request_payload + LLM 원본 응답 보존): id 2=AAOI, 4=ABVX, 5=ADV, 6=BWET, 8=CLSM
+
+### 외부 평가 진단 (Architect → Builder) — 약점 7가지
+
+| ID | 우선순위 | 약점 | 근거 |
+|---|---|---|---|
+| A | HIGH | risk_flags 카테고리 에러 | 5/5에서 `high_rs_rating` 포함 — RS 99는 양성 신호인데 위험으로 분류 |
+| B | HIGH | reasoning ↔ risk_flags 불일치 | reasoning에 "climax run", "wide-and-loose" 명시했지만 해당 flag 없음 |
+| C | HIGH | reverse split 미탐지 | price_data_notes에 corporate action 있어도 `reverse_split_distortion` flag 없음 |
+| D | HIGH | ETF 탐지 부재 | BWET을 개별 주식처럼 분석. 정책: ETF면 즉시 ignore + etf_methodology_mismatch |
+| E | MEDIUM | pattern naming discipline 부족 | ABVX를 cup_handle로 명명, 실제 구조 부재 |
+| F | MEDIUM | pivot/breakout 정확도 | CLSM pivot $24.00 (실제 $24.50), breakout date 1주 어긋남 |
+| G | LOW | liquidity 보고 | US ADV < $5M → thin_liquidity_us_only (informational), KR은 평가 안 함 |
+
+### v1 → v2 주요 변경 사항
+
+| 약점 | 수정 위치 | 내용 |
+|---|---|---|
+| A+B+C | §5 Risk Flags | 12개 taxonomy로 제한. "Trend Template 양성 특성은 NEVER risk_flags" 명시. reasoning↔flags 일관성 규칙. `reverse_split_distortion` 트리거 조건 명시. |
+| D | Pre-Check (프롬프트 최상단) | `market == "ETF"` 또는 fund vehicle 감지 시 즉시 ignore+etf_methodology_mismatch 반환 |
+| E | §4 Base Pattern | 패턴별 textbook 정의 표 추가. "구조 부재 시 none 사용" 명시. `cup_handle`→`cup_with_handle`, `VCP`→`vcp` |
+| F | §6 Pivot & Breakout | pivot = max(weekly.high) + $0.10 명시. breakout_date 정의. 실제 데이터 불일치 시 confidence -0.2 |
+| G | §5 Rule 3 | thin_liquidity_us_only: US 개별주만, volume_ma20×price < $5M. KR은 평가 안 함. |
+| 수정 6 | §7 Confidence | calibration 규칙 4개 명시 (reasoning 품질, pattern-data 불일치, multi-flag, high confidence 조건) |
+
+### Pydantic 모델 변경 (models/analysis_result.py)
+
+VALID_PATTERNS (v1 → v2):
+- 제거: `cup_handle`, `VCP`
+- 추가: `cup_with_handle`, `vcp`
+- 유지: `flat_base`, `double_bottom`, `none`
+
+VALID_RISK_FLAGS (v1 → v2):
+- 제거: `high_rs_rating`, `extended_from_ma50`, `low_volume`, `thin_base`, `earnings_imminent`, `market_weakness`, `sector_overconcentration`
+- 추가: `climax_run`, `late_stage_base`, `extended_from_ma`, `faulty_pivot`, `low_volume_breakout`, `narrow_base`, `wide_and_loose`, `thin_liquidity_us_only`, `prior_uptrend_insufficient`, `volume_contraction_on_advance`, `reverse_split_distortion`, `etf_methodology_mismatch`
+
+단위 테스트: 25/25 통과 (기존 13 갱신 + v2 신규 12)
+
+### v1 결과 백업 (2026-05-02)
+
+- 파일: `/tmp/eval_export/v1_results_backup.json` (4,629B) + Downloads 복사
+- 5종목 포함 확인. llm_call_ids: AAOI=2, ABVX=4, ADV=5, BWET=6, CLSM=8
+- 중요 발견: BWET + CLSM 모두 `market='ETF'` — 5종목 중 2개가 ETF
+
+### v2 5종목 재호출 완료 (2026-05-02)
+
+settings.yaml timeout_seconds 60→120 조정 (v2 프롬프트 길어져 AAOI 첫 시도 timeout).
+
+| symbol | type | v1 날짜 | v2 날짜 | v1 분류 | v2 분류 | v1 risk_flags | v2 risk_flags | 핵심 변화 |
+|---|---|---|---|---|---|---|---|---|
+| AAOI | stock | 04-10 | 04-27 | ignore (0.95) | ignore (0.90) | high_rs_rating, extended_from_ma50 | climax_run, extended_from_ma, wide_and_loose | flag 교정 |
+| ABVX | stock | 04-10 | 04-17 | ignore (0.80) | ignore (0.75) | high_rs_rating, low_volume | climax_run, wide_and_loose, reverse_split_distortion | cup_handle→none, split flag |
+| ADV | stock | 04-10 | 04-27 | ignore (0.95) | ignore (0.90) | high_rs_rating, thin_base, low_volume | reverse_split_distortion, climax_run, wide_and_loose, thin_liquidity_us_only | split + liquidity flag |
+| BWET | ETF | 04-10 | 04-27 | ignore (0.95) | ignore (1.0) | high_rs_rating, extended_from_ma50, thin_base | etf_methodology_mismatch | Pre-Check 9초 즉시 종료 |
+| CLSM | ETF | 04-10 | 04-27 | **entry (0.72)** | **ignore (1.0)** | high_rs_rating | etf_methodology_mismatch | **분류 반전** ✓ |
+
+핵심 검증 결과:
+- ETF 탐지 (BWET, CLSM 2/2): ✅ confidence=1.0, etf_methodology_mismatch, 각 9·11초 즉시 종료
+- CLSM 분류 반전 (entry→ignore): ✅ v2 핵심 교정 확인
+- high_rs_rating 제거 (5/5): ✅ v2에서 단 1건도 없음
+- reverse_split_distortion 자동 포함: ✅ ABVX(~Jul 2025), ADV(2026-03-26) 정확 탐지. AAOI는 price_data_notes의 이벤트가 모멘텀 급등으로 판단 (합리적 — vol_ratio 역전 없음)
+- thin_liquidity_us_only: ✅ ADV $3.2M daily dollar volume 직접 계산해 적용
+- taxonomy 외 flag 출력: 0건 ✅ (단위 테스트 whitelist 통과)
+- pattern naming: ✅ ABVX cup_handle → none 교정
+
+prompt_tokens: 22,617~22,756 (평균 22,715, v1 평균 21,451 대비 +1,264 — v2 프롬프트 길이 증가)
+duration_ms: AAOI 77s, ABVX 70s, ADV 64s, BWET 9s, CLSM 11s
+
+export 파일 (Downloads + /tmp/eval_export/):
+- 5종목 _eval_input_v2.json (v2 결과 eval_input 포맷)
+- 5종목 _v1_v2_comparison.json (v1 vs v2 key_differences)
+- v1_results_backup.json
+
+⚠️ 주의: v2 분석 날짜가 v1(2026-04-10)과 다름 — `--date` 미지정 시 MAX(date) 사용. 비교 시 데이터 시차 혼재. `_v1_v2_comparison.json`에 note 기재.
+
+## 1.1 게이트 체크리스트 (2026-05-02)
+
+phase1_brief.md §9.1 기준:
+
+| # | 항목 | 결과 | 비고 |
+|---|---|---|---|
+| 1 | daily_analysis_kr, daily_analysis_us, llm_calls 테이블 DEV 존재 | ✅ | Alembic 마이그레이션 적용 완료, llm_calls 18건 기록 확인 |
+| 2 | Q-002 운영 큐 항목 등록됨 | ✅ | 텍스트 작성 완료. 운영 적용은 Architect 영역 (PROD 접근 필요) |
+| 3 | apps/llm-analysis/ 디렉토리 구조 §5.2와 일치 | ✅ | 1.1.3에서 25파일 구조 검증 |
+| 4 | LLMBackend 인터페이스 + CLI·API 두 구현체 | ✅ | core/anthropic_client.py. mock 단위 테스트 통과 |
+| 5 | 표본 5종목 CLI 백엔드 (5) 호출 성공 (실패 ≤ 1건) | ✅ | v1 5종목 + v2 5종목 = 총 10건. timeout 재시도 포함 최종 실패 0건 |
+| 6 | 표본 1종목 API 백엔드 (5) 호출 성공 | ⏭️ | 사용자 결정으로 미룸 (1.1.4-c). mock 단위 테스트로 추상화 검증. 전환 결정 시 수행 |
+| 7 | AnalysisResult 스키마 준수 | ✅ | v2 whitelist 25/25 통과. v2 5종목 실호출 parse 성공, taxonomy 위반 0건 |
+| 8 | llm_calls 테이블 호출 로그 기록 | ✅ | 18건 기록 (v1 7건 + v2 5건 + timeout 재시도 포함) |
+| 9 | daily_analysis_us에 결과 행 생성 | ✅ | v2 5종목 결과 행 존재 |
+| 10 | (5) 프롬프트 v1 확정 commit | ✅→v2 | v1 보존, v2를 production prompt로 lock. 외부 평가 production-ready 판정 |
+| 11 | phase1_progress.md에 1.1 종료 보고 작성 | ✅ | 이 섹션 |
+
+**결과: 10/11 통과 (⏭️ 1건 — 사용자 승인 결정으로 미룸. Phase 1 진행에 영향 없음)**
+
+---
+
+## 1.1 단계 종료 보고 (2026-05-02)
+
+**종료 일시**: 2026-05-02
+
+### 단계별 완료 현황
+
+| 항목 | 상태 |
+|---|---|
+| 1.1.1 DB 마이그레이션 3종 산출물 | ✅ 완료 |
+| 1.1.2 운영 환경 마이그레이션 적용 | ⏳ 사용자 직접 (Q-002) |
+| 1.1.3 apps/llm-analysis/ 골격 | ✅ 완료 |
+| 1.1.4 LLMBackend 인터페이스 | ✅ 완료 |
+| 1.1.5 CLI 백엔드 | ✅ 완료 |
+| 1.1.6 API 백엔드 | ✅ 완료 (mock 검증) |
+| 1.1.7 llm_calls 기록 wrapper | ✅ 완료 |
+| 1.1.8 프롬프트 v1 작성 | ✅ 완료 (v1 보존, v2로 승계) |
+| 1.1.9 data_loader.py | ✅ 완료 |
+| 1.1.10 prompt_builder.py | ✅ 완료 |
+| 1.1.11 result_parser + AnalysisResult | ✅ 완료 (v2 taxonomy 갱신) |
+| 1.1.12 run_single_symbol.py CLI | ✅ 완료 |
+| 1.1.13 단일 종목 검증 5종목 | ✅ 완료 |
+| 1.1.14 API 백엔드 단일 종목 검증 | ⏭️ 미룸 (사용자 결정) |
+| 1.1.15 프롬프트 튜닝 v2 + 외부 평가 | ✅ 완료 |
+
+### v1 → v2 전환 완료
+
+**production prompt = `prompts/analyze_chart_v2.md`** (settings.yaml `prompts.analyze_chart: "v2"`)
+v1은 `prompts/analyze_chart_v1.md`로 보존.
+
+### 외부 평가 결과 (Web Claude Minervini Evaluator, Opus 4.7)
+
+| 약점 | 차원 | 결과 |
+|---|---|---|
+| A (risk_flags 카테고리 에러) | HIGH | ✅ improved — high_rs_rating 5/5 제거 |
+| B (reasoning↔flag 불일치) | HIGH | ✅ improved — climax_run 등 flag 일관성 확보 |
+| C (reverse_split 미탐지) | HIGH | ⚠️ partial — ABVX/ADV 자동 감지, AAOI 누락 (ratio 작고 시기 오래됨) |
+| D (ETF 탐지 부재) | HIGH | ✅ improved — BWET/CLSM 2/2 즉시 감지, CLSM entry→ignore 반전 |
+| E (pattern naming discipline) | MEDIUM | ✅ improved — ABVX cup_handle→none 교정 |
+| F (pivot/breakout 정확도) | MEDIUM | ⏭️ untestable — 표본 5종목 모두 ignore/ETF, entry 후보 없음 |
+| G (liquidity 정책) | LOW | ✅ improved — ADV thin_liquidity_us_only $3.2M 자동 계산 |
+
+**평가 최종 판정: production-ready (5종목 evaluator_verdict: agree)**
+
+### 1.1 게이트 통과
+
+10/11 ✅ (API 백엔드 실호출 1건 ⏭️ — 사용자 결정)
+
+### 다음 단계
+
+**1.2**: `calculate_entry_params()` — entry 후보 종목에 대한 진입 파라미터 산출
+- `prompts/calculate_entry_params_v1.md` 작성
+- `EntryParams` Pydantic 모델
+- `run_single_symbol.py --with-entry-params`
+- 표본 entry 종목 5건 이상 검증
 
 ## 주간 운영 메모
 
