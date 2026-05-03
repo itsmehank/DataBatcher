@@ -85,8 +85,20 @@ def main(argv=None) -> int:
         print("Error: ACTIVE 종목 없음. us_sync_symbol_master.py 먼저 실행", file=sys.stderr)
         return 2
 
+    # ADR-013: ETF 제외 (symbol_type = 'ETF' 기준)
+    total_before = len(symbol_details)
+    symbol_details = [d for d in symbol_details if d.get("symbol_type") != "ETF"]
+    etf_excluded = total_before - len(symbol_details)
+    if etf_excluded:
+        print(f"[us_minervini_update] ADR-013: ETF {etf_excluded}종목 제외 (symbol_type='ETF')")
+
+    if not symbol_details:
+        print("Warning: ETF 제외 후 종목 없음")
+        return 0
+
+    non_etf_symbols = {d["symbol"] for d in symbol_details}
     symbol_market_map = {d["symbol"]: d["market"] for d in symbol_details}
-    print(f"[us_minervini_update] 종목 수: {len(symbol_details)}")
+    print(f"[us_minervini_update] 종목 수(ETF 제외): {len(symbol_details)}")
 
     # 2. 가격 데이터 로드 (wide format)
     prices_wide = load_all_prices_wide(
@@ -101,6 +113,12 @@ def main(argv=None) -> int:
     if prices_wide.empty:
         print("Error: 가격 데이터 없음", file=sys.stderr)
         return 3
+
+    # ADR-013: prices_wide에서 ETF 컬럼 제거
+    etf_price_cols = [c for c in prices_wide.columns if c not in non_etf_symbols]
+    if etf_price_cols:
+        prices_wide = prices_wide.drop(columns=etf_price_cols)
+        print(f"[us_minervini_update] ADR-013: 가격 데이터 ETF 컬럼 {len(etf_price_cols)}개 제거")
 
     print(f"[us_minervini_update] 가격 데이터: {prices_wide.shape[0]} 거래일 x {prices_wide.shape[1]} 종목")
 

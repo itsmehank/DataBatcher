@@ -101,7 +101,7 @@ def load_us_symbols_with_details(
         )
 
     sql = """
-        SELECT symbol, name, market FROM us_symbol_master
+        SELECT symbol, name, market, symbol_type FROM us_symbol_master
         WHERE status = :status
     """
     params: dict[str, object] = {"status": status}
@@ -120,6 +120,6 @@ def load_us_symbols_with_details(
     with engine.connect() as conn:
         result = conn.execute(text(sql), params)
         return [
-            {"symbol": row[0], "name": row[1], "market": row[2]}
+            {"symbol": row[0], "name": row[1], "market": row[2], "symbol_type": row[3]}
             for row in result
         ]

@@ -84,6 +84,29 @@
 - [1.3 자동화] reasoning 사실 정확성 sanity check — reasoning의 구체 숫자(volume, % 수치)가 source data와 일치하는지 자동 비교.
 - [1.3 taxonomy 검토] 추가 flag 후보: `late_stage_base`, `distribution_days`, `reversal_off_high` (평가 LLM 제안). 1.3 운영 빈도 확인 후 추가 결정.
 
+---
+
+## 단계 1.2 — calculate_entry_params 구현
+
+### 1.2.0-A — ADR-013 구현 (2026-05-03)
+
+- **ETF 제외 필터**: `us_minervini_update.py`, `kr_minervini_update.py`에 ADR-013 option (a) 적용
+  - `load_symbols_with_details` / `load_us_symbols_with_details` 에 `symbol_type` 필드 추가 (backward-compatible)
+  - 종목 목록 로드 후 `d.get("symbol_type") != "ETF"` 조건으로 ETF 제외
+  - `prices_wide` 에서도 non_etf_symbols 집합으로 ETF 컬럼 drop
+- **KR/US 동일 정책**: 두 시장 모두 `symbol_type = 'ETF'` 기준으로 제외 (market='ETF'와 100% 일치 확인)
+- **기존 행 보존** (ADR-013 §4.i 채택): `minervini_screen_results_us` ETF 177,065행 / `_kr` ETF 77,353행 그대로 보존
+- **단위 테스트**: `scripts/tests/test_minervini_etf_exclusion.py` — 9/9 통과
+  - US/KR ETF 제외 검증, symbol_type=NULL 처리, prices_wide 컬럼 제거, end-to-end pass_mask 검증
+- **브랜치**: `phase1/1.2-entry-params`
+- **다음**: 1.2.1 calculate_entry_params 프롬프트 v1 작성
+
+### 1.2 후속 작업 등록
+
+- [후속 검토] KR 시장 KONEX 종목의 미너비니 스크리닝 포함 여부 — ADR-013 사전 점검(2026-05-03) 시 발견.
+  KONEX 110종목이 symbol_master에 ACTIVE이나 현재 minervini_screen_results_kr에는 0건(자연 통과 없음).
+  KONEX 포함/제외 정책을 명시할지 사용자 결정 필요. ADR-013 구현 후에도 KONEX는 현행 동작(포함 가능 상태) 유지.
+
 
 ---
 
