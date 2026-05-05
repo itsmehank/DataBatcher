@@ -360,38 +360,71 @@ CREATE TABLE llm_calls (
 
 #### `risk_flags` (daily_analysis_*.risk_flags)
 
-배열. 가능한 값:
-- `"high_rs_rating"`: RS Rating 95 이상
-- `"extended_from_ma50"`: 50일 이평선에서 너무 멀리 이격
-- `"low_volume"`: 거래량 부족
-- `"thin_base"`: 베이스 기간이 너무 짧음 (<7주)
-- `"sector_overconcentration"`: 해당 섹터에 이미 충분한 노출
-- `"earnings_imminent"`: 실적 발표 임박
-- `"market_weakness"`: 전체 시장이 약세 국면
+배열. 분석 LLM v2 production lock 기준 (Phase 1.1.15, 2026-05-02). 다음 12개 값만 허용 (`apps/llm-analysis/models/analysis_result.py`의 `VALID_RISK_FLAGS` whitelist와 일치):
 
-예: `["high_rs_rating", "extended_from_ma50"]`
+- `"climax_run"`: 단기간 급등으로 거래량·변동성 폭증한 climactic 상태
+- `"late_stage_base"`: 4번째 이상 베이스 — 통계적으로 실패율 높음
+- `"extended_from_ma"`: 50/150/200일 이동평균에서 과도하게 이격 (보통 +10% 이상)
+- `"faulty_pivot"`: 베이스 구조에서 식별된 pivot이 잘못 설정됨 (예: ill-defined base, false handle)
+- `"low_volume_breakout"`: 돌파 시 거래량이 책 기준(1.4~1.5배 이상) 미달
+- `"narrow_base"`: 베이스 진폭이 너무 좁아 institutional accumulation 신호 부족
+- `"wide_and_loose"`: 베이스 진폭이 너무 넓고 거칠어 sloppy structure
+- `"thin_liquidity_us_only"`: US 개별주에 한해 평균 일일 달러 거래량 < $5M (KR은 평가 안 함)
+- `"prior_uptrend_insufficient"`: Stage 2 진입 전 prior uptrend 폭이 25~30% 미만
+- `"volume_contraction_on_advance"`: 상승 구간에서 거래량 감소 — institutional 매수 약화 신호
+- `"reverse_split_distortion"`: 역분할 등 corporate action으로 차트가 왜곡됨
+- `"etf_methodology_mismatch"`: 분석 대상이 ETF 또는 fund vehicle — 미너비니 방법론 직접 적용 불가 (Pre-Check trigger)
+
+예: `["climax_run", "wide_and_loose", "extended_from_ma"]`
+
+**v1(구 taxonomy) 대비 변경 이력**: v1의 `high_rs_rating`, `extended_from_ma50`, `low_volume`, `thin_base`, `earnings_imminent`, `market_weakness`, `sector_overconcentration` 7개는 1.1.15 외부 평가에서 카테고리 에러(특히 `high_rs_rating`은 양성 신호인데 위험으로 분류) 또는 단일 종목 분석으로 판정 불가(market/sector/earnings)로 판명되어 v2에서 제거됐다. 변경 사유는 04_DECISIONS의 v2 production lock 결정 + phase1_progress.md 1.1.15 v2 작성 메모 §"v1 → v2 주요 변경 사항" 참조.
 
 #### `entry_params` (daily_analysis_*.entry_params)
 
-`classification='entry'`일 때만 채워짐.
+`classification='entry'`일 때만 채워짐. (6) `calculate_entry_params` v1 production lock 기준 (Phase 1.2 트랙 B, 2026-05-05). `apps/llm-analysis/models/entry_params.py`의 `EntryParams` Pydantic 모델과 일치.
 
 ```json
 {
-  "pivot_price": 165.00,
-  "stop_loss_price": 152.00,
-  "stop_loss_pct": -7.88,
-  "suggested_weight_pct": 15.0,
-  "volume_confirmation": {
-    "required": true,
-    "ratio_to_ma20": 1.5
-  },
-  "expected_target": {
-    "conservative": 180.00,
-    "optimistic": 210.00
-  },
-  "valid_until": "2026-04-28"
+  "pivot_price": 22.67,
+  "stop_loss_price": 21.47,
+  "stop_loss_pct": -5.30,
+  "suggested_weight_pct": 4.9,
+  "expected_target_price": 27.20,
+  "expected_target_pct": 20.0,
+  "entry_window_days": 3,
+  "max_chase_pct_from_pivot": 5.0,
+  "breakout_volume_requirement": "ge_1.4x_50day_avg",
+  "pattern_basis": "cup_with_handle handle high $22.67",
+  "notes": "Position size reduced 0.7x due to low_volume_breakout flag.",
+  "known_warnings": [],
+  "other_warnings": []
 }
 ```
+
+**필드 정의**:
+
+| 필드 | 타입 | 의미 |
+|---|---|---|
+| `pivot_price` | float | 베이스 돌파 기준선 (handle high 또는 base high) |
+| `stop_loss_price` | float | 손절 가격 |
+| `stop_loss_pct` | float | pivot 기준 stop 거리 (%, 음수). 범위 [-10, -5] (사전 자문 §0.6 채택). 책 기준 절대 한도 -7~-8% (O'Neil), Minervini 7-8% 룰 또는 risk_flag 기반 tightening |
+| `suggested_weight_pct` | float | 총 자산 대비 진입 비중 (%). 범위 [0, 25]. base 7~20% × risk_flag multipliers |
+| `expected_target_price` | float | 1차 목표가 (sell-half 또는 partial exit 기준) |
+| `expected_target_pct` | float | pivot 대비 target 거리 (%, 양수) |
+| `entry_window_days` | int | 분석 시점부터 buy zone 유효 일수 (보통 3~5거래일) |
+| `max_chase_pct_from_pivot` | float | pivot 위로 매수 가능한 최대 거리 (%). O'Neil "5% chase rule" 기반, 보통 5.0 |
+| `breakout_volume_requirement` | enum | 돌파 거래량 요건. 값: `"ge_1.4x_50day_avg"`, `"ge_1.5x_50day_avg"`, `"ge_2.0x_50day_avg"` 등 |
+| `pattern_basis` | string | 산출 근거가 된 base/pattern 정보 (예: "cup_with_handle handle high $X") |
+| `notes` | string | 산출 과정의 추가 설명 또는 특이사항 |
+| `known_warnings` | array | 책 기반 경고 (예: breakout volume 미달, RS rating 약함). v1.1 fix로 자동 발행 강화 예정 |
+| `other_warnings` | array | known_warnings 외 LLM이 자유롭게 식별한 위험 신호 |
+
+**v1.1 fix 예정 사항** (1.3 진입 전 필수, NVST B.5.5 1차 Evaluator 평가 반영, 06_CURRENT_STATE 미해결 이슈 §L 참조):
+1. `stop_loss_pct`를 두 viewpoint로 분리 — `stop_loss_pct_from_pivot` + `stop_loss_pct_from_current_price` 둘 다 emit. 후자가 7~8% 초과 시 known_warnings에 자동 추가.
+2. `breakout_volume_requirement` vs 실제 관측 거래량 mismatch 시 `known_warnings`에 자동 발행 (size 조정과 무관하게).
+3. (5) `analyze_chart` 출력의 pivot 가격과 (6) 출력의 `pivot_price` 일치성 schema-level reconcile (예: trigger 버퍼 별도 필드 분리 또는 buffer 제거).
+
+**구 스키마(B.1 brief §6.3 v0)와의 차이**: brief v0의 `volume_confirmation`, `expected_target.conservative/optimistic`, `valid_until` 3필드는 1.2 트랙 B 사전 자문 hybrid 적용 단계에서 위 13필드로 재설계됐다. 변경 사유는 phase1_progress.md 1.2 트랙 B B.1 사전 자문 메모 + commit α `abbaeb2` 참조.
 
 ### B.3 모듈 함수 시그니처
 
