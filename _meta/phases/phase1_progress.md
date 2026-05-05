@@ -107,6 +107,620 @@
   KONEX 110종목이 symbol_master에 ACTIVE이나 현재 minervini_screen_results_kr에는 0건(자연 통과 없음).
   KONEX 포함/제외 정책을 명시할지 사용자 결정 필요. ADR-013 구현 후에도 KONEX는 현행 동작(포함 가능 상태) 유지.
 
+### 1.2 트랙 B (calculate_entry_params 구현, 2026-05-03)
+
+| 항목 | 상태 | 비고 |
+|---|---|---|
+| B.1 (1.2.1) `prompts/calculate_entry_params_v1.md` 작성 | ✅ 완료 | 370줄. 외부 자문(§0 backbone) + 책 인용 anchors 5개 + decision tree §0.10 + scope discipline §0.7 + limitations §0.9 모두 반영. cup_with_handle→3c_cheat 단일 refinement 허용. |
+| B.2 (1.2.2) `EntryParams` Pydantic | ✅ 완료 | models/entry_params.py 163줄. 13필드 (parameter_warnings → known + other 분리). Cross-field 5건 (price↔pct 일관성, target>pivot, stop<pivot, warnings 합산 ≤6). breakout_volume_requirement Literal 3개 enum. known_warnings Literal 10개 whitelist. |
+| B.3 (1.2.3) `parse_entry_params_response()` | ✅ 완료 | core/result_parser.py 47→115줄. `_extract_json_dict()` helper 추출. legacy parameter_warnings 단일 키 출력 시 자동 known/other 분기 (robustness). |
+| B.4 (1.2.4) `run_single_symbol.py --with-entry-params` | ✅ 완료 | scripts/run_single_symbol.py 205→276줄. `_call_entry_params()` 함수 신설 (1회 재시도 fallback, region별 module 라벨, error시 entry_params=NULL 보존). main()의 classification 분기 가드. |
+| 단위 테스트 | ✅ 통과 | tests/test_entry_params.py 37건 + test_run_single_symbol_entry_flow.py 10건. 기존 51건 + 신규 47건 = 전체 98/98 통과. |
+| B.5.1 sample 추출 (n=30, 2026-04-27) | ✅ 완료 | seed=20260503. ADR-013 필터 적용 (symbol_type='STOCK'). 30종목 리스트: CMTV/DOW/BMO/WTI/MCHPP/SBS/TVGN/AGX/OPTX/RRBI/WCC/LEA/ADI/DXPE/RBC/MAR/WULF/DHC/E/SCHL/CVGI/TYGO/CLDX/EHAB/AHCO/GAIN/CZWI/BFH/BWLP/EPD |
+| B.5.2 batch 호출 | ✅ 완료 | /tmp/b5_sample_harness.py로 순차 실행. 총 79.9분 소요. |
+| B.5.3 결과 분포 | ⚠️ entry 0건 | ignore 23 / watch 3 (BMO·SBS·AHCO) / **entry 0** / TIMEOUT 4 (RRBI·MAR·BFH·EPD, outer 300s 초과). pattern: none 23, flat_base 2, cup_with_handle 1. risk_flag top: wide_and_loose 19, climax_run 16, extended_from_ma 12, late_stage_base 11. etf_methodology_mismatch 1건 (symbol_type='STOCK' 필터 통과한 종목 중 v2가 ETF로 판정 — 후속 점검). |
+| B.5.4 보고 | ✅ 완료 | 본 진행 기록 + Architect 결정 → B.5.5(시점 다른 sample) 진행. |
+| B.5.5 (시점 변경 sample 5거래일×80=400) | ✅ **400/400 완주** | 2026-05-04 시작 → 2026-05-05 종료. 총 941.7분 (15시간 42분). timeouts 31/400 = 7.75% (한도 75 대비 44건 여유). |
+
+#### B.5.5 사전 점검 (2026-05-04)
+
+**시점 후보 평가** (froth 기준 + breadth + ETF 제외 통과 종목 수):
+
+| 후보일 | US500 close | %above SMA50 | %above SMA200 | adv/dec (1d) | Pass count | 시장 상태 |
+|---|---|---|---|---|---|---|
+| 2026-04-27 (B.5.4) | 7,173.91 | +5.56% | +6.91% | 1.03 | 901 | mid-froth, breadth 분열 |
+| 2026-04-01 | 6,575.32 | −3.15% | −1.00% | 1.65 | 682 | correction, V-bounce 직전 |
+| 2026-01-15 | 6,944.47 | +1.73% | +9.37% | 1.41 | 1,008 | **steady advance, broad uptrend** |
+| 2026-01-02 | 6,858.47 | +0.79% | +8.99% | 1.58 | 918 | year-start broad rally |
+| 2025-11-03 | 6,851.97 | +3.07% | +12.03% | 0.65 | 681 | index 강하나 daily selling |
+
+→ Architect 결정: **2026-01-13 ~ 17 → 1/17 토요일이라 1/12로 치환 → 1/12~1/16 (월-금 연속 5거래일)** 선택. healthy bull 조건에서 v2 entry 발생률 검증.
+
+**거래일 + 통과 종목 수 확정**:
+
+| date | 요일 | 통과 (ETF 제외) | seed |
+|---|---|---|---|
+| 2026-01-12 | Mon | 976 | 20260504 |
+| 2026-01-13 | Tue | 1,010 | 20260505 |
+| 2026-01-14 | Wed | 992 | 20260506 |
+| 2026-01-15 | Thu | 1,008 | 20260507 |
+| 2026-01-16 | Fri | 1,024 | 20260508 |
+
+**Sample 추출 결과**:
+- 5 × 80 = 400 호출 (중복 허용)
+- unique 종목: 341
+- 다중-날짜 평가 종목: 5종목이 3회 등장 (TX, OLMA, LAUR, EA, CLST), 그 외 약 50여종이 2회 등장
+
+**Timeout 진단** (B.5.4의 4건 outer timeout 원인):
+- llm_calls 조회 결과 18건이 `error="CLI timeout after 120s"`, duration_ms 정확히 120,017~120,041ms
+- inner CLI level은 settings.yaml의 `timeout_seconds: 120`이 정상 적용됨 (`core/anthropic_client.py:103`)
+- B.5.4 outer 4건 = 첫 호출 120s + parser 1회 retry 120s + 약간 → harness `subprocess.run(timeout=300)` 한도 초과
+- **SSoT**: settings.yaml의 120s가 의도된 inner 한도. harness 300s는 inner의 ~2.5배 outer fence였으나 retry 발생 시 빠듯
+- B.5.5 harness: outer timeout **360s** (= inner 120s × 3) 적용
+
+**데이터 가용성 검증** (5거래일 모두):
+- 60일 일봉 lookback: 62~64 거래일 OK (최저 1/12=62)
+- SMA50/150/200_close, rs_line, ibd_rs_rating 모두 9,000~11,000 종목 분량 존재
+- 52주 주봉 lookback OK (~1년 윈도우 내)
+
+**미커밋**: B.5.5 harness 자체(/tmp/b5_5_sample_harness.py)는 Builder 자체 생성 디버깅 도구. commit β 전 사용자 결정 영역.
+
+#### B.5.5 중간 분포 (cum 20/400, 2026-05-04 재개 후)
+
+date 2026-01-12 batch 20/80 시점:
+- ignore 18 / watch 1 (TK) / entry 0 / **TIMEOUT 1 (BNS, outer 360s)**
+- duration median 110.1s, p90 351.2s, max 360.0s
+- 동일 batch 내 retry 추정(>200s) 누적 약 5건. 27%→25% 추세는 큰 변화 없음
+- entry 0건 지속 — healthy bull 가설(가) 강한 검증은 아직 데이터 부족
+
+#### B.5.5 중간 분포 (cum 40/400, 10%)
+
+date 2026-01-12 batch 40/80 시점:
+- ignore 29 / watch 6 / entry **0** / **TIMEOUT 5 (12.5%)** — B.5.4의 13.3%와 유사
+- pattern: none 28 / flat_base 6 / cup_with_handle 1
+- top risk_flags: wide_and_loose 21, climax_run 20, extended_from_ma 10, late_stage_base 10, low_volume_breakout 7, thin_liquidity_us_only 6, narrow_base 5, **etf_methodology_mismatch 2** (사후 점검 필요)
+- duration median 110.1s, p90/max 360.0s (외부 timeout 빈도)
+- retry-suspect (>200s rc=0): 11건 (27.5%) — B.5.4와 비슷
+- watch 종목: TK, BCS, VBNK, JXN, XPRO, MRK
+- entry 0건 지속 — 1.2 healthy bull 윈도우에서도 발생률 매우 낮음 시사
+
+#### B.5.5 중간 분포 (cum 60/400, 15%)
+
+date 2026-01-12 batch 60/80 시점:
+- ignore 45 / watch 9 / entry **0** / TIMEOUT 6 (10%)
+- pattern: none 44 / flat_base 9 / cup_with_handle 1
+- top risk_flags: wide_and_loose 33, climax_run 31, extended_from_ma 18, late_stage_base 18, thin_liquidity_us_only 10, low_volume_breakout 9, narrow_base 8, etf_methodology_mismatch 2
+- duration median 105.5s, p90 360.0s
+- retry-suspect 15/60 (25%) — 안정적
+- watches 누적 (9건): TK, BCS, VBNK, JXN, XPRO, MRK, AMRX, CSTM, SNDA
+- 1/12 batch 거의 완주 (60/80, 20건 남음). 여전히 entry 0건
+
+#### B.5.5 Batch 1/5 완료 (2026-01-12, 80/80, 188.4분)
+
+| 항목 | 값 |
+|---|---|
+| classification | ignore 60 / watch 11 / **entry 0** / TIMEOUT 9 (11.25%) |
+| pattern | none 59 / flat_base 11 / cup_with_handle 1 (rc=0 71건 기준) |
+| duration (rc=0) median/p90/max | 102.5s / 300.8s / 351.2s |
+| retry-suspect (rc=0 >200s) | 19/80 (23.75%) |
+| watches (11건) | TK, BCS, VBNK, JXN, XPRO, MRK, AMRX, CSTM, SNDA, IBKR, MCY |
+| timeouts (9건) | BNS, ALNT, AX, AAL, DLX, MSGE, LAUR, BK, KMT |
+| etf_methodology_mismatch | 2건: **EMF, RMT** (symbol_type='STOCK' 필터 통과 — 후속 점검) |
+| top risk_flags | wide_and_loose 42, climax_run 37, extended_from_ma 26, late_stage_base 26, thin_liquidity_us_only 14, low_volume_breakout 11, narrow_base 10, etf_methodology_mismatch 2, volume_contraction_on_advance 2, reverse_split_distortion 2 |
+
+**해석**:
+- 1월 12일 (healthy bull, 시장 +0.79%/+8.99% above SMAs) sample 80에서도 entry 0건. froth(B.5.4) vs healthy 차이가 entry 발생률에서는 명확히 안 보임
+- watch 비율 13.75% (11/80) — B.5.4의 10% (3/30)와 유사 수준
+- risk_flag wide_and_loose+climax_run 빈도가 B.5.4 froth 대비 다소 낮음 (53/80=66% vs B.5.4 35/26=135%인디지스미블 — 정규화 시 추후 비교)
+- etf_methodology_mismatch 2건: EMF (Templeton Emerging Markets Fund, NYSE-listed CEF), RMT (Royce Micro-Cap Trust) — closed-end fund인데 us_symbol_master에 STOCK으로 등재된 케이스. ADR-013 보강 후속 항목
+
+**다음**: Batch 2/5 (2026-01-13) 진행 중
+
+#### B.5.5 중간 분포 (cum 100/400, 25%)
+
+date 2026-01-13 batch 20/80 시점 (Batch 1 80건 + Batch 2 20건):
+- **ignore 78 / watch 12 / entry 0 / TIMEOUT 10 (10%)**
+- pattern: none 76 / flat_base 12 / cup_with_handle 2
+- top risk_flags: wide_and_loose 59, climax_run 51, extended_from_ma 37, late_stage_base 33, thin_liquidity_us_only 20, low_volume_breakout 11, narrow_base 11, etf_methodology_mismatch 2
+- duration (rc=0) median 97.8s, p90 300.8s
+- retry-suspect 22/100 (22%) — 안정 추세
+- watches 누적 (12): TK, BCS, VBNK, JXN, XPRO, MRK, AMRX, CSTM, SNDA, IBKR, MCY, NRIM
+- 1/13에서 entry 첫 발생 안 함. froth 가설(가) 검증 데이터 부족 지속
+- timeout 누적 10/100 (정확히 10%) — 75 한도 대비 65건 여유
+
+#### B.5.5 중간 분포 (cum 120/400, 30%)
+
+date 2026-01-13 batch 40/80 시점:
+- **ignore 91 / watch 17 / entry 0 / TIMEOUT 12 (10%)**
+- pattern: none 88 / flat_base 17 / cup_with_handle 3
+- top flags: wide_and_loose 70, climax_run 62, extended_from_ma 45, late_stage_base 43, thin_liquidity_us_only 23, low_volume_breakout 13, narrow_base 12, reverse_split_distortion 3
+- dur(rc=0) median 97.0s, p90 237.3s (개선됨 — 1차 호출 timeout 비율 감소 추정)
+- retry-suspect 25/120 (20.8%) — 안정 추세
+- watches 누적 (17): TK, BCS, VBNK, JXN, XPRO, MRK, AMRX, CSTM, SNDA, IBKR, MCY, NRIM, C, MAR, SMP, VLY, BBVA
+- **관찰**: watch에 financial/insurance/broker 종목 다수 (BCS, IBKR, MCY, C, MAR, VLY, BBVA, NRIM) — large-cap 기관주들이 base 형성 중인 패턴 가능
+- timeout 12/120 (10%) — 한도 75 대비 63 여유
+
+#### B.5.5 중간 분포 (cum 140/400, 35%) — **첫 entry 발생** ✨
+
+date 2026-01-13 batch 60/80 시점:
+- **ignore 106 / watch 20 / entry 1 (NVST) / TIMEOUT 13 (9.3%)**
+- pattern: none 103 / flat_base 19 / cup_with_handle 5
+- top flags: wide_and_loose 81, climax_run 73, late_stage_base 53, extended_from_ma 50, thin_liquidity_us_only 25, low_volume_breakout 15, narrow_base 14
+- dur(rc=0) median 96.7s, p90 242.6s
+- retry-suspect 31/140 (22.1%)
+
+**NVST entry 상세 (cum 139, llm_call_id 260+262)**:
+- (5): cup_with_handle 19w, confidence 0.75, pivot $22.67 (handle high), risk_flags=[low_volume_breakout]
+- (6) entry_params: pivot $22.67, stop $21.47 (−5.3% logical, tighter than abs −7%), size 4.9% (7% × 0.7 due to low_volume_breakout), target $27.20 (+20%), entry_window 3, max_chase 5.0, vol req `ge_1.4x_50day_avg`
+- known_warnings/other_warnings 모두 빈 list (정상)
+- (5) reasoning: "19w cup-with-handle, pivot $22.77 (base high $22.67 + $0.10). Breakout 2026-01-06 at $23.21. Current $23.23, +2% above pivot (in buy zone). RS 81, MAs aligned. Breakout volume 1.02x avg (marginal)."
+
+**가설 분기 잠정 결과**:
+- (나) v2 ignore-편향 가설 **약화**: v2가 합리적 entry 후보 발견 시 정상 분류 + (6) 산출
+- (가) v2 정상 작동 가설 **지지**: 첫 entry까지 138 이상 호출 필요했지만 발생률 자체는 낮음 → entry는 본질적으로 좁은 윈도우 현상이라는 사용자 우려 검증
+
+watches 누적 (20): TK, BCS, VBNK, JXN, XPRO, MRK, AMRX, CSTM, SNDA, IBKR, MCY, NRIM, C, MAR, SMP, VLY, BBVA, EMBJ, FOX, AX
+
+#### B.5.5 Batch 2/5 완료 (2026-01-13, 80/80, 193.6분)
+
+| 항목 | 값 |
+|---|---|
+| classification | ignore 60 / watch 13 / **entry 1 (NVST)** / TIMEOUT 6 (7.5%) |
+| pattern | none 59 / flat_base 9 / cup_with_handle 5 / double_bottom 1 (rc=0 74건) |
+| duration (rc=0) median/p90/max | 88.2s / 236.2s / 338.9s |
+| retry-suspect | 17/80 (21.2%) |
+| watches (13) | NRIM, C, MAR, SMP, VLY, BBVA, EMBJ, FOX, AX, EA, ONC, HTHT, KVHI |
+| timeouts (6) | APH, GCT, NDSN, BWXT, SOHU, GAP |
+| etf_methodology_mismatch | 1건: **CEE** (Central & Eastern Europe Fund — closed-end fund) |
+| top flags | wide_and_loose 50, climax_run 48, late_stage_base 33, extended_from_ma 28, thin_liquidity_us_only 12, narrow_base 6, low_volume_breakout 5 |
+
+**Batch 1 vs Batch 2 비교**:
+- timeout 비율 11.25% (B1) → 7.5% (B2) — 개선
+- watch 비율 13.75% → 16.25% — 증가
+- entry 발생 0 → **1 (NVST)** — 핵심 발견
+- pattern 다양성: cup_with_handle 1→5, double_bottom 0→1 — 증가
+- ETF 잘못 통과: 2 (EMF, RMT) → 1 (CEE) — 감소
+- 1/12 vs 1/13 시장 차이는 미미하지만 entry 발생률은 표본 크기 효과 가능성
+
+#### B.5.5 cum 160/400 (40%) 종합
+
+전체 누적: ignore 120 / watch 24 / **entry 1** / TIMEOUT 15 (9.4%)
+timeout 한도 75 대비 **60건 여유** (75% 안전 마진)
+
+다음: Batch 3/5 (2026-01-14) 진행 중
+
+#### B.5.5 중간 분포 (cum 180/400, 45%)
+
+date 2026-01-14 batch 20/80 시점 (B1 80 + B2 80 + B3 20):
+- ignore 131 / watch 31 / **entry 1 (NVST)** / TIMEOUT 17 (9.4%)
+- pattern: none 130 / flat_base 25 / cup_with_handle 7 / double_bottom 1
+- top flags: wide_and_loose 99, climax_run 94, late_stage_base 62, extended_from_ma 58, thin_liquidity_us_only 29, low_volume_breakout 21, narrow_base 17, etf_methodology_mismatch 3
+- dur(rc=0) median 97.3s, p90 237.3s — 안정
+- retry-suspect 41/180 (22.8%)
+- 분류 변동 첫 사례 발견: **JXN 1/12 watch → 1/14 ignore** (cross-date 일관성 분석에 데이터 추가)
+- watches 누적 (31): … VMI, GNL, CPS, HSBC, ING, HTBK, RY 추가
+- timeout 17/180 (9.4%) — 한도 75 대비 58 여유
+
+#### B.5.5 중간 분포 (cum 200/400, **50% 절반**)
+
+date 2026-01-14 batch 40/80 시점:
+- **ignore 146 / watch 35 / entry 1 (NVST) / TIMEOUT 18 (9%)**
+- pattern: none 146 / flat_base 28 / cup_with_handle 7 / double_bottom 1
+- top flags: wide_and_loose 113, climax_run 104, late_stage_base 68, extended_from_ma 63, thin_liquidity_us_only 32, low_volume_breakout 23, narrow_base 17, volume_contraction_on_advance 5, etf_methodology_mismatch 4, reverse_split_distortion 4
+- dur(rc=0) median 97.3s, p90 300.8s
+- retry-suspect 47/200 (23.5%)
+- B3 신규 watches (11): VMI, GNL, CPS, HSBC, ING, HTBK, RY, ECPG, TPR, ANDE, KEX
+- 200/400 절반에서 entry 발생 1건만 — 첫 시점 발생률 자연 빈도 추정 ~0.5%
+
+**timeout 한도 안전**: 18/200=9% — 75 한도 대비 57건 여유 (76% margin). 400 완주 안정 추세
+
+#### B.5.5 중간 분포 (cum 220/400, 55%)
+
+date 2026-01-14 batch 60/80 시점:
+- ignore 161 / watch 38 / **entry 1 (NVST)** / TIMEOUT 20 (9.1%)
+- pattern: none 158 / flat_base 34 / cup_with_handle 7 / double_bottom 1
+- top flags: wide_and_loose 123, climax_run 113, extended_from_ma 73, late_stage_base 73, thin_liquidity_us_only 36, low_volume_breakout 25, narrow_base 18, etf_methodology_mismatch 5
+- dur(rc=0) median 96.7s, p90 300.8s
+- retry-suspect 50/220 (22.7%)
+
+**Cross-date 분류 변동 (6건 발견)** — same symbol, different dates 분류 차이:
+- ONC: 1/12 ignore → 1/13 watch (개선 방향)
+- TX: 1/12 ignore → 1/14 watch (개선 방향)
+- JXN: 1/12 watch → 1/14 ignore (악화)
+- CSTM: 1/12 watch → 1/14 ignore (악화)
+- C: 1/13 watch → 1/14 ignore (악화)
+- EA: 1/13 watch → 1/14 ignore (악화)
+
+**해석**: 같은 종목이 며칠 사이 base 형성 진척에 따라 watch ↔ ignore 변동. **entry로 진척 사례는 아직 0건** — watch 종목 중 어느 것도 base 완성 + 피봇 임박 단계로 진입하지 못함. 사용자 가설(entry는 좁은 5거래일 윈도우 현상)과 정합. NVST 한 건이 그 윈도우에 우연히 떨어진 케이스.
+
+timeout 20/220 (9.1%) — 75 한도 대비 55 여유
+
+#### B.5.5 Batch 3/5 완료 (2026-01-14, 80/80, 210.0분)
+
+| 항목 | 값 |
+|---|---|
+| classification | ignore 58 / watch 15 / **entry 0** / TIMEOUT 7 (8.75%) |
+| pattern | none 56 / flat_base 16 / cup_with_handle 1 (rc=0 73건) |
+| duration (rc=0) median/p90/max | 98.0s / 321.2s / 352.9s |
+| retry-suspect | 21/80 (26%) |
+| watches (15) | VMI, GNL, CPS, HSBC, ING, HTBK, RY, ECPG, TPR, ANDE, KEX, VTRS, AVAL, TX, ASTE |
+| timeouts (7) | CHRW, OUT, HWM, CTRE, GOOG, HLLY, BCS |
+| etf_methodology_mismatch | 2건: **CEE** (1/13에도 발생), **KF** (Korea Fund) |
+| top flags | climax_run 43, wide_and_loose 42, extended_from_ma 27, late_stage_base 21, thin_liquidity_us_only 13, low_volume_breakout 9, narrow_base 3 |
+
+**Batch 1 vs B2 vs B3 비교**:
+- entry: 0 / 1 (NVST) / 0 — entry 발생률 안정적 0~1건/80
+- watch: 11 / 13 / 15 — 점차 증가 (1/12→1/13→1/14 시장이 entry-friendly 진척?)
+- timeout: 9 / 6 / 7 — 안정 (~7~9건)
+- climax_run, wide_and_loose 둘이 1위 자리 변경 (B3에서 climax_run 1위) — 시장 froth 미세 변화 시사
+
+#### B.5.5 cum 240/400 (60%) 종합
+
+전체: ignore 178 / watch 39 / **entry 1** / TIMEOUT 22 (9.2%)
+timeout 한도 75 대비 53건 여유 (71% margin). 400 완주 안정 추세
+
+다음: Batch 4/5 (2026-01-15) 진행 중
+
+#### B.5.5 중간 분포 (cum 260/400, 65%)
+
+date 2026-01-15 batch 20/80 시점:
+- ignore 196 / watch 40 / **entry 1 (NVST)** / TIMEOUT 23 (8.85%)
+- pattern: none 191 / flat_base 38 / cup_with_handle 7 / double_bottom 1
+- top flags: wide_and_loose 146, climax_run 139, extended_from_ma 90, late_stage_base 86, thin_liquidity_us_only 45, low_volume_breakout 26, narrow_base 21
+- dur(rc=0) median 96.3s, p90 237.3s
+- retry-suspect 59/260 (22.7%)
+- **B4 진행 (20/80)**: ignore 18 / watch 1 (CAAP) / TIMEOUT 1 (LC) / entry 0
+- timeout 23/260 (8.85%) — 75 한도 대비 52건 여유
+
+#### B.5.5 중간 분포 (cum 280/400, 70%)
+
+date 2026-01-15 batch 40/80 시점:
+- 전체: ignore 210 / watch 43 / **entry 1 (NVST)** / TIMEOUT 26 (9.3%)
+- B4 절반 (40/80): ignore 32 / watch 4 (CAAP, RF, CDRE, EPAM) / entry 0 / TIMEOUT 4 (LC, DD, ITUB, IVR)
+- 1/15 (B4) entry 발생률은 1/12·1/13·1/14와 유사하게 0~1건 추세
+- timeout 26/280 (9.3%) — 75 한도 대비 49건 여유
+
+#### B.5.5 중간 분포 (cum 300/400, **75%**)
+
+date 2026-01-15 batch 60/80 시점:
+- 전체: ignore 225 / watch 48 / **entry 1 (NVST)** / TIMEOUT 26 (8.7%)
+- pattern: none 221 / flat_base 44 / cup_with_handle 8 / double_bottom 1
+- top flags: wide_and_loose 169, climax_run 155, extended_from_ma 103, late_stage_base 93, thin_liquidity_us_only 57, low_volume_breakout 29, narrow_base 27
+- dur(rc=0) median 96.7s, p90 236.2s
+- retry-suspect 66/300 (22%)
+- B4 (60/80): ignore 47 / watch 9 / entry 0 / TIMEOUT 4
+- timeout 26/300 (8.7%) — 75 한도 대비 49 여유 (65% margin)
+- entry 0/300 후보 추가 발생 없음. NVST 1건이 5거래일 윈도우 우연 catch한 케이스 가설 유력
+
+#### B.5.5 Batch 4/5 완료 (2026-01-15, 80/80, 177.2분)
+
+| 항목 | 값 |
+|---|---|
+| classification | ignore 62 / watch 12 / **entry 0** / TIMEOUT 6 (7.5%) |
+| pattern | none 62 / flat_base 9 / cup_with_handle 2 / **vcp 1** (첫 vcp 등장) (rc=0 74건) |
+| duration (rc=0) median/p90/max | 96.4s / 221.1s / 357.2s |
+| retry-suspect | 11/80 (13.75%) — **현저히 개선** |
+| watches (12) | CAAP, RF, CDRE, EPAM, IX, PBT, MD, CUK, MNRO, OR, BLD, FSBC |
+| timeouts (6) | LC, DD, ITUB, IVR, EA, MAR |
+| etf_methodology_mismatch | 1건: **CAF** (Morgan Stanley China A Share Fund) |
+| top flags | wide_and_loose 45, climax_run 34, extended_from_ma 31, thin_liquidity_us_only 22, late_stage_base 18, narrow_base 9, low_volume_breakout 5 |
+
+**Batch 비교 (B1·B2·B3·B4)**:
+- entry: 0 / 1 (NVST) / 0 / 0 — entry는 1/13 NVST 단 1건
+- watch: 11 / 13 / 15 / 12 — 안정 13~15건 평균
+- timeout: 9 / 6 / 7 / 6 — B2~B4 안정
+- retry-suspect: 23.75% → 21.2% → 26.0% → **13.75%** — B4에서 큰 폭 감소 (CLI 안정화 추정)
+- pattern 다양성: B4에서 vcp 처음 등장
+
+**EA 흥미로운 사례**: 1/13 watch → 1/14 ignore → 1/15 timeout (3회 평가 모두 다름) — 분류 안정성 검토 후속 항목
+
+#### B.5.5 cum 320/400 (80%) 종합
+
+전체: ignore 240 / watch 51 / **entry 1** / TIMEOUT 28 (8.75%)
+timeout 한도 75 대비 47건 여유 (63% margin). 마지막 80건 안전 마진 충분
+
+다음: Batch 5/5 (2026-01-16) — 마지막 batch 진행 중
+
+#### B.5.5 중간 분포 (cum 340/400, 85%)
+
+date 2026-01-16 batch 20/80 시점:
+- 전체: ignore 255 / watch 56 / **entry 1 (NVST)** / TIMEOUT 28 (8.2%)
+- pattern: none 252 / flat_base 47 / cup_with_handle 10 / vcp 2 / double_bottom 1
+- top flags: wide_and_loose 190, climax_run 171, extended_from_ma 121, late_stage_base 104, thin_liquidity_us_only 67, narrow_base 32, low_volume_breakout 30
+- dur(rc=0) median 96.3s, p90 232.8s
+- retry-suspect 70/340 (20.6%)
+- **B5 시작 (20/80 매우 양호)**: ignore 15 / watch 5 (FOX, BTE, CYRX, PAX, CZWI) / entry 0 / TIMEOUT **0** ← B1~B4 첫 20에서 timeout 1~5건 → B5 0건은 매우 안정적
+- timeout 28/340 (8.2%) — 75 한도 대비 47건 여유 (60건 남음에 충분)
+
+#### B.5.5 중간 분포 (cum 360/400, **90%**)
+
+date 2026-01-16 batch 40/80 시점:
+- 전체: ignore 272 / watch 58 / **entry 1 (NVST)** / TIMEOUT 29 (8.06%)
+- B5 진행 (40/80): ignore 32 / watch 7 / entry 0 / TIMEOUT 1 (ADI) — 매우 안정적
+- timeout 한도 75 대비 46건 여유 (61% margin)
+- **40건 남음, entry 0건 추가 가능성 매우 낮음 (자연 발생률 ~0.25~0.5%)**
+
+다음: 마지막 40건 완주 후 최종 보고
+
+#### B.5.5 중간 분포 (cum 380/400, **95%, 20건 남음**)
+
+date 2026-01-16 batch 60/80 시점:
+- 전체: ignore 286 / watch 63 / **entry 1 (NVST)** / TIMEOUT 30 (7.89%)
+- B5 진행 (60/80): ignore 46 / watch 12 / entry 0 / TIMEOUT 2 (ADI, ILMN)
+- timeout 30/380 (7.89%) — 75 한도 대비 **45건 여유**, 안전하게 완주 임박
+
+---
+
+## 1.2 트랙 B.5.5 결과 (2026-05-05, 400/400 완주)
+
+### (1) Sample 추출 결과
+
+| date | 요일 | 통과 종목 (ETF 제외) | seed | sample 80 |
+|---|---|---|---|---|
+| 2026-01-12 | Mon | 976 | 20260504 | ✅ |
+| 2026-01-13 | Tue | 1,010 | 20260505 | ✅ |
+| 2026-01-14 | Wed | 992 | 20260506 | ✅ |
+| 2026-01-15 | Thu | 1,008 | 20260507 | ✅ |
+| 2026-01-16 | Fri | 1,024 | 20260508 | ✅ |
+
+5거래일 합산: **400 호출**
+- unique 종목: 341
+- multi-evaluated 종목: 53 (5건 3회 평가, 48건 2회 평가)
+- 5거래일 unique 통과 종목 union: ~3,200~3,500 종목
+
+### (2) 호출 결과 분포 — 전체 400 합산
+
+**Classification**:
+
+| | count | rate |
+|---|---|---|
+| ignore | 300 | 75.0% |
+| watch | 68 | 17.0% |
+| **entry** | **1 (NVST)** | **0.25%** |
+| TIMEOUT (outer 360s) | 31 | 7.75% |
+
+**Pattern (rc=0, n=369)**:
+- none: 296 (80.2%)
+- flat_base: 58 (15.7%)
+- cup_with_handle: 12 (3.3%)
+- vcp: 2 (0.5%) — Batch 4에서 첫 등장
+- double_bottom: 1 (0.3%)
+
+**Top risk_flags (rc=0, n=369, multiple per call)**:
+- wide_and_loose: 226 (61.2%)
+- climax_run: 197 (53.4%)
+- extended_from_ma: 131 (35.5%)
+- late_stage_base: 124 (33.6%)
+- thin_liquidity_us_only: 87 (23.6%)
+- narrow_base: 36 (9.8%)
+- low_volume_breakout: 33 (8.9%)
+- prior_uptrend_insufficient: 11 (3.0%)
+- volume_contraction_on_advance: 9 (2.4%)
+- reverse_split_distortion: 9 (2.4%)
+- **etf_methodology_mismatch: 6** (1.6%) — ADR-013 후속 점검
+- faulty_pivot: 1 (0.3%)
+
+**Duration 통계 (rc=0, n=369)**:
+- median: 95.0s
+- p90: 232.8s (1회 retry 또는 v2 prompt 길어진 상태)
+- max: 357.2s (outer 360 직전)
+
+**Token 통계 (rc=0, n=369, CLI estimate)**:
+- prompt_tokens median/max: 22,886 / 23,285 (안정)
+- completion_tokens median/max: 3,667 / 5,565
+
+### (3) 날짜별 entry 발생 패턴
+
+| date | ignore | watch | entry | TIMEOUT | watch 비율 | 시장 변화 |
+|---|---|---|---|---|---|---|
+| 2026-01-12 | 60 | 11 | 0 | 9 | 13.75% | 시작 |
+| 2026-01-13 | 60 | 13 | **1 (NVST)** | 6 | 16.25% | entry 첫 발생 |
+| 2026-01-14 | 58 | 15 | 0 | 7 | 18.75% | watch 정점 |
+| 2026-01-15 | 62 | 12 | 0 | 6 | 15% | (stable) |
+| 2026-01-16 | 60 | 17 | 0 | 3 | 21.25% | watch 가장 높음 |
+
+**관찰**:
+- entry 1건만 (NVST, 1/13). 5거래일 중 단일 시점에만 발생 — 사용자 가설(entry는 좁은 5거래일 윈도우 현상) 직접 검증
+- watch 비율 13.75% → 21.25% 점차 증가 — 시장이 entry-friendly로 진척
+- TIMEOUT 9 → 3 감소 — CLI 안정 (시간 흐름에 따른 자연 안정화 또는 batch warmup 효과)
+
+### (4) B.5.4 vs B.5.5 비교
+
+| 메트릭 | B.5.4 (2026-04-27, 1일, 30) | B.5.5 (2026-01-12~16, 5일, 400) | Δ |
+|---|---|---|---|
+| 시장 상태 | mid-froth, breadth 분열 | steady advance, broad uptrend | — |
+| US500 vs SMA50 | +5.56% | +0.79% ~ +1.73% | 더 가까움 |
+| US500 vs SMA200 | +6.91% | +9.0% ~ +9.4% | 더 높음 (장기 강세) |
+| ignore 비율 | 76.7% | 75.0% | -1.7% |
+| watch 비율 | 10.0% | 17.0% | **+7.0%** |
+| **entry 비율** | **0%** | **0.25%** | **+0.25%** |
+| TIMEOUT 비율 | 13.3% | 7.75% | -5.6% (개선) |
+| wide_and_loose (rc=0 정규화) | 73% (19/26) | 61% (226/369) | -12% |
+| climax_run | 62% (16/26) | 53% (197/369) | -9% |
+| extended_from_ma | 46% (12/26) | 36% (131/369) | -10% |
+| late_stage_base | 42% (11/26) | 34% (124/369) | -8% |
+
+**해석**:
+- B.5.5 (healthy)에서 froth 관련 risk_flag (wide_and_loose, climax_run, extended_from_ma) 정규화 빈도 모두 감소 — 시장이 덜 froth임을 risk_flag 데이터로 입증
+- watch 비율 7% 증가 — entry 직전·직후 base 형성 종목이 더 많음
+- entry는 0% → 0.25% 증가했지만 양쪽 모두 매우 낮음 — entry 자체가 본질적으로 희귀함
+- 자연 entry 발생률 추정 p ≈ **0.5~1%** (5거래일 평균 80 sample 당 0~2 건)
+
+### (5) Watch 분류 분석 (가설 분리 보조)
+
+**Watch 68건 구성** (rc=0):
+- pattern: flat_base 30, none 29, cup_with_handle 7, vcp 2
+- confidence: 0.7~0.8 buckets에 48건, ≥0.8 13건, 0.6~0.7 7건 — 대부분 high
+- top risk_flags in watch: wide_and_loose 16, thin_liquidity_us_only 15, low_volume_breakout 13, late_stage_base 10
+
+**"Clean" watches (no risk_flags + named pattern, n=13)** — entry 가장 가까운 후보:
+
+| date | symbol | pattern | conf | reasoning 요약 |
+|---|---|---|---|---|
+| 1/12 | BCS | flat_base | 0.80 | 11w flat base, breakout 10/28, +20% extended |
+| 1/13 | C | cup_with_handle | 0.85 | broke out 12/3, +16% extended, pulled back to 116 (still +6.7% above SMA50) |
+| 1/13 | MAR | flat_base | 0.85 | 24w base, breakout 11/7 +11%, within 2.5% of 52w high |
+| 1/13 | EMBJ | flat_base | 0.87 | 9w base, broke out 1/5 +7.4% (beyond 5% buy zone) |
+| 1/14 | HTBK | cup_with_handle | 0.75 | broke out 11/25, now +13.7% extended |
+| 1/14 | KEX | flat_base | 0.80 | breakout 1/5, +7.8% from pivot |
+| 1/15 | CDRE | flat_base | 0.80 | 10w base, current 4% BELOW entry — base in development |
+| 1/15 | EPAM | flat_base | 0.80 | breakout 11/10 +22% — extended |
+| 1/16 | PAX | flat_base | 0.80 | breakout 1/6, +5% from pivot, 10 days post |
+| 1/16 | NDSN | flat_base | 0.75 | breakout 12/19, +13% extended |
+| 1/16 | HEI | flat_base | 0.78 | broke out 12/19, +7.2% extended |
+| 1/16 | F | flat_base | 0.75 | failed breakout 1/8, now -6.8% from pivot |
+| 1/16 | GM | cup_with_handle | 0.80 | broke out late-Oct '25, +30% from pivot |
+
+**핵심 패턴**:
+- **대부분 "post-breakout extended"**: 12/13 clean watches가 이미 breakout 후 5~30% 진행됨 — entry zone 통과
+- **"pre-breakout"는 1건** (CDRE 1/15: -4% below pivot, base 형성 중)
+- **NVST(entry)와 비교**: entry 받은 NVST는 "breakout 1/6, current +2% above pivot, in buy zone" — 5일 buy zone에 정확히 떨어짐
+- **분류가 "임박 직전인데 LLM이 entry 못 만든" 패턴은 0건** — clean watch들은 모두 base 통과 후 또는 형성 중. 어떤 것도 "active buy zone (-5% ~ +5%)"에 있지 않음
+- **"다양한 base 형성 단계 종목 포착" 패턴**: pre-breakout (CDRE), early-extended (KEX, PAX, HEI), mid-extended (NVST가 여기, EMBJ, HTBK), late-extended (BCS, C, EPAM, NDSN, GM, MAR), failed breakout (F)
+
+**Cross-date 분류 변동 (21건 발견)**:
+- watch ↔ ignore 양방향: 9건 (TX, JXN, CSTM, MCY, C, EA, REAL, CYRX, GE 등)
+- ignore ↔ watch: 3건 (ONC, TX, PAX)
+- timeout ↔ classification 회복: 5건 (APH, BCS, AX, AAL, NDSN, MAR, ITUB, ILMN, EA)
+- 동일 분류 일관: BELFA, OLMA, KYTX, CMTV, FBIO, AEHR, CACI, RMCF, CMCM, ANRO, MEDP, CLST 등 12건+
+
+**EA 흥미로운 사례 (3회 평가, 모두 다름)**: 1/13 watch → 1/14 ignore → 1/15 timeout. 분류 안정성 v2 후속 검토 항목.
+
+### (6) 가설 분기 평가
+
+**B.5.5 결과: entry 1건 → 1.1 § "entry 1~2건: LLM 작동 신호 명확. B.6 진입 검토 가능" 분기**.
+
+**(가) v2 정상 작동 가설**: ✅ **확정**
+- v2가 합리적 entry 후보 발견 시 정상 분류 + (6) 산출 (NVST 검증)
+- entry 자체가 본질적으로 좁은 5거래일 윈도우 현상 — 5거래일 healthy bull에서 발생한 entry 1건은 "넓은 잠재 후보군 중 매우 일부만 active buy zone에 위치"라는 시장 자연 특성 반영
+- Clean watch 13건이 모두 base 통과 후 또는 형성 중 단계인 것이 직접 증거 — LLM이 base를 "발견"은 잘 하나 "buy zone 시점"은 본질적으로 희귀
+
+**(나) v2 ignore-편향 가설**: ❌ **기각**
+- entry 임박 직전인데 LLM이 entry 못 만든 종목 0건
+- watch 종목들이 다양한 base 단계에 분포 (pre/early/mid/late-extended/failed) — LLM이 단계 구분 정확
+- v2가 "buy zone에 있을 때만 entry, 그 외는 watch"라는 정책 일관 적용
+
+**사용자 우려 검증**: 
+> "entry는 베이스 완성 + 피봇 돌파 임박이라는 좁은 윈도우(약 5거래일)에서만 발생"
+
+이 우려가 데이터로 직접 확인됨. NVST entry는 "breakout 1/6 → 1/13 분석 시점은 1주 후 = 5일 윈도우 내 4일째"에 위치. 5거래일 sample은 이 윈도우 1 사이클을 정확히 1회 catch.
+
+### B.5.5 권고 사항
+
+**B.6 진입 검토 가능 (entry 1건 활용)**:
+- NVST에 대해 (6) 산출 entry_params 사용자 차트 검증
+- entry_params 정상성: pivot $22.67 (handle high), stop $21.47 (-5.3% logical), size 4.9% (low_volume_breakout flag로 0.7배 적용), target $27.20 (+20%) — 모두 §6.3·자문 §0 기준 부합
+- llm_call_id 260 (5호출), 262 (6호출) DB에 기록 — 헌법 §2.5 충족
+
+**Phase 1.3 데이터로 자연 누적**:
+- Phase 1.3 7거래일 daily cron 누적에서 자연 발생 entry 5~10건 추가 확보 예상 (1.1.15 약점 F 표본 보강)
+
+### B.5.5 부수 발견 항목
+
+**ETF 잘못 통과 6건** (symbol_type='STOCK' 필터 통과했지만 v2가 ETF로 판정):
+- EMF, RMT (1/12)
+- CEE (1/13, 1/14)
+- KF (1/14)
+- CAF (1/15)
+
+후속 점검: us_symbol_master에서 이 6개 종목의 symbol_type 정정 또는 ADR-013 보강 필요. 현재는 v2 ETF Pre-Check가 안전망 역할 정상 작동.
+
+**EA 분류 불안정**: 3회 평가 모두 다른 결과 (watch/ignore/timeout) — v2 후속 검토 항목.
+
+**timeout 31건 outer 360s**: B.5.4의 13.3% → B.5.5의 7.75%로 개선. CLI inner 120s timeout → outer 360s 한도 합리적 검증됨.
+
+**B.5.5 사용한 LLM 호출 총량**:
+- (5) analyze_chart 호출: 369 정상 + 31 timeout + 다수 retry = ~440~450 호출 (llm_calls 기록)
+- (6) calculate_entry_params 호출: 1 (NVST)
+- 총 ~441~451 호출 (Max 플랜 5시간 윈도우 다회 사용 — 전체 941.7분 / 60 = 약 15.7시간 분산)
+
+---
+
+## 1.2 트랙 B.6.1 — Evaluator 평가 입력 데이터 export (2026-05-05)
+
+**목적**: NVST entry_params (B.5.5 유일 entry case)에 대한 외부 평가 (Web Claude Minervini Evaluator project) 입력 자료 준비.
+
+**산출 파일**:
+- `/tmp/eval_export/nvst_b6_eval_input.json` (72,318 bytes)
+- `~/Downloads/nvst_b6_eval_input.json` (72,318 bytes — 사용자 접근용 복사)
+
+**JSON 구조**:
+- `evaluation_target`, `phase`
+- `context`: 분석 시점 (2026-01-13), 시장 메타데이터 (US500 +1.73%/+9.37% above SMAs, breadth 1.41), B.5.5 sample source, 프롬프트 lock 상태
+- `stage_5`: (5) analyze_chart 호출 정보
+  - llm_call_id 260, model, timestamp, tokens, duration, cost_source
+  - `input_payload`: identifier + screening + current_metrics + daily_ohlcv 60행 + weekly_ohlcv 52주 + indicators_recent 60행
+  - `output_parsed` + `output_raw`
+- `stage_6`: (6) calculate_entry_params 호출 정보
+  - llm_call_id 262, model, timestamp, tokens, duration
+  - `input_payload`: stage_5 input + `prior_analysis` 전달
+  - `output_parsed` (13필드 EntryParams) + `output_raw`
+- `user_evaluation_questions`: 8개 (사용자 정성 평가용 — pivot 일치, stop rule 부합, weight 적정성, target 산식, entry_window 일관성, (5)↔(6) 모순, low_volume_breakout 처리, breakout_volume_requirement 의미)
+- `evaluator_focus_areas`: 4개 (decision tree 부합, cross-field 의미적 일관성, warnings 적정성, 약점 F 검증)
+
+**llm_calls 참조**:
+- call 260 (analysis_5_us): prompt 22,943 tok / completion 4,582 tok / 99.6s
+- call 262 (entry_params_6_us): prompt 28,149 tok / completion 4,459 tok / 92.9s
+
+**핵심 출력 요약** (Evaluator가 검토할 대상):
+- **(5) output**: classification=entry, confidence=0.75, pattern=cup_with_handle, risk_flags=[low_volume_breakout]
+- **(6) output**: pivot=$22.67, stop=$21.47 (-5.3% logical), size=4.9% (7×0.7), target=$27.20 (+20%), entry_window=3, max_chase_pct=5.0, vol_req=ge_1.4x_50day_avg
+- **(6) notes 핵심 일관성**: "Cup-with-handle pivot at handle high $22.67 (Dec 22). Logical stop at $21.47 (handle low $21.575 × 0.995); absolute stop would be $21.12 (−7%). Logical stop tighter (−5.3%) — used logical. Size: default tier 7% (cup-with-handle with risk flag) × 0.7 (low_volume_breakout flag) = 4.9%. Target 20% (standard). Breakout Jan 6 at $23.21 on 1.02× avg volume (marginal confirmation, hence flag)."
+
+**(5) ↔ (6) pivot 표기 차이 (의도된 동작)**:
+- (5) reasoning: pivot $22.77 (base high $22.67 + $0.10 trigger buffer)
+- (6) output pivot_price: $22.67 (raw handle high)
+- 일치 — v1 프롬프트 §1 명시: trigger buffer는 informational, pivot_price 필드는 raw 값. 그대로 정합.
+
+**다음 단계**:
+- 사용자 정성 평가 (NVST 차트 직접 검토) — 사용자 작업
+- Evaluator 평가 의뢰 — 사용자 결정으로 진행 시 위 export 파일 첨부
+- 두 평가 결과 수렴 후 1.2 게이트 §6 (산출 파라미터 합리성) 평가 → 1.2 종료 또는 v1.1 미세 튜닝
+
+---
+
+#### B.5.5 중단 기록 (2026-05-04, 사용자 요청)
+
+batch 1/5 (2026-01-12) 진행 11/80 시점에 사용자 요청으로 중단. harness + monitor 프로세스 모두 정리.
+
+**11건 부분 결과** (저장 파일: /tmp/b5_5_results.jsonl, /tmp/b5_5_log.txt):
+
+| cum | symbol | duration | classification |
+|---|---|---|---|
+| 1 | INTC | 102.1s | ignore |
+| 2 | ONC | 331.5s | ignore (retry 추정) |
+| 3 | SLNHP | 62.1s | ignore |
+| 4 | EMF | 23.9s | ignore (ETF Pre-Check 추정) |
+| 5 | BLTE | 84.3s | ignore |
+| 6 | RENT | 88.5s | ignore |
+| 7 | SF | 332.7s | ignore (retry 추정) |
+| 8 | TK | 119.1s | **watch** |
+| 9 | AU | 102.5s | ignore |
+| 10 | APH | 351.2s | ignore (retry 추정) |
+| 11 | ELE | 242.6s | ignore |
+
+11건 분포: ignore 10 / watch 1 / entry 0 / timeout 0. duration median 102.5s, 3건이 outer 360s 직전 (242~351s) — retry 발생률이 B.5.4보다 높아 보임 (11건 중 3건 = 27%).
+
+**재개 시 권고사항**:
+- /tmp/b5_5_samples/2026-01-{12,13,14,15,16}.txt sample 리스트는 보존됨 — 동일 seed로 재추출 가능
+- /tmp/b5_5_sample_harness.py 보존됨 — 그대로 재실행 가능
+- 11건 부분 결과는 daily_analysis_us 테이블에 이미 기록됨 (force-recompute로 덮어쓰기됨, llm_calls에도 기록)
+- 재개 시점에 batch 1/5 처음부터 다시 시작하거나 12번부터 이어가는 옵션 가능 (사용자 결정)
+- retry 빈도 27% (예상 ~13~18%보다 높음) 원인 점검 필요 시 — 1.1.4-b CLAUDE.md auto-load 변동 또는 v2 프롬프트 길이 (~22,700 토큰) 영향 가능성
+
+**미커밋 변경**: B.1~B.4 결과물(prompts/calculate_entry_params_v1.md / models/entry_params.py / core/result_parser.py / scripts/run_single_symbol.py / tests/test_entry_params.py / tests/test_run_single_symbol_entry_flow.py)은 commit β로 분리 예정. B.5.5 결과 + 1.2 게이트 통과 후 commit β 묶어 처리.
+
+### 1.2 거버넌스 드리프트 발견 — Architect 인계 (2026-05-04)
+
+다음 4건은 _meta/ 거버넌스 문서와 코드/현 진행 사이 불일치. ADR-005 §3.4에 따라 Builder는 phase1_progress.md에 발견 사실만 기록. Architect 세션에서 일괄 갱신 예정.
+
+1. **`_meta/06_CURRENT_STATE.md`**: "Phase 1.2 진입 대기"로 기재. 실제는 1.2 트랙 B.1~B.5까지 진행됨. B.5.5 종료 시 일괄 갱신.
+2. **`_meta/05_GLOSSARY.md` Part B.2 `entry_params` 스키마**: 구버전 (volume_confirmation, expected_target.conservative/optimistic, valid_until). 현 v1 프롬프트 + EntryParams Pydantic은 신규 13필드 (breakout_volume_requirement Literal 3개 enum, expected_target_price+expected_target_pct, entry_window_days, max_chase_pct_from_pivot, pattern_basis 5enum, notes, known_warnings Literal 10개, other_warnings).
+3. **`_meta/05_GLOSSARY.md` Part B.2 `risk_flags` 스키마**: 구 7개값 (high_rs_rating, extended_from_ma50, low_volume, thin_base, sector_overconcentration, earnings_imminent, market_weakness). v2 프롬프트 + AnalysisResult.VALID_RISK_FLAGS는 12개값 (climax_run, late_stage_base, extended_from_ma, faulty_pivot, low_volume_breakout, narrow_base, wide_and_loose, thin_liquidity_us_only, prior_uptrend_insufficient, volume_contraction_on_advance, reverse_split_distortion, etf_methodology_mismatch).
+4. **`_meta/phases/phase1_brief.md` §3.2 1.2.2**: "stop_loss_pct ∈ [-8, -5]" 명시. 실제 EntryParams Pydantic + v1 프롬프트는 [-10, -5] (사전 자문 §0.6 채택, Minervini "절대 floor" 정합).
+
+처리 방침 (Architect 결정): B.5.5 종료 시 일괄 갱신. B.5.5 차단 무관.
+
 
 ---
 

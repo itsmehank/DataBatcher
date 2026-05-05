@@ -27,8 +27,8 @@ from core.config import load_settings
 from core.data_loader import get_screened_symbols, load_symbol_payload
 from core.db import make_session_factory
 from core.llm_call_recorder import call_and_record
-from core.prompt_builder import build_analyze_chart_prompt
-from core.result_parser import ParseError, parse_analysis_result
+from core.prompt_builder import build_analyze_chart_prompt, build_entry_params_prompt
+from core.result_parser import ParseError, parse_analysis_result, parse_entry_params_response
 from models.db_models import DailyAnalysisKR, DailyAnalysisUS
 
 
@@ -43,6 +43,8 @@ def _parse_args() -> argparse.Namespace:
                         help="LLM 호출 없이 페이로드 구성·출력만 수행")
     parser.add_argument("--force-recompute", action="store_true",
                         help="이미 결과 있어도 재호출 (캐시 무시)")
+    parser.add_argument("--with-entry-params", action="store_true",
+                        help="(5)가 entry로 분류 시 (6) calculate_entry_params 자동 호출 (Phase 1.2)")
     return parser.parse_args()
 
 
@@ -69,8 +71,13 @@ def _already_exists(db_session, symbol: str, target_date: date, region: str) -> 
 
 
 def _save_result(db_session, symbol: str, target_date: date, region: str,
-                 analysis, payload: dict, llm_call_id: int) -> None:
-    """분석 결과를 daily_analysis_kr/us에 저장 (upsert — 기존 행 삭제 후 재삽입)."""
+                 analysis, payload: dict, llm_call_id: int,
+                 entry_params: dict | None = None) -> None:
+    """분석 결과를 daily_analysis_kr/us에 저장 (upsert — 기존 행 삭제 후 재삽입).
+
+    entry_params: (6) 호출 결과 dict (model_dump). known_warnings + other_warnings 두 키
+    분리 저장. 미호출 또는 비-entry 분류 시 None.
+    """
     tbl = "daily_analysis_kr" if region == "KR" else "daily_analysis_us"
     # 기존 행 삭제 (force-recompute 시)
     db_session.execute(text(
@@ -87,12 +94,60 @@ def _save_result(db_session, symbol: str, target_date: date, region: str,
         reasoning=analysis.reasoning,
         pattern=analysis.pattern,
         risk_flags=analysis.risk_flags or None,
-        entry_params=None,
+        entry_params=entry_params,
         screen_config_hash=payload.get("screen_config_hash"),
         llm_call_id=llm_call_id or None,
     )
     db_session.add(row)
     db_session.commit()
+
+
+def _call_entry_params(backend, db_session, settings, payload, analysis, region):
+    """(6) calculate_entry_params 호출.
+
+    Returns:
+        (entry_params_dict, call_id) 튜플. 실패 시 (None, call_id_or_None).
+    """
+    anthropic_cfg = settings.get("anthropic", {})
+    model = anthropic_cfg.get("model_analysis", "claude-sonnet-4-6")
+    max_tokens = anthropic_cfg.get("max_tokens", 2000)
+    retry_cfg = anthropic_cfg.get("retry", {})
+    max_retries = retry_cfg.get("max_attempts", 3) - 1
+    backoff = retry_cfg.get("backoff_base_sec", 2)
+
+    prior = analysis.model_dump()
+    prompt = build_entry_params_prompt(payload, prior, settings)
+
+    module_label = "entry_params_6_kr" if region == "KR" else "entry_params_6_us"
+
+    response, call_id = call_and_record(
+        backend, db_session, prompt, model, max_tokens, module_label,
+        max_retries=max_retries, retry_delay_seconds=backoff,
+    )
+    if response.error:
+        print(f"[ERROR] (6) LLM 호출 실패: {response.error}", file=sys.stderr)
+        return None, call_id
+
+    # 1회 재시도 fallback (analyze_chart 동일 패턴)
+    for attempt in range(2):
+        try:
+            entry = parse_entry_params_response(response.text)
+            return entry.model_dump(mode="json"), call_id
+        except ParseError as exc:
+            if attempt == 0:
+                print(f"[WARN] (6) 파싱 실패, 1회 재시도: {exc}", file=sys.stderr)
+                response, call_id = call_and_record(
+                    backend, db_session, prompt, model, max_tokens, module_label,
+                    max_retries=0, retry_delay_seconds=0,
+                )
+                if response.error:
+                    print(f"[ERROR] (6) 재시도 LLM 호출 실패: {response.error}", file=sys.stderr)
+                    return None, call_id
+            else:
+                print(f"[ERROR] (6) 파싱 2회 실패 — entry_params NULL로 저장. {exc}", file=sys.stderr)
+                return None, call_id
+
+    return None, call_id
 
 
 def main() -> None:
@@ -182,8 +237,22 @@ def main() -> None:
         if analysis is None:
             sys.exit(1)
 
-        # 결과 저장
-        _save_result(db_session, args.symbol, target_date, args.region, analysis, payload, call_id)
+        # (6) calculate_entry_params 호출 — Phase 1.2
+        entry_params_dict: dict | None = None
+        entry_call_id: int | None = None
+        if args.with_entry_params and analysis.classification == "entry":
+            print(f"[INFO] (5) classification=entry → (6) calculate_entry_params 호출")
+            entry_params_dict, entry_call_id = _call_entry_params(
+                backend, db_session, settings, payload, analysis, args.region,
+            )
+        elif args.with_entry_params:
+            print(f"[INFO] --with-entry-params 지정됐으나 classification={analysis.classification} → (6) 스킵")
+
+        # 결과 저장 (entry_params 포함)
+        _save_result(
+            db_session, args.symbol, target_date, args.region,
+            analysis, payload, call_id, entry_params=entry_params_dict,
+        )
 
         # stdout 출력
         result_dict = analysis.model_dump()
@@ -194,6 +263,9 @@ def main() -> None:
         result_dict["completion_tokens"] = response.completion_tokens
         result_dict["cost_usd"] = float(response.cost_usd) if response.cost_usd else None
         result_dict["duration_ms"] = response.duration_ms
+        if entry_params_dict is not None:
+            result_dict["entry_params"] = entry_params_dict
+            result_dict["entry_params_llm_call_id"] = entry_call_id
         print(json.dumps(result_dict, indent=2, ensure_ascii=False, default=str))
 
     finally:
