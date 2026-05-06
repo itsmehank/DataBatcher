@@ -310,7 +310,7 @@ def main(argv=None) -> int:
 
     # Build indicator pipeline (US Index weekly)
     weekly_cfg = cfg.get('indicators_us_index_weekly', {})
-    pipeline_specs = [IndicatorSpec(**spec) for spec in weekly_cfg.get('pipeline', [])]
+    pipeline_specs = [IndicatorSpec(**spec) for spec in (weekly_cfg.get('pipeline') or [])]
     pipeline = IndicatorPipeline(pipeline_specs)
 
     # Initialize saver
