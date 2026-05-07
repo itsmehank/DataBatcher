@@ -54,7 +54,7 @@ modules:
 # 프롬프트 버전 — 버전 변경 시 새 파일 생성 + ADR 기록 (brief §6.4)
 prompts:
   analyze_chart: "v2"
-  calculate_entry_params: "v1"
+  calculate_entry_params: "v1_1"
 
 # 입력 데이터 범위
 input_data:

@@ -62,8 +62,11 @@ def _make_analysis(classification: str = "entry") -> AnalysisResult:
 def _valid_entry_params_json() -> str:
     return json.dumps({
         "pivot_price": 192.50,
+        "trigger_price": 192.69,
+        "current_price": 192.30,
         "stop_loss_price": 178.96,
-        "stop_loss_pct": -7.0,
+        "stop_loss_pct_from_pivot": -7.0,
+        "stop_loss_pct_from_current_price": -6.9,
         "suggested_weight_pct": 10.0,
         "expected_target_price": 231.00,
         "expected_target_pct": 20.0,
@@ -71,6 +74,7 @@ def _valid_entry_params_json() -> str:
         "entry_window_days": 3,
         "max_chase_pct_from_pivot": 5.0,
         "breakout_volume_requirement": "ge_1.4x_50day_avg",
+        "observed_breakout_volume_ratio": None,
         "notes": "Flat base 7 weeks. Stop bound by absolute -7%. Standard tier 10%, no flags. Target 20% default.",
         "known_warnings": [],
         "other_warnings": [],
