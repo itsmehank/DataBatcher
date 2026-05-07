@@ -1,8 +1,8 @@
 # DataBatcher Database Schema
-**Last Updated**: 2026-02-26
+**Last Updated**: 2026-05-07
 **Database**: MySQL 8.0
 **Charset**: utf8mb4
-**Schema Source**: `db/init/01_schema.sql` + running DB (`information_schema`/`SHOW CREATE`)
+**Schema Source**: `db/init/01_schema.sql` + running DB (`information_schema`/`SHOW CREATE`) + `db/migrations/` (Alembic + raw SQL)
 
 ---
 
@@ -19,11 +19,13 @@
 10. [Crypto Tables](#crypto-tables)
 11. [Crypto Weekly Tables](#crypto-weekly-tables)
 12. [Minervini Screen Tables](#minervini-screen-tables)
-13. [System Tables](#system-tables)
-14. [Database Views](#database-views)
-15. [Scripts and Tables Mapping](#scripts-and-tables-mapping)
-16. [Index Strategy](#index-strategy)
-17. [Data Types and Precision](#data-types-and-precision)
+13. [LLM Analysis Tables](#llm-analysis-tables)
+14. [Auth & User Tables](#auth--user-tables)
+15. [System Tables](#system-tables)
+16. [Database Views](#database-views)
+17. [Scripts and Tables Mapping](#scripts-and-tables-mapping)
+18. [Index Strategy](#index-strategy)
+19. [Data Types and Precision](#data-types-and-precision)
 
 ---
 
@@ -61,13 +63,19 @@
 | 26 | `crypto_indicators_weekly` | Crypto | Weekly | - | `indicators_crypto_weekly` |
 | 27 | `minervini_screen_results_kr` | KR | Daily | - | `minervini_kr` |
 | 28 | `minervini_screen_results_us` | US | Daily | - | `minervini_us` |
-| 29 | `metrics` | System | - | - | - |
-| 30 | `sync_log` | System | - | - | - |
-| 31 | `watchlist_items` | Utility | - | - | - |
+| 29 | `daily_analysis_kr` | KR | Daily | - | LLM (Phase 1) |
+| 30 | `daily_analysis_us` | US | Daily | - | LLM (Phase 1) |
+| 31 | `llm_calls` | System | - | - | LLM call log (헌법 §2.5) |
+| 32 | `users` | Auth | - | - | - |
+| 33 | `minervini_list_selection` | UI | - | - | - |
+| 34 | `sync_log` | System | - | - | ETL + LLM monitoring |
+| 35 | `kr_sector_snapshot` | KR | Daily | - | - |
+| 36 | `watchlist_items` | Legacy | - | - | (미사용 — Phase 6에서 제거 검토) |
+| 37 | `alembic_version` | System | - | - | Alembic migration tracker |
 
-\* `kr_sector_snapshot`는 init SQL/문서에는 정의되어 있으나, 현재 실행 중인 DB(`trade`)에는 생성되지 않은 상태입니다.
-
-> Running DB 기준 객체 수: **BASE TABLE 30개 + VIEW 10개**
+> Running DB 기준 객체 수 (DEV, 2026-05-07): **BASE TABLE 36개 + VIEW 10개**.
+> 과거 `metrics` 테이블은 제거됨. Phase 1에서 `daily_analysis_kr/us`, `llm_calls` 신설(ADR-009).
+> P0.5에서 `minervini_screen_results_*`에 `conditions_met JSON` 컬럼 추가(ADR-009 결정 3).
 
 ### Database Configuration
 ```yaml
@@ -187,9 +195,9 @@ CREATE TABLE stock_indicators (
 
 ### kr_sector_snapshot
 
-**Purpose**: KR 섹터/시장 기준 스냅샷 및 스크리닝 결과 저장
+**Purpose**: KR 섹터/시장 기준 스냅샷 (일별 집계, Grafana 등에서 참조용)
 
-> **Status (running DB)**: 현재 실행 중인 DB(`trade`)에는 테이블이 생성되어 있지 않음. (init SQL에는 정의됨)
+> **Status (running DB, 2026-05-07)**: 테이블 존재. `apps/ingest-databatcher/ops/shell/refresh_kr_sector_snapshot.sh`로 갱신.
 
 ```sql
 CREATE TABLE kr_sector_snapshot (
@@ -803,6 +811,7 @@ CREATE TABLE minervini_screen_results_kr (
   market             VARCHAR(16)  NOT NULL,      -- KOSPI / KOSDAQ / ETF
   rs_rating          DECIMAL(5,1) NULL,
   is_blue_dot        TINYINT      NULL,
+  conditions_met     JSON         NULL,           -- ADR-009 (P0.5 추가): per-condition pass/fail map
   screen_config_hash CHAR(40)     NOT NULL,
   failed_reason      VARCHAR(512) NULL,
   created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -819,6 +828,7 @@ CREATE TABLE minervini_screen_results_kr (
 | market | VARCHAR(16) | 시장 구분 | `KOSPI`, `KOSDAQ`, `ETF` |
 | rs_rating | DECIMAL(5,1) | IBD RS Rating (1~99) | `85.2` |
 | is_blue_dot | TINYINT | Blue Dot 신호 (0/1) | `1` |
+| conditions_met | JSON | 미너비니 8조건 통과 여부 (ADR-009) | `{"price_above_ma150_ma200": true, ...}` |
 | screen_config_hash | CHAR(40) | 스크리닝 설정 해시 (PK) | `abc123...` |
 | failed_reason | VARCHAR(512) | 탈락 사유 (미사용, NULL) | NULL |
 | created_at | TIMESTAMP | 레코드 생성 시각 | `2026-02-07 17:00:00` |
@@ -831,10 +841,17 @@ CREATE TABLE minervini_screen_results_kr (
 
 **Storage**: 통과 종목만 저장 (탈락 종목은 저장하지 않음)
 
+**`conditions_met` JSON 키** (8개, ADR-009 / `_meta/05_GLOSSARY.md` Part B.2):
+```
+price_above_ma150_ma200, ma150_above_ma200, ma200_uptrend_1mo,
+ma50_above_ma150_ma200, price_above_ma50, price_30pct_above_52w_low,
+price_within_25pct_of_52w_high, rs_rating_above_70
+```
+
 **Config Key**: `minervini_kr`
 
 **Related Scripts**:
-- `scripts/kr_minervini_update.py` — 스크리닝 배치 실행
+- `scripts/kr_minervini_update.py` — 스크리닝 배치 실행 (ADR-013 ETF 제외 적용)
 
 ---
 
@@ -849,6 +866,7 @@ CREATE TABLE minervini_screen_results_us (
   market             VARCHAR(16)  NOT NULL,      -- NYSE / NASDAQ / ETF
   rs_rating          DECIMAL(5,1) NULL,
   is_blue_dot        TINYINT      NULL,
+  conditions_met     JSON         NULL,           -- ADR-009 (P0.5 추가): per-condition pass/fail map
   screen_config_hash CHAR(40)     NOT NULL,
   failed_reason      VARCHAR(512) NULL,
   created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -864,6 +882,7 @@ CREATE TABLE minervini_screen_results_us (
 | market | VARCHAR(16) | 시장 구분 | `NYSE`, `NASDAQ`, `ETF` |
 | rs_rating | DECIMAL(5,1) | IBD RS Rating (1~99) | `92.5` |
 | is_blue_dot | TINYINT | Blue Dot 신호 (0/1) | `1` |
+| conditions_met | JSON | 미너비니 8조건 통과 여부 (ADR-009) | (KR과 동일 8키) |
 | screen_config_hash | CHAR(40) | 스크리닝 설정 해시 (PK) | `abc123...` |
 | failed_reason | VARCHAR(512) | 탈락 사유 (미사용, NULL) | NULL |
 | created_at | TIMESTAMP | 레코드 생성 시각 | `2026-02-07 07:00:00` |
@@ -878,30 +897,171 @@ CREATE TABLE minervini_screen_results_us (
 **Config Key**: `minervini_us`
 
 **Related Scripts**:
-- `scripts/us_minervini_update.py` — 스크리닝 배치 실행
+- `scripts/us_minervini_update.py` — 스크리닝 배치 실행 (ADR-013 ETF 제외 적용)
+
+---
+
+## LLM Analysis Tables
+
+> Phase 1 (ADR-009)에서 신설. 미너비니 통과 종목에 대해 LLM이 차트 분석·분류와 진입 파라미터를 산출한다.
+> 헌법 §2.2 준수: `apps/llm-analysis/`는 `apps/ingest-databatcher/` 함수를 import하지 않으며 본 테이블들을 통해 DB 레벨로만 연결된다.
+
+### daily_analysis_kr
+
+**Purpose**: KR 주식 일일 LLM 분석 결과 (5) `analyze_chart` + (6) `calculate_entry_params`
+
+```sql
+CREATE TABLE daily_analysis_kr (
+  symbol             VARCHAR(32)  NOT NULL,
+  date               DATE         NOT NULL,
+  market             VARCHAR(16)  NOT NULL,      -- KOSPI / KOSDAQ / ETF
+  classification     VARCHAR(20)  NOT NULL,      -- entry / watch / ignore
+  confidence         DECIMAL(3,2) NULL,          -- 0.00 ~ 1.00
+  reasoning          TEXT         NULL,          -- LLM 자연어 근거
+  pattern            VARCHAR(50)  NULL,          -- VCP / flat_base / cup_handle / 3c_cheat / double_bottom / none
+  risk_flags         JSON         NULL,          -- 12개 화이트리스트 (Phase 1.1.15 v2)
+  entry_params       JSON         NULL,          -- v1.1 16필드 (Phase 1.3.0)
+  screen_config_hash CHAR(40)     NULL,
+  llm_call_id        BIGINT       NULL,          -- llm_calls.id 소프트 외래키
+  created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (symbol, date),
+  KEY idx_date_class (date, classification),
+  KEY idx_date_market (date, market)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+**Primary Key**: `(symbol, date)` — KR/US 분리이므로 region 컬럼 불필요 (ADR-009)
+
+**JSON 스키마**: `_meta/05_GLOSSARY.md` Part B.2 참조 (`risk_flags` 12 whitelist + `entry_params` v1.1 16필드)
+
+**Related Scripts** (Phase 1.3):
+- `apps/llm-analysis/scripts/run_daily_analysis.py --region KR` — 일일 배치 진입점
+- `apps/llm-analysis/scripts/run_single_symbol.py --region KR` — 단일 종목 디버깅
+- `apps/llm-analysis/scripts/show_cost_summary.py` — 호출 통계 점검
+
+---
+
+### daily_analysis_us
+
+**Purpose**: US 주식 일일 LLM 분석 결과. `daily_analysis_kr`와 구조 동일, `market` 값만 NYSE/NASDAQ/ETF.
+
+```sql
+CREATE TABLE daily_analysis_us (
+  symbol             VARCHAR(32)  NOT NULL,
+  date               DATE         NOT NULL,
+  market             VARCHAR(16)  NOT NULL,      -- NYSE / NASDAQ / ETF
+  classification     VARCHAR(20)  NOT NULL,
+  confidence         DECIMAL(3,2) NULL,
+  reasoning          TEXT         NULL,
+  pattern            VARCHAR(50)  NULL,
+  risk_flags         JSON         NULL,
+  entry_params       JSON         NULL,
+  screen_config_hash CHAR(40)     NULL,
+  llm_call_id        BIGINT       NULL,
+  created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (symbol, date),
+  KEY idx_date_class (date, classification),
+  KEY idx_date_market (date, market)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+---
+
+### llm_calls
+
+**Purpose**: 모든 LLM 호출의 영구 보존 (헌법 §2.5 — "모든 LLM 출력은 구조화된 형식으로 저장")
+
+```sql
+CREATE TABLE llm_calls (
+  id                BIGINT PRIMARY KEY AUTO_INCREMENT,
+  timestamp         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  module            VARCHAR(50),                  -- analysis_5_kr | analysis_5_us | entry_params_6_kr | entry_params_6_us | agent_8 ...
+  model             VARCHAR(50),                  -- claude-sonnet-4-5 등
+  prompt_tokens     INT,
+  completion_tokens INT,
+  cost_usd          DECIMAL(10,6),                -- CLI 백엔드는 NULL 또는 참고값 (ADR-011 §3)
+  request_payload   JSON,
+  response_payload  JSON,
+  duration_ms       INT,
+  error             TEXT NULL,
+  KEY idx_timestamp (timestamp),
+  KEY idx_module_timestamp (module, timestamp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+**용도**:
+- 사후 검증·디버깅·통계 (헌법 §2.5)
+- ADR-012 §3.4 호출 로그 주간 점검 (`show_cost_summary.py`)
+- ADR-012 §3.1 일일 호출 상한 카운트 source
+
+---
+
+## Auth & User Tables
+
+### users
+
+**Purpose**: 트레이딩 뷰 프로젝트(`apps/trading-view-project/`) 인증 사용자 마스터
+
+```sql
+CREATE TABLE users (
+  id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  username            VARCHAR(64)  NOT NULL,
+  password_hash       VARCHAR(255) NOT NULL,
+  role                VARCHAR(16)  NOT NULL DEFAULT 'viewer',  -- viewer | editor (CHECK constraint)
+  is_active           TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  last_login_at       DATETIME     NULL,
+  failed_login_count  INT UNSIGNED NOT NULL DEFAULT 0,
+  locked_until        DATETIME     NULL,
+  password_changed_at DATETIME     NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_users_username (username),
+  CONSTRAINT chk_user_role CHECK (role IN ('viewer','editor'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+**Used by**: `apps/trading-view-project/` (FastAPI auth + frontend login)
+
+---
+
+### minervini_list_selection
+
+**Purpose**: 미너비니 통과 종목에 대한 사용자 분류 상태 (focus / action / pass) — 진입 후보 picking 워크플로
+
+```sql
+CREATE TABLE minervini_list_selection (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  region       VARCHAR(8)   NOT NULL,           -- KR | US (CHECK 미적용, 코드 enforce)
+  date         DATE         NOT NULL,
+  market       VARCHAR(32)  NOT NULL,
+  symbol       VARCHAR(32)  NOT NULL,
+  list_type    VARCHAR(16)  NOT NULL,           -- focus | action | pass (CHECK constraint)
+  trigger_price DECIMAL(18,4) NULL,             -- ≥ 0 (CHECK)
+  stop_price    DECIMAL(18,4) NULL,             -- ≥ 0 (CHECK)
+  status_tag   VARCHAR(32)  NULL,               -- A | B | C | D | E
+  memo         TEXT NULL,
+  updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_minervini_list_selection (region, date, market, symbol),
+  KEY idx_minervini_list_selection_lookup (region, date, list_type),
+  CONSTRAINT chk_minervini_list_type CHECK (list_type IN ('focus','action','pass')),
+  CONSTRAINT chk_trigger_price_nonneg CHECK (trigger_price IS NULL OR trigger_price >= 0),
+  CONSTRAINT chk_stop_price_nonneg    CHECK (stop_price    IS NULL OR stop_price    >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+**Used by**: `apps/trading-view-project/` (사용자가 차트에서 진입 트리거·손절 설정)
+
+**Note**: Phase 6에서 `order_reservations`와의 관계 정리 + `watchlist_items`(legacy)와 통합 검토 예정.
 
 ---
 
 ## System Tables
 
-### metrics
-
-**Purpose**: Grafana 등에서 사용하는 범용 메트릭 저장 테이블
-
-```sql
-CREATE TABLE metrics (
-  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-  metric_name   VARCHAR(255) NOT NULL,
-  metric_value  DOUBLE NOT NULL,
-  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
-
----
-
 ### sync_log
 
-**Purpose**: ETL 작업 실행 로그 (Reserved, 미구현)
+**Purpose**: ETL 작업 실행 로그 + LLM 분석 모니터링 이벤트 (ADR-012 §3.2)
 
 ```sql
 CREATE TABLE sync_log (
@@ -912,18 +1072,43 @@ CREATE TABLE sync_log (
   start_time    DATETIME NOT NULL,
   end_time      DATETIME NULL,
   rows_processed INT DEFAULT 0,
-  status        VARCHAR(16) NOT NULL,      -- SUCCESS / FAIL / PARTIAL
+  status        VARCHAR(16) NOT NULL,      -- success / failed / running / WARN / ERROR
   message       VARCHAR(1024) NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_job_market_time (job_name, market, start_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
+**Active jobs (status 값)**:
+- ETL 적재(`success`/`failed`/`running`) — Phase 0 이후 사용
+- LLM 분석 모니터링(`WARN`/`ERROR`) — Phase 1.3.2부터 사용:
+  - `llm_analysis_kr` / `llm_analysis_us` — 일일 분석 배치 마커
+  - `llm_daily_call_limit` — 일일 호출 한도 도달 (ADR-012 §3.1)
+  - `llm_terms_violation_signal` — 약관 위반 징후 패턴 매치 (ADR-012 §3.3)
+  - `llm_token_spike` — 프롬프트 토큰 폭증 감지 (1.1.7 후속, ADR-012 §3.2)
+
+---
+
+### alembic_version
+
+**Purpose**: Alembic 마이그레이션 버전 트래커
+
+```sql
+CREATE TABLE alembic_version (
+  version_num VARCHAR(32) NOT NULL,
+  PRIMARY KEY (version_num)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**State (DEV, 2026-05-07)**: head = `20260424_000001` (P0.5 시점 stamp). Phase 1 마이그레이션(`20260428_000001_add_daily_analysis_and_llm_calls`)은 raw SQL 직접 적용 — DEV·PROD `alembic_version` 동기화는 미해결 이슈 §G로 추적 중 (`_meta/06_CURRENT_STATE.md`).
+
 ---
 
 ### watchlist_items
 
-**Purpose**: 사용자별 관심 종목(Watchlist) 및 상태 그룹 저장
+**Purpose**: 사용자별 관심 종목(legacy, 미사용)
+
+> **Status**: 본 테이블은 과거 설계의 잔존 테이블. 현재 로직에서 호출되지 않으며, Phase 6에서 `order_reservations` 설계 시 `minervini_list_selection`과 통합 또는 제거 결정 예정.
 
 ```sql
 CREATE TABLE watchlist_items (
@@ -1061,6 +1246,21 @@ SELECT * FROM v_crypto_price_weekly_with_ma WHERE symbol = 'BTCUSDT' ORDER BY we
 | `crypto_daily_update.py` | Binance API | `crypto_prices_daily`, `crypto_indicators_daily` | Daily |
 | `crypto_bulk_update_weekly.py` | `crypto_prices_daily` | `crypto_prices_weekly`, `crypto_indicators_weekly` | Initial |
 | `crypto_weekly_update.py` | `crypto_prices_daily` | `crypto_prices_weekly`, `crypto_indicators_weekly` | Weekly |
+
+### LLM Analysis (Phase 1, `apps/llm-analysis/`)
+
+본 앱은 헌법 §2.2에 따라 `apps/ingest-databatcher/` 함수를 import하지 않고 DB만 공유한다.
+
+| Script | Reads From | Writes To | Frequency |
+|--------|-----------|-----------|-----------|
+| `scripts/run_daily_analysis.py` | `minervini_screen_results_kr/us`, `stock_prices`, `us_stock_prices`, `*_indicators`, `*_symbol_master` | `daily_analysis_kr` 또는 `daily_analysis_us`, `llm_calls`, `sync_log` | Daily (Task Scheduler, ADR-012) |
+| `scripts/run_single_symbol.py` | (위와 동일, 단일 종목) | (위와 동일) | On-demand |
+| `scripts/show_cost_summary.py` | `llm_calls`, `sync_log` | (read-only) | Weekly check |
+| `scripts/backfill_analysis.py` | (위와 동일) | (위와 동일) | On-demand |
+
+**Task Scheduler 등록** (ADR-012, Q-003):
+- `LLMAnalysis_US` — 매일 16:00 KST → `ops/scheduler/windows/run_analysis_today.ps1 -Region US`
+- `LLMAnalysis_KR` — 매일 21:00 KST → `ops/scheduler/windows/run_analysis_today.ps1 -Region KR`
 
 ---
 

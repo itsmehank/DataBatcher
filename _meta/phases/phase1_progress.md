@@ -1090,6 +1090,7 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 | §K (5) v2 분류 보수성 | NVST 운영자 시각 평가 | 1.3.9 entry 분류 종목들의 RS/breakout volume/lone signal 분포 추적 예정 |
 | §L (6) v1.1 fix | 1.3.0 완료 — auto-emit 검증 통과 | 1.3.9 누적에서 두 auto-warning 자연 발생률 모니터링 |
 | §M EA 분류 불안정 | EA 1/13~1/15 3회 평가 모두 다름 | **NVST도 추가 사례** (B.5.5 entry → 2026-05-07 ignore) |
+| §N database_schema.md 드리프트 | 다른 세션 발견 (2026-05-07) | `apps/ingest-databatcher/docs/database_schema.md` (Last Updated 2026-02-26)가 운영 DB 실제 상태와 불일치. 누락 테이블: `daily_analysis_kr`, `daily_analysis_us`, `llm_calls`, `users`, `minervini_list_selection`, `alembic_version`. 삭제된 테이블 `metrics`가 문서에 잔존. 신규 컬럼 `conditions_met` 누락. `kr_sector_snapshot` 설명 잘못됨. **2026-05-07 본 세션에서 즉시 갱신 처리** — TOC + Table Summary 갱신, LLM Analysis Tables / Auth & User Tables 신규 섹션 추가, `conditions_met` 컬럼 + 8 키 명시, `metrics` 제거 (historical note만 잔존), `sync_log` "ETL + LLM 모니터링" 갱신, `kr_sector_snapshot` "테이블 존재" 정정, Scripts mapping에 LLM Analysis 추가. 1125 → 1325 lines. |
 
 ### 1.3.1~1.3.8 — 메인 진입점 + 모니터링 + 통제권 + Q-003 등록 (2026-05-07)
 
