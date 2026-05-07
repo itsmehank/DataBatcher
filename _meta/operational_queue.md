@@ -49,6 +49,69 @@
 
 ## 대기 중인 작업
 
+### Q-004: us_symbol_master ETF 정정 12건 — symbol_type STOCK→ETF 정정 (등록: 2026-05-08)
+
+**배경**: ADR-013은 Minervini 스크리너에서 ETF를 upstream 필터로 제외하나, us_symbol_master에서 12개 종목이 `symbol_type='STOCK'`으로 잘못 분류되어 필터를 우회함. LLM Pre-Check가 `etf_methodology_mismatch` (conf=1.00)로 안전망 역할을 수행 중 — 즉각 위험 없음. 1.3.10 정성 평가 중 발견 (§10.4 1번 예외로 Builder 직접 등록).  
+**관련 ADR**: ADR-013 (ETF 제외 정책) — Phase 2에서 Architect 세션이 ADR-013 확장(스크리너 upstream 필터 보강)과 함께 처리.  
+**위험도**: 낮음 (UPDATE — 12행 symbol_type 변경, 롤백 가능)  
+**예상 소요**: 5분 미만 (SQL 1건 + 미너비니 스크리너 재실행 확인)  
+**우선순위**: 보통 (LLM Pre-Check 안전망 작동 중이므로 즉시 처리 불필요; Phase 1 종료 후 Architect 세션에서 ADR-013 확장과 함께 처리)  
+**타이밍 윈도우**: US cron(08:00~14:00) 직후를 피하면 어느 시각이든 안전
+
+**대상 종목 (12건)**:
+
+| 심볼 | 현재 symbol_type | 정정 후 |
+|---|---|---|
+| VRTL | STOCK | ETF |
+| SOXL | STOCK | ETF |
+| MVLL | STOCK | ETF |
+| MUU | STOCK | ETF |
+| MULL | STOCK | ETF |
+| AMDG | STOCK | ETF |
+| AMDL | STOCK | ETF |
+| AMUU | STOCK | ETF |
+| KORU | STOCK | ETF |
+| INTW | STOCK | ETF |
+| DLLL | STOCK | ETF |
+| BWET | STOCK | ETF |
+
+**적용 절차**:
+
+```powershell
+# 1. 사전 확인 — 12건 STOCK 분류 현황
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
+  -e "SELECT symbol, symbol_type FROM trade.us_symbol_master WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') ORDER BY symbol;"
+
+# 2. UPDATE 실행
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" trade `
+  -e "UPDATE us_symbol_master SET symbol_type = 'ETF' WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') AND symbol_type = 'STOCK';"
+
+# 3. 적용 후 확인 — 12건 모두 ETF로 변경됨 확인
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
+  -e "SELECT symbol, symbol_type FROM trade.us_symbol_master WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') ORDER BY symbol;"
+
+# 4. (선택) Minervini 스크리너 재실행 — 12건이 스크리너 결과에서 제외되는지 확인
+#    Phase 2 Architect 세션에서 ADR-013 확장 정책 확정 후 지시에 따라 실행
+```
+
+**완료 기준**:
+- 12건 `symbol_type` 모두 `ETF`로 변경됨 (SELECT 결과 확인)
+- (선택) `us_minervini_update.py` 재실행 후 12건이 Minervini 스크리너 대상에서 제외됨
+
+**롤백 방법**:
+
+```powershell
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" trade `
+  -e "UPDATE us_symbol_master SET symbol_type = 'STOCK' WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') AND symbol_type = 'ETF';"
+```
+
+**메모**:
+- 발견 경위: 1.3.10 정성 평가 중 daily_analysis_us에서 `etf_methodology_mismatch` warn 12건 확인. LLM Pre-Check가 conf=1.00으로 정확히 포착 — ADR-013 안전망 작동 중.
+- 근본 원인: us_sync_symbol_master.py가 외부 소스(FDR/yfinance)에서 가져온 데이터에서 ETF가 STOCK으로 잘못 분류됨. ADR-013 upstream 필터 보강(Phase 2)으로 재발 방지 예정.
+- 본 큐 항목은 §10.4 1번 예외에 따라 1.3 단계 한정으로 Builder가 직접 등록.
+
+---
+
 ### Q-003: Phase 1 LLM 분석 모듈 운영 환경 적용 — Task Scheduler 등록 + 첫 자동 실행 검증 (등록: 2026-05-07)
 
 **관련 commit**: `phase1/1.3-daily-analysis` 브랜치 머지 commit (머지 후 hash 기입). 1.3 작업 진입 시점 HEAD = `2ba0ef4`. 1.3.0~1.3.8 commits include `c2114f7` (v1.1 fix), `2ba0ef4` (progress 기록), 1.3.1~1.3.8 후속 commit.
