@@ -50,13 +50,13 @@
 9. ✅ commit β `dd09e2d` 봉인 (2026-05-05)
 
 **Phase 1.3 시작 조건**:
-- [ ] 거버넌스 드리프트 6건 갱신 commit (본 작업 중)
-- [ ] (6) v1.1 fix 3가지 구현 (Builder 세션, 1.3 코드 작업과 함께)
+- [x] 거버넌스 드리프트 6건 갱신 commit `92a8b77` (2026-05-07 봉인)
+- [x] 1.3 시작 프롬프트 작성 (Architect 세션, 산출물 (a) Builder 인계 프롬프트 + (b) Q-003 운영 큐 텍스트 초안)
+- [ ] (6) v1.1 fix 3가지 구현 (Builder 세션, 1.3.0 단계로 분리)
   - stop_pct dual reporting (pivot 기준 + 매수가 기준)
   - breakout_volume vs observed mismatch 시 known_warnings 자동 발행
   - (5)/(6) pivot 가격 일치성 schema fix
-- [ ] Q-002 운영 환경 적용 (PROD에 daily_analysis_kr/us, llm_calls 테이블 생성)
-- [ ] 1.3 시작 프롬프트 작성 (Architect 세션, 본 작업 후속)
+- [ ] Q-002 운영 환경 적용 (PROD에 daily_analysis_kr/us, llm_calls 테이블 생성, 1.3.0 시작 직전 또는 1.3.7 Task Scheduler 등록 직전까지 완료 필요)
 
 ---
 
@@ -357,4 +357,4 @@
 
 ---
 
-*마지막 업데이트: 2026-05-05 (Phase 1.2 트랙 A·B 완료, NVST 두 차례 Evaluator 평가, 1.2 게이트 통과, 1.3 진입 대기 — (6) v1.1 fix 3가지 선행 필요)*
+*마지막 업데이트: 2026-05-07 (Phase 1.3 진입 가이드 작성 완료 — Architect 세션 산출: Builder 인계 프롬프트 + Q-003 운영 큐 텍스트 초안. 거버넌스 드리프트 6건 갱신 commit `92a8b77` 봉인. (6) v1.1 fix 3가지 + Q-002 PROD 적용은 1.3 단계 진행 중 처리)*
