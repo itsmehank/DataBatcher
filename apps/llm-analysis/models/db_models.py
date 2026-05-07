@@ -77,3 +77,33 @@ class DailyAnalysisUS(Base):
     screen_config_hash: Mapped[Optional[str]]  = mapped_column(String(40))
     llm_call_id:        Mapped[Optional[int]]  = mapped_column(BigInteger)
     created_at:         Mapped[datetime]       = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
+class SyncLog(Base):
+    """
+    sync_log 테이블 ORM 모델 (read+write).
+
+    ingest-databatcher의 결정론 코어가 사용하는 같은 테이블에 LLM 분석 레이어가
+    write-only로 합류한다 (헌법 §2.2 — DB는 공유, 함수 import 안 함).
+
+    ADR-012 §3.2: 일일 상한 초과·이상 이벤트를 sync_log에 status='WARN'/'ERROR' 기록.
+    job_name 컨벤션:
+      - 'llm_analysis_kr' / 'llm_analysis_us'                 — run_daily_analysis 작업 마커
+      - 'llm_daily_call_limit'                                 — 한도 초과 이벤트
+      - 'llm_terms_violation_signal'                           — ADR-012 §3.3 경고 패턴 감지
+      - 'llm_token_spike'                                      — 1.1.7 후속 (프롬프트 토큰 폭증)
+    """
+    __tablename__ = "sync_log"
+
+    # Integer (Python int = arbitrary precision) for SQLite autoincrement compat;
+    # MySQL prod is BIGINT AUTO_INCREMENT (created by ingest-databatcher migrations).
+    id:             Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_name:       Mapped[str]            = mapped_column(String(64), nullable=False)
+    market:         Mapped[str]            = mapped_column(String(16), nullable=False)
+    symbol:         Mapped[Optional[str]]  = mapped_column(String(32))
+    start_time:     Mapped[datetime]       = mapped_column(DateTime, nullable=False)
+    end_time:       Mapped[Optional[datetime]] = mapped_column(DateTime)
+    rows_processed: Mapped[Optional[int]]  = mapped_column(Integer, default=0)
+    status:         Mapped[str]            = mapped_column(String(16), nullable=False)
+    message:        Mapped[Optional[str]]  = mapped_column(String(1024))
+    created_at:     Mapped[datetime]       = mapped_column(DateTime, nullable=False, server_default=func.now())

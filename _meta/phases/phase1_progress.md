@@ -1091,9 +1091,63 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 | §L (6) v1.1 fix | 1.3.0 완료 — auto-emit 검증 통과 | 1.3.9 누적에서 두 auto-warning 자연 발생률 모니터링 |
 | §M EA 분류 불안정 | EA 1/13~1/15 3회 평가 모두 다름 | **NVST도 추가 사례** (B.5.5 entry → 2026-05-07 ignore) |
 
+### 1.3.1~1.3.8 — 메인 진입점 + 모니터링 + 통제권 + Q-003 등록 (2026-05-07)
+
+**개요**: 1.3.0 v1.1 fix 통과 후 곧바로 진행. 1.3.1~1.3.6은 코드 (DEV 작업), 1.3.7은 PowerShell 래퍼/install 스크립트 (DEV 작성, PROD 적용은 Q-003), 1.3.8은 Q-003 운영 큐 등록 (§10.4 1번 예외).
+
+**산출물**:
+
+| 단계 | 산출물 | 비고 |
+|---|---|---|
+| 1.3.2 | `core/cost_tracker.py` (신규 본문) — `DailyCallLimitExceeded` 예외, `check_daily_limit`, `count_calls_today`, `record_sync_log`, `check_terms_violation_signals`(9 패턴), `record_terms_violation_signal`, `get_cost_summary` | ADR-012 §3 모니터링 4종 모두 |
+| 1.3.2 | `models/db_models.py` 갱신 — `SyncLog` ORM 추가 (read+write, 헌법 §2.2 준수: ingest-databatcher 함수 import 안 함, DB만 공유) | SQLite 호환 위해 PK는 Integer (MySQL prod는 BIGINT AUTO_INCREMENT) |
+| 1.3.2 | `core/llm_call_recorder.py` 갱신 — wire-up cost_tracker. `_check_daily_call_limit` placeholder 제거, `check_daily_limit` 호출 (hard_stop 시 `DailyCallLimitExceeded` raise propagate). `_post_call_monitoring` 추가 (토큰 폭증 감지 + 약관 위반 징후 sync_log WARN 기록) | 1.1.7 후속 작업 + ADR-012 §3.2/§3.3 |
+| 1.3.1 / 1.3.3-5 | `scripts/run_daily_analysis.py` (신규 본문, ~330줄) — argparse 5종(--region BOTH/KR/US, --date, --limit, --force-recompute, --dry-run, --backend), KR/US 순차 처리, skip_if_exists 캐싱, `DailyCallLimitExceeded` catch, 모듈 킬 스위치, 부분 실패 허용(per-symbol sync_log 기록 후 계속), job-level sync_log running/success/WARN/ERROR 마커, 종료 코드 0/1/2 | brief §5.5 + §7.6 |
+| 1.3.6 | `scripts/show_cost_summary.py` (신규 본문) — 일일 한도 잔여, 모듈별 통계, 일별 합계, sync_log llm_* WARN/ERROR 카운트, 최근 monitoring events. `--days N --json` 지원 | ADR-012 §3.4 |
+| 1.3.7 | `ops/scheduler/windows/run_analysis_today.ps1` (신규 본문) — venv 자동 탐지, 로그 파일 자동 생성, run_daily_analysis + show_cost_summary 연쇄 실행 | brief §8.3.1 |
+| 1.3.7 | `ops/scheduler/windows/install_task.ps1` (신규 본문) — LLMAnalysis_KR (21:00 KST) / LLMAnalysis_US (16:00 KST) 등록, idempotent (기존 작업 unregister 후 재등록) | brief §8.3.2 |
+| 1.3.8 | `_meta/operational_queue.md` Q-003 등록 (§10.4 1번 예외, 본 1.3 단계 한정 허용) | Q-002 선행 조건 명시, 적용 절차 9단계 + 검증 4종 + 롤백 |
+
+**검증 결과**:
+
+(1) 단위 테스트 — 7 파일 합산 **132/132 통과**:
+- test_anthropic_client 16/16
+- test_cost_tracker 17/17 (신규 — limit 분기 6, terms violation 6, sync_log 2 등)
+- test_entry_params 53/53
+- test_llm_call_recorder 6/6 (구 contract 5/5 → 신규 contract 6/6 갱신; soft_warn proceeds 케이스 추가)
+- test_prompt_builder 5/5
+- test_result_parser 25/25
+- test_run_single_symbol_entry_flow 10/10
+
+(2) `run_daily_analysis --region US --date 2026-01-13 --limit 3 --dry-run` 실행 검증:
+- screened=962, listed=3 (RS rating DESC 정렬 — ABVX/AFJKU/ALM)
+- sync_log 2행 기록 확인 (running + success)
+
+(3) `show_cost_summary --days 1` 실행 검증:
+- Today usage: KR 0/50 (remaining 50), US 4/50 (remaining 46)
+- By module 표 + Daily totals 표 + sync_log llm_* WARN/ERROR count + Recent events
+- NVST v1.1 검증 호출이 `entry_params_6_us` 1건으로 정상 집계
+
+**1.3 게이트 §9.1 진행 상황** (DEV 가능 항목 모두 통과):
+- ✅ (6) v1.1 fix 3건 구현·검증 (1.3.0)
+- ✅ run_daily_analysis.py 작동 (KR/US 분리, 상한, 캐싱, dry-run, force-recompute)
+- ✅ run_analysis_today.ps1 래퍼 스크립트 (DEV 작성, PROD 검증은 Q-003)
+- ✅ 일일 호출 상한 hard stop 정확히 작동 (test_daily_call_limit_hard_stop_raises 통과)
+- ✅ 캐싱 정확히 작동 (skip_if_exists)
+- ✅ 부분 실패 처리 (per-symbol sync_log + 계속)
+- ✅ show_cost_summary.py 작동
+- ✅ 모니터링 4종 가동 (test_cost_tracker로 path 검증)
+- ✅ 통제권 메커니즘 4종: ① Task Scheduler disable (install_task.ps1 주석 명시) ② settings.yaml `modules.{analyze_chart, calculate_entry_params}` 킬 스위치 (run_daily_analysis가 정확히 분기) ③ daily_call_limits.{kr,us}=0 부분 비활성화 (test_check_daily_limit_zero_limit_returns_true) ④ 매매 게이트 부재 (코드상 경로 자체 없음 — Phase 6까지)
+- ⏳ Q-003 PROD 적용 (사용자, Q-002 선행 후)
+- ⏳ 백필 7거래일 + 자연 운영 1~2거래일 (1.3.9-A/B)
+- ⏳ 사용자 정성 평가 (1.3.10~1.3.11)
+
 ### 다음 단계
 
-**1.3.1**: `run_daily_analysis.py` 메인 진입점 작성. KR/US 분리 처리, 일일 상한, 캐싱, dry-run, force-recompute 지원.
+**1.3.9-A** 백필 시작 전 사용자 결정 필요 사항:
+1. Q-002 PROD 적용 상태 (현재 미적용 — 1.3.7 PROD 검증 직전 처리 필요)
+2. 백필 대상 7거래일 윈도우 선정 (예: 2026-04-28 ~ 2026-05-06)
+3. Max 플랜 5시간 윈도우 한도 인지 + 백필 실행 시점 합의
 
 ## 주간 운영 메모
 
