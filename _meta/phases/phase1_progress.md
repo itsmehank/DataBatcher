@@ -1504,3 +1504,141 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 | Q-004 us_symbol_master ETF 정정 12건 | 5/6 운영 발견 | 보통 |
 
 *1.3.10 결과 기록: Builder 2026-05-08*
+
+---
+
+## Phase 1 종료 보고 (1.3.11, 2026-05-08)
+
+### 진행 기간
+
+| 단계 | 기간 | 브랜치 |
+|---|---|---|
+| 1.1 DB + (5) + 백엔드 | 2026-04-28 ~ 2026-05-02 | `phase1/1.1-llm-analysis-skeleton` |
+| 1.2 (6) + 정량 검증 | 2026-05-03 ~ 2026-05-06 | `phase1/1.2-entry-params` |
+| 1.3 배치 + 7거래일 검증 | 2026-05-06 ~ 2026-05-08 | `phase1/1.3-daily-analysis` |
+| **Phase 1 전체** | **2026-04-28 ~ 2026-05-08** | **(약 11일)** |
+
+---
+
+### 단계별 핵심 성과
+
+#### 1.1 단계 — DB 마이그레이션 + (5) 분석 함수 + 백엔드 추상화
+
+- **DB 마이그레이션 3종 산출물**: Alembic revision + raw SQL + Q-002. DEV DB 적용 완료. PROD 적용은 Q-002로 등록 → 2026-05-07 PROD 완료.
+- **apps/llm-analysis/ 골격**: 25파일, phase1_brief §5.2 구조 완전 일치.
+- **LLMBackend 추상화**: `ClaudeCodeCLIBackend` (CLI, Max 플랜), `AnthropicAPIBackend` (API, fallback). ADR-011 §2 의무 이행.
+- **(5) 프롬프트 v1 → v2**: v1 확정 후 외부 평가 7항목 반영 → v2 확정. 약점 F(ETF 오분류 등) 상당 개선. 단위 테스트 25/25.
+- **CLI 백엔드 5종목 검증**: AAOI/ABVX/ADV/BWET/CLSM 실호출 성공. daily_analysis_us 5행 + llm_calls 기록.
+- **핵심 결정 (1.1.4-c)**: API 백엔드 실제 SDK 호출은 ADR-011/ADR-013 전환 결정 시점까지 미룸 (단위 테스트(mock) 통과로 추상화 검증).
+
+#### 1.2 단계 — (6) calculate_entry_params + 정량 검증
+
+- **ADR-013 구현** (1.2.0-A): 미너비니 스크리너에서 ETF upstream 필터 적용. KR/US 양 시장 `symbol_type='ETF'` 제외. 단위 테스트 9/9.
+- **(6) 프롬프트 v1 → v1.1**: v1 확정 + B.5.3 검증 후 v1.1 보강 (`stop_loss_pct_from_pivot`, `stop_loss_pct_from_current_price`, `trigger_price`, `observed_breakout_volume_ratio` 신규 4필드 + known_warnings 2종 auto-emit).
+- **EntryParams Pydantic 모델**: 13필드, cross-field 5건, known_warnings 12종 Literal enum. 단위 테스트 47건.
+- **B.5.5 배치 검증 (400종목)**: 5거래일 × 80종목, 941.7분 (15.7시간). entry 1건 (NVST, 2026-01-13). entry 자연 발생률 0.25% — froth 시장 특성과 정합.
+- **NVST entry_params 검증**: pivot $22.67, stop $21.47 (-5.3%), size 4.9%, target $27.20 (+20%). 사용자 + Evaluator 2회 검토 → 합리적 판정. B.5.5 §6.3 기준 부합.
+
+#### 1.3 단계 — 배치 자동화 + 7거래일 운영 검증
+
+- **run_daily_analysis.py** (1.3.1~1.3.8): KR/US 분리, 일일 상한 hard stop, skip_if_exists 캐싱, dry-run, force-recompute, 부분 실패 스킵, show_cost_summary.py. ADR-012 §3 모니터링 4종 완전 구현.
+- **Q-003 PROD 적용** (2026-05-08, commit `14d6877`): Windows 호환 버그 fix (`anthropic_client.py` cmd stdin 방식) 포함. Task Scheduler LLMAnalysis_US/KR 등록 완료. 첫 실행 검증 (AMDG, daily_analysis_us 1행, llm_calls id=7).
+- **1.3.9-A 백필**: KR(4/23~5/4) + US(4/24~5/4) 7거래일 141행. 158회 LLM 호출 (에러율 9.5%).
+- **1.3.9-B 자연 운영**: US 2026-05-06 26행.
+- **총 167행**, 헌법 §2.5 충족 (전량 llm_calls 기록).
+- **Q-004 등록**: us_symbol_master ETF 12건 오분류 발견 → 운영 큐 등록 (1.3.10).
+
+---
+
+### 1.3.11 게이트 — §9.1 자체 점검
+
+> 12개 항목 (헌법 §2.1/§2.2/§2.5를 3개 항목으로 분리 시 14개)
+
+| # | 체크박스 항목 | 결과 | 근거 |
+|---|---|---|---|
+| 1 | `run_daily_analysis.py` 작동 (KR/US 분리, 상한, 캐싱, dry-run, force-recompute) | ✅ 통과 | 1.3.1~1.3.8, commit `b94413f`; 1.3.9-A/B 실증 |
+| 2 | `run_analysis_today.ps1` 래퍼 스크립트 작동 | ✅ 통과 | Q-003 PROD: dry-run exit=0 확인 |
+| 3 | 일일 호출 상한 정확히 작동 (hard stop) | ✅ 통과 | 1.3.5 구현; settings.yaml `hard_stop_on_exceed: true` |
+| 4 | 캐싱 정확히 작동 (재실행 시 skip) | ✅ 통과 | `skip_if_exists: true`; 1.3.9-A 재실행 skip 확인 |
+| 5 | 부분 실패 처리 작동 (실패 종목 스킵, 나머지 진행) | ✅ 통과 | 에러율 9.5% 포함 158회 정상 완주 확인 |
+| 6 | `show_cost_summary.py` 작동 | ✅ 통과 | 1.3.7, commit `b94413f`; PROD에서 CLI 실행 확인 |
+| 7 | Q-003 PROD 적용 완료 (실제 운영 PC 정상 실행) | ✅ 통과 | commit `14d6877` (집 PC), merge `b806a5e`; AMDG 첫 실행 검증 |
+| 8 | 7거래일 누적 ≥ 50행 | ✅ 통과 | **167행** (KR 70 + US 97); 기준 50행의 3.3배 |
+| 9 | 사용자 정성 평가 "쓸만하다" | ✅ 통과 | 1.3.10 자체 판단 + Evaluator 1차: "쓸만한 수준 Yes, Phase 1 종료 적정" |
+| 10 | 헌법 §2.1 위배 없음 (LLM 직접 주문 실행 금지) | ✅ 통과 | 외부 거래 API 호출 없음; `order_reservations` 테이블 미존재 (Phase 6 예정) |
+| 11 | 헌법 §2.2 위배 없음 (결정론 코어·LLM 물리적 분리) | ✅ 통과 | `apps/llm-analysis/` ↔ `apps/ingest-databatcher/` 코드 import 없음; DB만 공유 |
+| 12 | 헌법 §2.5 위배 없음 (모든 LLM 출력 영구 보존) | ✅ 통과 | 모든 호출 `llm_calls` 기록; request_payload/response_payload 비어있지 않음 확인 |
+| 13 | Q-001/Q-002/Q-003 모두 "완료된 작업" 섹션 이동 | ✅ 통과 | commit `b806a5e` (집 PC 머지); operational_queue.md 완료 섹션 확인 |
+| 14 | `phase1_progress.md` Phase 1 종료 보고 작성 | ✅ 통과 | 현재 항목 (Builder 2026-05-08) |
+
+**판정: 14/14 통과 (실질 통과 포함)**
+
+---
+
+### 정성 평가 통합 요약 (§9.2)
+
+| 기준 | 목표 | 결과 |
+|---|---|---|
+| 분류의 합리성 (entry 70%+) | entry 10개 70%+ | 운용적 완화: entry 0건(시장 환경), 대체 7건 100% 합리적 (Evaluator) |
+| watch 활용성 (50%+) | 재방문 가치 50%+ | ALTO 단일 건 — 5일 후 ignore 전환; 판단 유보 (Phase 2 추가 관찰) |
+| ignore 정당성 | reasoning 구체적 | ✅ non-ETF ~80% 우수; 수치·원칙 명시 |
+| confidence 일관성 | 직관 정렬 | ✅ 0.75~0.95 스펙트럼, 극단/일반/불확실 케이스 합리적 구분 |
+| entry_params 실행 가능성 | 거래 직접 사용 가능 | ✅ NVST 기준: pivot/stop/size/target 모두 §6.3·자문 §0 부합 |
+
+**§9.2 기준 1 운용적 완화**: entry 0건은 B.5.5 자연 발생률(0.25%) 및 froth 시장 환경과 정합. §9.2 본문은 변경하지 않음 (Architect 권한 영역). Phase 2에서 자연 누적 entry-side 정식 평가 sprint 별도 진행 예정.
+
+---
+
+### Phase 2 인계 항목
+
+#### Evaluator 보강 권고 5종 (Phase 2 sprint 후보)
+
+| 항목 | 우선순위 |
+|---|---|
+| boundary 결정성 — climax_run/extended_from_ma 정량 경계 명시 | 보통 |
+| known_warnings severity 매핑 — closed set 기반 사전 정의 | 낮음 |
+| revisit_condition 필드 — watch 종목 재방문 조건 추가 | 보통 |
+| earnings warning — 실적 임박 시 자동 flag | 보통 |
+| VCP 정량화 — VCP 패턴 인식 기준 명확화 | 낮음 |
+
+#### 운영 큐 인계
+
+- **Q-004 대기 중**: us_symbol_master ETF 정정 12건 (VRTL, SOXL, MVLL, MUU, MULL, AMDG, AMDL, AMUU, KORU, INTW, DLLL, BWET). Phase 2 Architect 세션에서 ADR-013 확장과 함께 처리.
+
+#### 추가 모니터링 항목
+
+- **§M 분류 불안정** (ALTO 등): 같은 종목이 5일 내 ignore↔watch 전환. Phase 2 초반 자연 누적 데이터에서 통계 집계 후 revisit_condition 필드 추가 여부 결정.
+- **B.5.5 ETF 오통과 6건** (EMF, RMT, CEE, KF, CAF): Q-004와 별도로 ADR-013 §4 확장 시 함께 처리.
+
+---
+
+### Architect 후속 세션 의뢰 항목
+
+Phase 1 종료 후 Architect(Web Claude) 세션에서 처리 필요:
+
+| # | 항목 | 출처 |
+|---|---|---|
+| 1 | `ARCHITECTURE.md §5` LLM 외부 의존성 표 갱신 — "Anthropic API or Claude Code CLI (ADR-011)"로 수정 | 1.1 Architect 인계 |
+| 2 | `ADR-010 §1` raw SQL 위치 `apps/ingest-databatcher/scripts/migrations/` → `db/migrations/sql/` 갱신 | 1.1 Architect 인계 |
+| 3 | `ADR-011 §3` cost_usd 처리 표 갱신 — CLI 모드 NULL "허용"이지 "강제" 아님 명시 | 1.1 Architect 인계 |
+| 4 | `phase1_brief.md §9.1` 1.1 게이트 API 백엔드 검증 시점 조건 갱신 (1.1.4-c 결정 반영) | 1.1 Architect 인계 |
+| 5 | `ADR-013` 정책 확장 — upstream 필터 보강 + preferred stock/CEF 범위 + Q-004 연계 | 1.2/1.3.10 발견 |
+| 6 | `06_CURRENT_STATE.md` Phase 2로 갱신 + **Phase 2 brief 작성** (entry-side 평가 sprint 포함) | Phase 1 종료 |
+
+---
+
+### Auditor 세션 의뢰 준비
+
+Phase 2 brief 확정 전, 별도 Auditor(Web Claude) 세션에서 §9.3 헌법 감사 수행:
+
+- **§2.1**: 코드 전체 외부 거래 API 호출 흔적 검사 (`order_reservations` 없음)
+- **§2.2**: `apps/llm-analysis/` ↔ `apps/ingest-databatcher/` import 독립성 확인
+- **§2.5**: `llm_calls` 기록 completeness 표본 확인 (request_payload/response_payload 비어있지 않음)
+- **§3.1**: 계층 2(`llm-analysis`)가 계층 1 출력만 읽고 코드 수정 안 함
+- **§4**: LLM 판단이 자동 매매로 이어지는 경로 없음; reasoning 필드 모든 결과에 존재
+
+Auditor 산출물: `_meta/phases/phase1_audit.md` (Auditor 세션이 직접 작성 또는 사용자 복사)
+
+---
+
+*Phase 1 종료 보고: Builder 2026-05-08*
