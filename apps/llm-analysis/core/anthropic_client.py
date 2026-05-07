@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from typing import Optional
@@ -67,13 +69,22 @@ class ClaudeCodeCLIBackend(LLMBackend):
         self._cwd = tempfile.gettempdir()
 
     def call(self, prompt: str, model: str, max_tokens: int) -> LLMResponse:
-        cmd = [
-            "claude",
-            "-p", prompt,
-            "--output-format", "json",
-            "--tools", "",
-            "--model", model,
-        ]
+        # Windows: claude is a .cmd file and command-line has an 8191-char limit.
+        # Pass prompt via stdin with bare -p flag to avoid both issues.
+        if sys.platform == "win32":
+            cmd = ["cmd", "/c", "claude",
+                   "--output-format", "json",
+                   "--tools", "",
+                   "--model", model,
+                   "-p"]
+            stdin_input = prompt
+        else:
+            cmd = ["claude",
+                   "-p", prompt,
+                   "--output-format", "json",
+                   "--tools", "",
+                   "--model", model]
+            stdin_input = None
 
         request_payload = {
             "prompt": prompt,
@@ -87,6 +98,7 @@ class ClaudeCodeCLIBackend(LLMBackend):
         try:
             proc = subprocess.run(
                 cmd,
+                input=stdin_input,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

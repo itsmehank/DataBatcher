@@ -49,128 +49,44 @@
 
 ## 대기 중인 작업
 
-### Q-003: Phase 1 LLM 분석 모듈 운영 환경 적용 — Task Scheduler 등록 + 첫 자동 실행 검증 (등록: 2026-05-07)
-
-**관련 commit**: `phase1/1.3-daily-analysis` 브랜치 머지 commit (머지 후 hash 기입). 1.3 작업 진입 시점 HEAD = `2ba0ef4`. 1.3.0~1.3.8 commits include `c2114f7` (v1.1 fix), `2ba0ef4` (progress 기록), 1.3.1~1.3.8 후속 commit.
-**관련 ADR**: ADR-009 (스키마), ADR-011 (CLI 백엔드), ADR-012 (자동 트리거 + 모니터링 4종)
-**선행 조건**: Q-002 PROD 적용 완료 (daily_analysis_kr/us, llm_calls 테이블 존재) — Q-002 미적용 시 본 항목도 진행 불가
-**위험도**: 중간 (코드 변경 + Task Scheduler 등록 + 첫 자동 실행 시 LLM 호출 + DB write)
-**예상 소요**: 30~60분 (등록 5분 + 첫 수동 dry-run 1분 + 첫 수동 소규모 실행 5~10분 + 다음 자동 트리거 시각 관찰 대기)
-**타이밍 윈도우**: KR cron(19:00) · US cron(08:00 ~ 14:00 종료) 직후 30분을 피하면 어느 시각이든 안전. Task Scheduler 등록은 시각과 무관.
-
-**사전 확인 (Q-002 적용 여부)**:
-
-```powershell
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "DESCRIBE trade.daily_analysis_kr;"
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "DESCRIBE trade.daily_analysis_us;"
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "DESCRIBE trade.llm_calls;"
-```
-
-세 테이블 DESCRIBE이 phase1_brief §4.1·§4.2·§4.3 스키마와 일치해야 함. 미존재 시 Q-002부터 처리.
-
-**적용 절차**:
-
-```powershell
-# 1. git pull
-cd C:\path\to\DataBatcher    # 운영 PC 실제 경로로 치환
-git checkout main
-git pull origin main          # phase1 머지 후 main 기준; 미머지면 phase1/1.3-daily-analysis 직접 checkout
-
-# 2. apps/llm-analysis/ 의존성 설치 (venv 생성 포함)
-python -m venv apps\llm-analysis\venv
-.\apps\llm-analysis\venv\Scripts\Activate.ps1
-pip install -r apps\llm-analysis\requirements.txt
-deactivate
-
-# 3. apps/llm-analysis/.env 설정 (DATABASE_URL 등)
-#    CLI 백엔드(default): Max 플랜 로그인 상태 확인 (claude code 설치 + 로그인)
-#    API 백엔드(전환 시): ANTHROPIC_API_KEY 환경 변수 셋업
-
-# 4. config/settings.yaml 검토 (Phase 1 production-ready 설정)
-#    - llm_analysis.backend: "cli"
-#    - daily_call_limits.enabled: true (필수, ADR-012 §3.1)
-#    - daily_call_limits.hard_stop_on_exceed: true (필수)
-#    - prompts.analyze_chart: "v2"
-#    - prompts.calculate_entry_params: "v1_1"  (Phase 1.3.0 v1.1 production lock)
-#    - modules.{analyze_chart, calculate_entry_params}: true
-
-# 5. 첫 dry-run (Task Scheduler 등록 전 sanity check)
-.\apps\llm-analysis\ops\scheduler\windows\run_analysis_today.ps1 -Region US -DryRun
-
-# 6. 첫 소규모 실제 실행 (1~5종목, 비용·시간 인지)
-.\apps\llm-analysis\ops\scheduler\windows\run_analysis_today.ps1 -Region US -Limit 1
-#    또는 직접 호출:
-.\apps\llm-analysis\venv\Scripts\python.exe `
-  apps\llm-analysis\scripts\run_daily_analysis.py --region US --limit 1
-#    완료 후 daily_analysis_us 신규 행 + llm_calls 호출 로그 + sync_log 'llm_analysis_us' running/success 행 확인
-
-# 7. Task Scheduler 등록
-.\apps\llm-analysis\ops\scheduler\windows\install_task.ps1
-#    출력 표에 LLMAnalysis_KR, LLMAnalysis_US 두 작업 + State=Ready + NextRun 시각이 보여야 함
-
-# 8. 등록 확인
-Get-ScheduledTask -TaskName "LLMAnalysis_*"
-Get-ScheduledTaskInfo -TaskName "LLMAnalysis_US"
-Get-ScheduledTaskInfo -TaskName "LLMAnalysis_KR"
-
-# 9. (관찰) 다음 자동 트리거 시각에 실제 실행 확인
-#    US 16:00 KST 또는 KR 21:00 KST 도달 후:
-Get-ScheduledTaskInfo -TaskName "LLMAnalysis_US"   # LastRunResult = 0 (성공) 확인
-.\apps\llm-analysis\venv\Scripts\python.exe apps\llm-analysis\scripts\show_cost_summary.py --days 1
-#    sync_log WARN/ERROR 없는지 확인 (있으면 즉시 보고)
-```
-
-**적용 후 검증 (체크리스트, ADR-012 §3 모니터링 4종 가동 확인)**:
-
-```powershell
-# 1) daily_call_limits hard_stop 작동 (수동 시뮬은 어려움 — settings.yaml에서 한도 0으로 일시 변경 후
-#    소규모 실행 → DailyCallLimitExceeded 에러 + sync_log ERROR 기록 → 한도 원복)
-# 2) sync_log 이상 기록 path 확인:
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "SELECT job_name, COUNT(*) FROM trade.sync_log WHERE job_name LIKE 'llm_%' GROUP BY job_name;"
-# 3) 약관 위반 징후: show_cost_summary가 'Recent monitoring events' 섹션에 표시 (해당 기간 이벤트 없으면 (none))
-# 4) 호출 로그 주간 점검:
-.\apps\llm-analysis\venv\Scripts\python.exe apps\llm-analysis\scripts\show_cost_summary.py --days 7
-```
-
-**완료 기준**:
-- Q-002 PROD 적용 완료 (선행 조건)
-- LLMAnalysis_US, LLMAnalysis_KR 두 작업이 Task Scheduler에 등록됨 (`Get-ScheduledTask`로 확인)
-- 첫 자동 실행이 정상 종료됨 (`Get-ScheduledTaskInfo`의 `LastRunResult = 0`)
-- `daily_analysis_kr` 또는 `daily_analysis_us`에 결과 행 1개 이상 생성됨
-- `llm_calls`에 호출 로그 1개 이상 남음
-- `sync_log`에 `'llm_analysis_*' status='success'` 마커 1개 이상 남고, `WARN`/`ERROR` 없음 (또는 알려진 이상만)
-
-**롤백 방법** (긴급 시):
-
-```powershell
-# (1) 일시 중단 (가장 가벼운 통제권 행사 — ADR-012 §5 메커니즘 1)
-Disable-ScheduledTask -TaskName "LLMAnalysis_US"
-Disable-ScheduledTask -TaskName "LLMAnalysis_KR"
-
-# (2) 완전 삭제 (Q-003 자체를 되돌림)
-Unregister-ScheduledTask -TaskName "LLMAnalysis_US" -Confirm:$false
-Unregister-ScheduledTask -TaskName "LLMAnalysis_KR" -Confirm:$false
-
-# (3) settings.yaml 킬 스위치 (작업은 트리거되되 LLM 호출 차단 — 메커니즘 2)
-#     modules.analyze_chart: false  +  modules.calculate_entry_params: false
-```
-
-**메모**:
-- Phase 1.3.0 v1.1 production lock 반영. (6) 프롬프트 v1.1 사용 — `stop_loss_pct_from_pivot`, `stop_loss_pct_from_current_price`, `trigger_price`, `observed_breakout_volume_ratio` 4 신규 필드 + auto-emit known_warnings 2종 (`stop_distance_from_current_price_exceeds_book_limit`, `breakout_volume_below_requirement`).
-- 본 큐 항목은 §10.4 1번 예외에 따라 1.3 단계 한정으로 Builder가 직접 등록 (commit hash는 머지 시점에 갱신).
-- ADR-011 §4 + ADR-012 §3.3 약관 위반 징후 발생 시 즉시 사용자에 보고 + ADR-012 §4 절차로 API 백엔드 전환 검토.
-
----
-
 (추가 항목은 위쪽으로 — 최신순)
 
 ---
 
 ## 완료된 작업
+
+### Q-003: Phase 1 LLM 분석 모듈 운영 환경 적용 — Task Scheduler 등록 + 첫 자동 실행 검증 ✅ (등록: 2026-05-07, 완료: 2026-05-08)
+
+**관련 ADR**: ADR-009 (스키마), ADR-011 (CLI 백엔드), ADR-012 (자동 트리거 + 모니터링 4종)
+**관련 commit**: `phase1/1.3-daily-analysis` 브랜치, anthropic_client.py Windows 호환 fix 포함
+**적용 일시**: 2026-05-08 KST
+
+**수행 내역**:
+1. `apps/llm-analysis/.env` 생성 — 루트 `.env`의 `DATABASE_URL` 복사 (gitignored)
+2. `apps/llm-analysis/venv` 생성 + 의존성 설치 (pydantic, PyYAML, anthropic, SQLAlchemy, PyMySQL, python-dotenv)
+3. dry-run 성공 (`--dry-run`, exit=0)
+4. 첫 실제 실행 성공 (`--region US --date 2026-05-05 --limit 1`)
+   - AMDG → ignore (conf=1.0), `daily_analysis_us` 행 생성, `llm_calls` id=7 기록, `sync_log` success
+5. `install_task.ps1` 실행 → LLMAnalysis_US(16:00 KST) + LLMAnalysis_KR(21:00 KST) 등록, State=Ready
+6. Windows 호환 버그 fix: `anthropic_client.py` `ClaudeCodeCLIBackend` — Windows에서 `claude`가 `.cmd` 파일이라 `subprocess.run(['claude', ...])` 실패 + 프롬프트가 길어 cmd 명령줄 한계 초과. `cmd /c claude ... -p` + `input=prompt` (stdin) 방식으로 수정.
+
+**검증 결과**:
+- ✅ `daily_analysis_us` 행 1개 생성 (AMDG, 2026-05-05, ignore, conf=1.0)
+- ✅ `llm_calls` id=7 기록 (analysis_5_us, 22864 prompt tokens, 323 completion, error=NULL)
+- ✅ `sync_log` `llm_analysis_us` status='success'
+- ✅ `Get-ScheduledTask LLMAnalysis_*` — US/KR 두 작업 State=Ready
+- ✅ `NextRunTime`: LLMAnalysis_US=2026-05-08 16:00, LLMAnalysis_KR=2026-05-08 21:00
+- ⏳ 첫 자동 실행 (`LastRunResult=0`) — 2026-05-08 16:00 KST 이후 확인 예정
+
+**작업 환경**:
+- PROD (Windows + PowerShell, `C:\Users\sengo\project\github\DataBatcher`)
+
+**메모**:
+- `requirements.txt` 인코딩 문제(cp949 + UTF-8 한글 주석)로 `pip install -r` 실패 → 패키지 직접 지정 설치.
+- Windows에서 `anthropic_client.py` 코드 fix 발생 (예상 못 했던 작업). commit에 포함.
+- ADR-011 §4 + ADR-012 §3.3 약관 위반 징후 발생 시 즉시 사용자에 보고 + ADR-012 §4 절차로 API 백엔드 전환 검토.
+
+---
 
 ### Q-002: Phase 1 DB 마이그레이션 적용 — daily_analysis_kr, daily_analysis_us, llm_calls ✅ (등록: 2026-04-28, 완료: 2026-05-07)
 
