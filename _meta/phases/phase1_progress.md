@@ -1023,6 +1023,78 @@ v1은 `prompts/analyze_chart_v1.md`로 보존.
 - `run_single_symbol.py --with-entry-params`
 - 표본 entry 종목 5건 이상 검증
 
+## 단계 1.3 — run_daily_analysis 메인 진입점 + 7거래일 누적 검증
+
+### 1.3 시작 (2026-05-07, Mac DEV 새 PC)
+
+**브랜치**: `phase1/1.3-daily-analysis` (base: 1fb1db3 = 1.2 commit β `dd09e2d` + 거버넌스 갱신 `92a8b77` + 1.3 진입 마크 `1fb1db3`).
+
+main 브랜치는 1.1·1.2 작업물을 포함하지 않고 `103b54e` (us-index fix)에서 정지. Phase 1 종료 시 일괄 머지 전략 채택 (사용자 결정).
+
+미커밋 `new_pc_setup_checklist.md` 변경(115/22)은 stash 처리 후 진행 (사용자 결정).
+
+### 1.3.0 — (6) v1.1 fix 3건 (2026-05-07)
+
+**commit**: `c2114f7 feat(llm-analysis): Phase 1.3.0 — calculate_entry_params v1.1 fix 3건`
+
+NVST B.5.5 1차 Evaluator 평가에서 도출된 (6) 함수 표기·투명성 문제 3건을 v1.1로 minor revision 발행.
+
+| Fix | 항목 | 변경 |
+|---|---|---|
+| 1 | dual stop_pct 분리 (transparency) | `stop_loss_pct` → `stop_loss_pct_from_pivot` (rename) + `stop_loss_pct_from_current_price` (NEW). \|from_current_price\| > 7.5 시 `stop_distance_from_current_price_exceeds_book_limit` auto-emit |
+| 2 | `trigger_price` schema-level 분리 | `pivot_price`(raw) + `trigger_price`(buffered, default pivot * 1.001) 둘 다 emit. (5) reasoning과 (6) 구조 필드 간 ambiguity 제거 |
+| 3 | breakout volume mismatch auto-warning | `observed_breakout_volume_ratio` (NEW, optional). observed < requirement threshold(1.3/1.4/1.5) 시 `breakout_volume_below_requirement` auto-emit (size 조정과 무관) |
+
+**스키마 변경**:
+- EntryParams 필드 13 → 16 (rename 1 + new 4: `current_price`, `trigger_price`, `stop_loss_pct_from_current_price`, `observed_breakout_volume_ratio`)
+- KnownWarning enum 10 → 12
+
+**산출물**:
+- `apps/llm-analysis/prompts/calculate_entry_params_v1_1.md` (신규, v1 보존)
+- `apps/llm-analysis/models/entry_params.py` 갱신 (auto-emit validator)
+- `apps/llm-analysis/core/result_parser.py` 갱신 (v1 → v1.1 legacy 매핑: `stop_loss_pct` rename, `trigger_price` derive, `from_current_price` derive)
+- `apps/llm-analysis/config/settings.yaml`: `prompts.calculate_entry_params: v1` → `v1_1`
+- 단위 테스트: `tests/test_entry_params.py` 39 → 53 (v1.1 신규 14건)
+- `tests/test_run_single_symbol_entry_flow.py` fixture v1.1 갱신
+
+**검증 결과**:
+
+(1) 단위 테스트 — 6 파일 합산 **114/114 통과** (test_entry_params 53/53, test_anthropic_client 16/16, test_llm_call_recorder 5/5, test_prompt_builder 5/5, test_result_parser 25/25, test_run_single_symbol_entry_flow 10/10).
+
+(2) NVST 실 LLM 재호출 검증 — 합성 prior_analysis 방식 (B.5.5 데이터는 이전 PC DB에만 있고 Mac DEV 미동기화)
+
+먼저 `run_single_symbol --with-entry-params --force-recompute`로 (5) v2 + (6) v1.1 풀 호출:
+- (5) v2 결과: classification=`ignore`, pattern=`none`, risk_flags=[late_stage_base, narrow_base], confidence 0.75
+- B.5.5 시점 entry 분류와 다른 결과 — **§M 분류 불안정의 또 다른 사례** (1.3 모니터링 항목 추가 1건)
+
+(6) 검증을 위해 NVST 원본 (5) 결과를 phase1_progress.md B.5.5 기록으로부터 합성하여 (6) v1_1만 LLM 호출 (`/tmp/nvst_v11_validate.py`):
+
+| 검증 항목 | 결과 |
+|---|---|
+| dual stop_pct emit | ✅ from_pivot=-5.3, from_current_price=**-7.6** (예상 -7.58% 1dp 일치) |
+| trigger_price 분리 | ✅ pivot=22.67, trigger=22.69 (pivot * 1.001) |
+| current_price echo | ✅ 23.23 (payload close 일치) |
+| stop_distance auto-emit | ✅ \|-7.6\| > 7.5 → known_warning 자동 발행 |
+| observed_breakout_volume_ratio emit | ✅ 1.02 (LLM이 chart에서 자동 추출) |
+| breakout_volume_below_requirement auto-emit | ✅ 1.02 < 1.4 → known_warning 자동 발행 |
+
+**6/6 OK**. v1.1 LLM 호출 메타: model=claude-sonnet-4-5, duration 107.9s, prompt 31,498 tokens, completion 5,492 tokens, llm_call_id=4.
+
+LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따라 emit — 가이드 준수 양호.
+
+### 1.3 부수 모니터링 (Phase 1.3 진행 중 자연 관찰)
+
+| 이슈 | 출처 | 1.3 누적 관찰 |
+|---|---|---|
+| §J ETF 잘못 통과 | B.5.5 (EMF/RMT/CEE/KF/CAF) | 1.3.9 누적에서 `etf_methodology_mismatch` 추적 예정 |
+| §K (5) v2 분류 보수성 | NVST 운영자 시각 평가 | 1.3.9 entry 분류 종목들의 RS/breakout volume/lone signal 분포 추적 예정 |
+| §L (6) v1.1 fix | 1.3.0 완료 — auto-emit 검증 통과 | 1.3.9 누적에서 두 auto-warning 자연 발생률 모니터링 |
+| §M EA 분류 불안정 | EA 1/13~1/15 3회 평가 모두 다름 | **NVST도 추가 사례** (B.5.5 entry → 2026-05-07 ignore) |
+
+### 다음 단계
+
+**1.3.1**: `run_daily_analysis.py` 메인 진입점 작성. KR/US 분리 처리, 일일 상한, 캐싱, dry-run, force-recompute 지원.
+
 ## 주간 운영 메모
 
 (Phase 1.3 시작 후부터 ADR-012 §3.4 호출 로그 점검 결과를 기록)
