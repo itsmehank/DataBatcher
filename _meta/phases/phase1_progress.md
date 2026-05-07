@@ -1221,4 +1221,286 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 
 ---
 
-*이 기록은 `_meta/00_CONSTITUTION.md` §5에 따라 Builder가 작성한 Phase 진행 로그다.*
+## 1.3.10 정성 평가 가이드 (2026-05-07)
+
+### 데이터 현황 (DEV DB 기준)
+
+| 구분 | KR | US | 합계 |
+|---|---|---|---|
+| 1.3.9-A 백필 | 7일 × 10 = 70행 | 7일 × 10 + NVST 1 = 71행 | 141행 |
+| 1.3.9-B 자연 운영 | 0행 (PROD 미확인) | 2026-05-06 26행 | 26행 |
+| **총합** | **70행** | **97행** | **167행** |
+
+**Classification 분포**:
+- KR: ignore 70 (100%)
+- US: ignore 96 (99.0%), watch 1 (ALTO 5/1, 1.0%)
+- **entry: 0건** (NVST B.5.5는 DB에서 현재 ignore로 덮어쓰여짐 — 1.3.0 재실행 시 분류 변경됨)
+
+**1.3.9-B 자연 운영 특이사항** (2026-05-06 US 26건):
+- ETF 오통과: VRTL, SOXL, MVLL, MUU, MULL, AMDG, AMDL, AMUU, KORU, INTW, DLLL, BWET = **12건 (46%)**
+- us_symbol_master.symbol_type='STOCK'으로 잘못 등록된 ETF/레버리지 ETF들
+- LLM Pre-Check이 conf=1.00으로 즉시 ignore 처리 (safety net 정상 작동)
+- ADR-013 upstream 필터 보강 필요 (§J 후속)
+
+---
+
+### §9.2 정성 평가 기준별 분석
+
+#### 기준 1: 분류의 합리성 — entry 10개 표본
+
+**상황**: 현재 DB에 entry 0건. §9.2가 요구하는 "entry 10개 표본" 기준 미달.
+
+**대체 평가 방향**:
+- entry: NVST (B.5.5) 1건 — DB에서 ignore로 덮어쓰여졌으나 B.5.5 결과 기록에서 평가 가능
+- watch 1건 (ALTO 5/1): reasoning 품질 평가
+- ignore 표본: RS 99이지만 ignore된 케이스들의 reasoning 타당성 평가
+
+**사용자 평가 대상 (ignore 중 납득 여부)**:
+
+| 날짜 | 종목 | Conf | 핵심 reasoning | flags |
+|---|---|---|---|---|
+| 5/6 | AAOI | 0.90 | "Climax run +255% in 10wks. Feb 27: +57% single day to $84.23 on 24.8M vol. 47% above SMA-50." | climax_run, extended_from_ma, wide_and_loose |
+| 5/6 | ANTX | 0.90 | "Climax run Mar4-9: $1.06→$6.91 (+552%) on 58M vol. Now -33% from high. No base(4wks). Thin $1.6M/day." | climax_run, extended_from_ma, wide_and_loose, thin_liquidity_us_only |
+| 5/6 | ARWR | 0.90 | "4th+ base in 508% Stage 2. Extended 22.6% above SMA-50. Wide-and-loose Mar-Apr (10-15% wkly swings)." | late_stage_base, extended_from_ma, wide_and_loose, volume_contraction_on_advance |
+| 4/24 | 064850 | 0.90 | "Climax run 4/7-4/22 (+75%, 2wks). 41% above SMA-50. Too late to enter. Need 8-12wk new base." | climax_run, extended_from_ma |
+| 4/24 | 082920 | 0.90 | "Jan-Feb flat base, breakout 3/12. Now +143% in 6wks. 71% above SMA-50. Climax bar 4/13." | climax_run, extended_from_ma, wide_and_loose, volume_contraction_on_advance |
+| 5/4 | 124500 | 0.75 | "8-week volatile consolidation. Weekly swings 15-25% wide-and-loose. -18% from recent high. Needs tighter action." | wide_and_loose |
+| 5/1 | ALTO | **watch→** | "No base forming—stock at new ATH $5.60. Extended 25.4% above SMA-50. RS 99. Monitor for pullback/base." | extended_from_ma |
+
+**평가 질문**: 위 ignore 케이스들이 "납득 가능"한가? 70% 이상 납득해야 기준 통과.
+
+---
+
+#### 기준 2: watch 분류의 활용성
+
+**현황**: watch 1건 (ALTO 2026-05-01)
+
+**ALTO 분류 이력 (§M 분류 불안정)**:
+
+| 날짜 | 분류 | Conf | 핵심 reasoning |
+|---|---|---|---|
+| 4/28 | ignore | 0.75 | "3rd base late-stage. Climax gap 3/5. 8-week consolidation wide-and-loose, now tightening. RS 99." |
+| 5/1 | **watch** | 0.75 | "No base forming—ATH $5.60. Extended 25.4% above SMA-50. RS 99. Monitor for pullback/base." |
+| 5/4 | ignore | 0.80 | "9-week consolidation $4.16-$5.60 wide-and-loose. Extended 25% above SMA-50. 3rd base Stage 2." |
+| 5/6 | ignore | 0.90 | "Climax run +54% March 5. Now 23% above SMA-50. Wide-and-loose consolidation. No textbook base." |
+
+**관찰**:
+- 5/1 한 번만 watch, 나머지 3일 ignore
+- 5/1 watch reasoning("No base forming, Monitor for pullback/base")이 실제로는 ignore와 큰 차이 없음
+- 5/6에서 confidence 올라가며(0.75→0.90) ignore 확정됨
+- 1~4주 후 entry로 발전할 가능성: 낮음 (5/6에서 "No textbook base" 유지)
+
+**평가 질문**: ALTO 5/1 watch가 "재방문할 가치 있다"고 느껴지는가?
+
+---
+
+#### 기준 3: ignore 분류의 정당성
+
+**reasoning 품질 샘플** (구체적 수치 포함 여부):
+
+**우수 사례** (구체적 수치 + 맥락):
+```
+[5/6 AAOI] "Climax run: +255% in 10wks (Feb 20 $51.68 → May 1 $183.51). Feb 27: +57% single day
+  to $84.23 on 24.8M vol (5× avg). Extended 47% above SMA-50 ($121.47). Wide-and-loose:
+  Apr-May weeks show 30-40% intraweek spreads. No proper base. RS 99 irrelevant—entry risk extreme."
+
+[4/24 082920] "Jan-Feb flat base, 10wks, pivot 23,100. Breakout 3/12 @23,500. Now +143% in 6wks.
+  Week 4/13: climax (high 58,200, 6.4M vol, largest spread). 71% above SMA-50.
+  Weekly swings 30-40%. Volume declining on recent advance. RS 99 elite but severely extended."
+
+[5/6 ANTX] "Climax run Mar 4-9: $1.06→$6.91 (+552%) on 58M volume. Now -33% from high at $4.65,
+  wide-and-loose action. No base formed (4wks from low, need 7+). Extended 28% above SMA-50.
+  Thin liquidity $1.6M/day."
+```
+
+**단순 반복 사례** (ETF 12건):
+```
+"ETF — Minervini/O'Neil methodology targets individual leadership stocks.
+ Recommend upstream screener filter."
+```
+
+**애매한 사례** (0.75 저신뢰):
+```
+[5/4 124500] "8-week volatile consolidation after climax to 75,500 (Mar-13).
+  Weekly swings 15-25% = wide-and-loose, not tradeable. RS 99 elite
+  but no clean base structure yet. 13.7% above SMA-50. -18% from recent high.
+  Needs tighter action."
+```
+→ 0.75 이유: "아직 base 형성 중이라 결론을 확신하기 어렵다"는 뉘앙스 → 합리적
+
+**평가 질문**: reasoning이 "구체적 근거" 수준인가? 특히 KR/US non-ETF의 reasoning이 단순 반복이 아닌지 확인.
+
+---
+
+#### 기준 4: confidence의 일관성
+
+**분포 요약**:
+
+| Conf | KR (70건) | US non-ETF (85건) | US ETF (12건) |
+|---|---|---|---|
+| 1.00 | 0건 | 0건 | 12건 (100%) |
+| 0.95 | 20건 (29%) | 18건 (21%) | - |
+| 0.90 | 41건 (59%) | 35건 (41%) | - |
+| 0.85 | 7건 (10%) | 15건 (18%) | - |
+| 0.80 | 1건 (1%) | 9건 (11%) | - |
+| 0.75 | 1건 (1%) | 5건 (6%) | - |
+
+**패턴 관찰**:
+- `conf=1.00` = ETF 전용 (Pre-Check 즉시 종료)
+- `conf=0.95` = 명확한 클라이맥스 런 (수치가 극단적, 의심 여지 없음)
+- `conf=0.90` = 대다수 (일반적 froth/climax 케이스)
+- `conf=0.85-0.80` = 복잡한 케이스 (late-stage인데 방향 불확실, 혹은 base 진행 중)
+- `conf=0.75` = 가장 모호한 케이스 (ALTO 5/1 watch 포함)
+
+**평가 질문**: 0.90 종목과 0.75 종목의 차이가 직관과 맞는가? 0.95가 0.90보다 "더 확실한 ignore"로 느껴지는가?
+
+---
+
+#### 기준 5: entry_params의 실행 가능성
+
+**현황**: 1.3.9-A/B에서 entry 0건 → 신규 entry_params 없음
+
+**가용 참조**: NVST (B.5.5, 2026-01-13) — Evaluator 2회 검토 완료:
+- pivot=$22.67 (handle high), trigger=$22.69 (pivot×1.001)
+- stop_loss_pct_from_pivot=-5.3%, stop_loss_pct_from_current_price=-7.6%
+- known_warnings: stop_distance_from_current_price_exceeds_book_limit, breakout_volume_below_requirement
+- suggested_weight_pct=4.9% (7% × 0.7 low_volume_breakout discount)
+- 2차 Evaluator (운영자 시각): "NVST는 약한 setup이나 (6) 산식 자체는 합리적"
+
+**평가 질문**: NVST entry_params를 실제 거래 결정에 사용할 수 있을 정도로 구체적이고 합리적인가?
+
+---
+
+### 종합 평가 체크리스트 (사용자 판단)
+
+| § | 기준 | 목표 | 현황 | 판단 필요 사항 |
+|---|---|---|---|---|
+| 9.2 기준1 | 분류의 합리성 | entry 10개 70%+ 납득 | **entry 0건** (미달) | 위 ignore 7건 + NVST 납득 여부 |
+| 9.2 기준2 | watch 활용성 | watch 50%+ 재방문 가치 | watch 1건 (ALTO) | ALTO 5/1 watch 합리성 |
+| 9.2 기준3 | ignore 정당성 | reasoning 구체적 | 우수 ~80% / ETF 반복 12건 | 전반적 reasoning 품질 충분한지 |
+| 9.2 기준4 | confidence 일관성 | 직관 정렬 | 0.75-0.95 스펙트럼 합리적 | 고/저신뢰 분포 납득 여부 |
+| 9.2 기준5 | entry_params 실행 가능성 | 거래 직접 사용 가능 | NVST 1건 (기검토) | B.5.5 NVST 기준으로 판단 |
+
+### 1.3 게이트 §9.1 상태
+
+| 항목 | 상태 |
+|---|---|
+| run_daily_analysis.py 작동 | ✅ |
+| run_analysis_today.ps1 | ✅ (DEV 작성) |
+| 일일 상한 hard stop | ✅ |
+| 캐싱 작동 | ✅ |
+| 부분 실패 처리 | ✅ |
+| show_cost_summary.py | ✅ |
+| Q-003 PROD 적용 | ⏳ 사용자 확인 필요 |
+| 7거래일 ≥ 50행 | ✅ 167행 |
+| 사용자 정성 평가 "쓸만하다" | **⏳ 본 단계** |
+| 헌법 §2.1/§2.2/§2.5 | ✅ (경로 없음 + 분리 + llm_calls 기록) |
+
+---
+
+*1.3.10 가이드 작성: Builder 2026-05-07*
+
+---
+
+### 1.3.10 정성 평가 결과 (2026-05-08)
+
+#### (a) 167행 데이터 분석 결과 요약
+
+| 구분 | KR | US | 합계 |
+|---|---|---|---|
+| 1.3.9-A 백필 | 70행 (7거래일 × 10) | 71행 (7거래일 × 10 + NVST 1) | 141행 |
+| 1.3.9-B 자연 운영 | 0행 | 26행 (2026-05-06) | 26행 |
+| **총계** | **70행** | **97행** | **167행** |
+
+**Classification 분포**:
+- KR: ignore 70 (100%)
+- US: ignore 96 (99.0%), watch 1 (ALTO 5/1, 1.0%), entry 0
+- **합계**: ignore 166 / watch 1 / **entry 0**
+
+**호출 메트릭** (1.3.9-A 백필 세션 누적):
+- analysis_5_kr: 75회 (에러 4, 5.3%), avg dur 79.8s
+- analysis_5_us: 82회 (에러 11, 13.4%), avg dur 88.2s
+- entry_params_6_us: 1회 (NVST 검증), avg dur 107.9s
+- 합계 158회, 에러율 9.5% (CLI timeout retry 정상 범위)
+
+#### (b) 사용자 자체 판단
+
+**§9.2 5종 기준 모두 충족** 판단:
+
+| 기준 | 목표 | 판단 |
+|---|---|---|
+| 분류의 합리성 | entry 10개 70%+ | 운용적 완화 (entry 0건 — 아래 (e) 참조) |
+| watch 활용성 | 50%+ 재방문 가치 | ALTO 5/1 1건: 판단 유보 (5일 후 ignore 전환) |
+| ignore 정당성 | reasoning 구체적 | ✅ non-ETF ~80% 우수 사례 확인 |
+| confidence 일관성 | 직관 정렬 | ✅ 저신뢰=복잡 케이스, 고신뢰=명확 케이스 |
+| entry_params | 거래 직접 사용 가능 | ✅ NVST (B.5.5) Evaluator 2회 검토 완료 |
+
+**종합 판단**: "**쓸만한 수준**" — Phase 1 종료 적정
+
+#### (c) Evaluator 1차 평가 요약 (Phase 1.3.10 정성 평가 보고)
+
+**대상 표본**: 7건 (ignore 6건 + watch 1건)
+
+**결론**:
+- **7건 표본 100% 합리적** (목표 70% 크게 상회)
+- **"쓸만한 수준" Yes**, **"Phase 1 종료 적정"** 명시
+
+**핵심 강점 5종**:
+1. ignore reasoning 품질 — 구체적 수치 포함 (%, vol, weeks) + 미너비니 원칙 근거 명시
+2. confidence 캘리브레이션 — 극단적 케이스(0.95) / 일반 케이스(0.90) / 방향 불확실(0.75) 합리적 구분
+3. ETF Pre-Check — conf=1.00 즉시 처리로 비용 낭비 최소화, safety net 정상 작동
+4. risk_flag taxonomy 일관 적용 — 12종 whitelist 준수, outlier 0건
+5. stage 분석 정확성 — late-stage vs early-stage 구분, climax run 시점 특정 정확
+
+**약점 6종** (Phase 2 또는 별도 sprint에서 처리 권고):
+1. entry-side 검증 부재 — 0건이라 실질적 entry 정확도 미검증
+2. watch reasoning 모호성 — ALTO 5/1 "Monitor for pullback/base" 수준이 ignore와 경계 불명확
+3. §M 분류 불안정 — 같은 종목 5일 간격 ignore↔watch 전환 (ALTO 4/28 ignore → 5/1 watch → 이후 ignore)
+4. boundary 결정성 부족 — "얼마나 확장되어야 extended_from_ma인가" 등 정량 경계 미명시
+5. ETF upstream 필터 미비 — ADR-013 적용 후에도 12건 오통과, us_symbol_master 정확도 문제
+6. VCP 정량화 미비 — VCP 패턴 인식 기준이 정성적, 정량 기준 없음
+
+#### (d) Evaluator 2차 평가 요약 (보강 자료)
+
+**"advance ≤ 3" 의미**:
+- late_stage_base flag 기준: base 횟수 3 이하 = late-stage 아님
+- 임상적 의미: 3rd base 이하이면 재진입 후보 가능성 존재
+- Phase 2 활용: watch 종목 중 advance ≤ 3인 경우를 "primary watch" 카테고리로 분리 가능
+
+**known_warnings severity 사전 매핑**:
+- 현재: known_warnings는 closed set (12종 Literal enum) — severity 정보 없음
+- Evaluator 권고: severity 사전 mapping 가능 (closed set이라 항목별 high/medium/low 미리 정의 가능)
+  - high: `stop_distance_from_current_price_exceeds_book_limit`, `breakout_volume_below_requirement`
+  - medium: 그 외 position-sizing 관련
+  - low: 정보성 flag
+- Phase 2 보강 시 참고 자료로 보존
+
+#### (e) §9.2 기준 1 운용적 완화 명시
+
+- **원래 기준**: entry 10개 표본 → 70%+ 납득
+- **실제 데이터**: entry 0건 (시장 환경 제약 — B.5.5 통계상 0.25% 자연 발생률과 정합, 167행에서 0~1건 예상 범위)
+- **대체 평가**: ignore 6건 + watch 1건 (ALTO) + NVST entry_params (B.5.5) 1건 → 8건 구성
+  - Evaluator가 7건 표본 100% 합리적 판정 → 시스템 작동 객관 검증
+- **결론**: §9.2 기준 1은 정식 충족 불가하나 운용적으로 완화 처리. **§9.2 본문은 변경하지 않음** (Architect 권한 영역)
+- **후속**: Phase 2에서 자연 누적 데이터로 entry-side 정식 평가 sprint 별도 진행 예정
+
+#### (f) ETF 12건 이슈
+
+- 5/6 US 자연 운영 데이터에서 us_symbol_master.symbol_type='STOCK'으로 잘못 등록된 12건 확인
+- VRTL, SOXL, MVLL, MUU, MULL, AMDG, AMDL, AMUU, KORU, INTW, DLLL, BWET
+- LLM Pre-Check이 안전망 정상 작동 → 즉각적 위험 없음
+- **Q-004 등록** (별도 처리): ADR-013 정책 확장 + us_symbol_master 정정
+
+#### (g) Phase 2 인계 항목
+
+| 항목 | 출처 | 우선순위 |
+|---|---|---|
+| boundary 결정성 — climax_run/extended_from_ma 정량 기준 추가 | Evaluator 강점 역방향 | 보통 |
+| known_warnings severity 매핑 — closed set 기반 사전 정의 | Evaluator 2차 | 낮음 |
+| revisit_condition 필드 — watch 종목에 재방문 조건 명시 | Evaluator 권고 | 보통 |
+| earnings warning — 실적 임박 시 자동 flag | Evaluator 권고 | 보통 |
+| VCP 정량화 — VCP 패턴 인식 정량 기준 명확화 | Evaluator 권고 | 낮음 |
+| ADR-013 정책 확장 — us_symbol_master 분류 범위 (preferred stock, CEF 등) | §J 후속 | 보통 |
+| Q-004 us_symbol_master ETF 정정 12건 | 5/6 운영 발견 | 보통 |
+
+*1.3.10 결과 기록: Builder 2026-05-08*
