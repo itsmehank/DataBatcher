@@ -166,74 +166,35 @@ Unregister-ScheduledTask -TaskName "LLMAnalysis_KR" -Confirm:$false
 
 ---
 
-### Q-002: Phase 1 DB 마이그레이션 적용 — daily_analysis_kr, daily_analysis_us, llm_calls (등록: 2026-04-28)
-
-**관련 commit**: `phase1/1.1-llm-analysis-skeleton` 브랜치 머지 commit (머지 후 hash 기입 예정)  
-**관련 ADR**: ADR-009 (LLM 분석 테이블 설계), ADR-010 (마이그레이션 3종 산출물)  
-**Alembic revision**: `20260428_000001` (down_revision: `20260424_000001`)  
-**raw SQL 파일**: `db/migrations/sql/20260428_000001_add_daily_analysis_and_llm_calls.sql`  
-**위험도**: 중간 (DB 변경 — CREATE TABLE 3개, 롤백 가능)  
-**예상 소요**: 5분 미만 (CREATE TABLE 3개, 기존 테이블 없음)  
-**타이밍 윈도우**: KR cron(19:00) · US cron(08:00) 각각 직전 30분을 피하면 어느 시각이든 안전
-
-**적용 전 사전 확인**:
-
-```powershell
-# 1. git pull 상태 확인
-cd C:\path\to\DataBatcher
-git log --oneline -3
-
-# 2. 대상 테이블 미존재 확인 (둘 다 빈 결과여야 함)
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "SHOW TABLES FROM trade LIKE 'daily_analysis%';"
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "SHOW TABLES FROM trade LIKE 'llm_calls';"
-```
-
-**적용 (raw SQL 직접 실행 — 이번에도 Alembic 미사용, 미해결 이슈 §G 유지)**:
-
-```powershell
-cd C:\path\to\DataBatcher
-git pull
-
-Get-Content db\migrations\sql\20260428_000001_add_daily_analysis_and_llm_calls.sql | `
-  docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" trade
-```
-
-**적용 후 검증 (세 테이블 DESCRIBE)**:
-
-```powershell
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "DESCRIBE trade.daily_analysis_kr;"
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "DESCRIBE trade.daily_analysis_us;"
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
-  -e "DESCRIBE trade.llm_calls;"
-```
-
-**완료 기준**: 세 테이블의 DESCRIBE 결과가 `_meta/phases/phase1_brief.md` §4.1·§4.2·§4.3 스키마와 일치
-
-**백업**: 생략 (Q-001과 동일 사유 — CREATE TABLE은 기존 데이터 무영향)
-
-**롤백 방법**:
-
-```powershell
-docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" trade `
-  -e "DROP TABLE IF EXISTS llm_calls; DROP TABLE IF EXISTS daily_analysis_us; DROP TABLE IF EXISTS daily_analysis_kr;"
-```
-
-**메모**:
-- Alembic 적용은 이번에도 생략 (미해결 이슈 §G — PROD `alembic_version` 동기화 미해결). raw SQL만 적용.
-- 미해결 이슈 §G 해소 시점(별도 결정)에 PROD stamp + upgrade head 일괄 처리 예정.
-- 본 큐 항목의 텍스트 출처: `_meta/phases/phase1_progress.md` §"Q-002 등록 대기" (Builder가 작성, Architect가 본 운영 큐로 이동, 2026-05-02).
-
----
-
 (추가 항목은 위쪽으로 — 최신순)
 
 ---
 
 ## 완료된 작업
+
+### Q-002: Phase 1 DB 마이그레이션 적용 — daily_analysis_kr, daily_analysis_us, llm_calls ✅ (등록: 2026-04-28, 완료: 2026-05-07)
+
+**관련 commit**: `phase1/1.3-daily-analysis` 브랜치 HEAD `57b6d48` 기준 적용  
+**관련 ADR**: ADR-009 (LLM 분석 테이블 설계), ADR-010 (마이그레이션 3종 산출물)  
+**Alembic revision**: `20260428_000001` (down_revision: `20260424_000001`)  
+**raw SQL 파일**: `db/migrations/sql/20260428_000001_add_daily_analysis_and_llm_calls.sql`  
+**적용 일시**: 2026-05-07 KST  
+**적용 방식**: raw SQL 직접 실행 (`Get-Content ... | docker exec -i mysql-standalone-mysql mysql ...`)  
+**Alembic**: 이번에도 생략 (미해결 이슈 §G — PROD `alembic_version` 동기화 미해결). raw SQL만 적용.
+
+**검증 결과**:
+- ✅ `daily_analysis_kr` DESCRIBE: symbol/date(PK), market, classification, confidence, reasoning, pattern, risk_flags(JSON), entry_params(JSON), screen_config_hash, llm_call_id, created_at — phase1_brief §4.1 스키마 일치
+- ✅ `daily_analysis_us` DESCRIBE: 동일 구조 — phase1_brief §4.2 스키마 일치
+- ✅ `llm_calls` DESCRIBE: id(PK AUTO_INCREMENT), timestamp, module, model, prompt_tokens, completion_tokens, cost_usd, request_payload(JSON), response_payload(JSON), duration_ms, error — phase1_brief §4.3 스키마 일치
+
+**작업 환경**:
+- PROD (Windows + PowerShell, `C:\Users\sengo\project\github\DataBatcher`)
+- DB: `mysql-standalone-mysql` Docker 컨테이너 (MySQL 8.4.8)
+
+**메모**:
+- Q-003 선행 조건 충족 완료.
+
+---
 
 ### Q-001: P0.5 마이그레이션 적용 ✅ (등록: 2026-04-24, 완료: 2026-04-26)
 
