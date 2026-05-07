@@ -1143,12 +1143,77 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 - ⏳ 백필 7거래일 + 자연 운영 1~2거래일 (1.3.9-A/B)
 - ⏳ 사용자 정성 평가 (1.3.10~1.3.11)
 
+### 1.3.9-A — 7거래일 백필 (2026-05-07)
+
+**대상 윈도우** (사용자 결정, 가장 최근 7거래일):
+- KR: 4/23, 4/24, 4/27, 4/28, 4/29, 4/30, 5/4 (KR은 5/1·5/5 휴장)
+- US: 4/24, 4/27, 4/28, 4/29, 4/30, 5/1, 5/4
+
+**실행 방식**: 사용자 결정대로 region·date당 10종목 (RS rating DESC 상위) 차례차례 manual chain. Background bash로 batch chain 직렬 실행. 한 번 중단 후 재개 (claude --resume) 시나리오까지 실증.
+
+**최종 누적 (141행)**:
+
+| Region | Dates | 분류 |
+|---|---|---|
+| KR | 4/23~5/4 (7일) × 10 = 70 | ignore 70 |
+| US | 4/24~5/4 (7일) × 10 + NVST 1 = 71 | ignore 70, **watch 1**, entry 0 |
+
+**Watch 종목** (1.3.9-A 첫 non-ignore 사례):
+- ALTO 2026-05-01, confidence 0.75, pattern none — 1.3.10 정성 평가에서 reasoning 검토 가치 있음
+
+**호출 메트릭 (오늘 LLM 호출 누적)**:
+
+| module | calls | errors | error rate | avg dur |
+|---|---|---|---|---|
+| analysis_5_kr | 75 | 4 | 5.3% | 79.8s |
+| analysis_5_us | 82 | 11 | 13.4% | 88.2s |
+| entry_params_6_us | 1 | 0 | 0% | 107.9s |
+| 합계 | 158 | 15 (9.5%) | (CLI timeout retry 정상 범위) | |
+
+**sync_log llm_* 이벤트**:
+- `llm_analysis_kr/us` running/success 마커: 정상
+- `llm_daily_call_limit ERROR 1`: KR 50 hit 시점 (시스템 안전장치 정상 작동) → 사용자 합의 후 settings.yaml 200/200 임시 상향, 백필 종료 후 50/50 원복
+- `llm_token_spike WARN 141`: 거의 모든 호출이 임계 24K 초과. 정상 prompt가 ~25K로 측정되어 1.3 후속 task #18(임계 50K로 상향)로 식별
+
+**§J/§K/§L/§M 부수 모니터링 결과**:
+
+| 이슈 | 1.3.9-A 결과 |
+|---|---|
+| §J ETF 잘못 통과 | 백필에서는 추가 발생 없음 (ADR-013 ETF 제외 필터 안정 동작) — 1.3.9-B 자연 운영에서 추가 관찰 |
+| §K (5) v2 분류 보수성 | entry 0 + watch 1 (ALTO). 백필 윈도우(froth) 특성상 entry 발생 자연 빈도 낮음. v2가 watch도 산출하므로 ignore-편향 가설 부분 약화. 더 다양한 시장 상태에서 확인 필요 |
+| §L (6) v1.1 fix | 1.3.0에서 단위/실LLM 검증 통과. 1.3.9-A에서는 entry 0건이라 (6) 추가 호출 없음 (NVST 외) |
+| §M EA 분류 불안정 | NVST B.5.5(entry) → 2026-05-07 (ignore) 사례 외 추가 multi-eval 변동 관찰 안 됨 (백필 윈도우 7일이 좁아 cross-date 표본 작음) |
+
+**1.3 게이트 §9.1 — 본 단계로 통과한 항목**:
+- ✅ run_daily_analysis 작동 (KR/US 분리, 상한, 캐싱, dry-run, force-recompute)
+- ✅ 부분 실패 처리 (15 errors도 chain 진행)
+- ✅ 일일 호출 상한 hard stop 동작 (1회 실증 + 사용자 합의 후 한도 상향 + 종료 후 원복)
+- ✅ 모니터링 4종 sync_log path 모두 가동 (running/success/WARN/ERROR + 4 종 marker)
+- ✅ 백필 7거래일 50행 이상 누적 (141행 = 목표 2.8배)
+- ⏳ 1.3.9-B 자연 운영 1~2거래일 (Q-003 PROD 적용 후)
+- ⏳ 1.3.10~11 사용자 정성 평가
+
+### 1.3.9-A 단계 부수 작업
+
+| 작업 | 처리 |
+|---|---|
+| settings.yaml `daily_call_limits.kr/us` 50→200 임시 상향 (백필 진행용) | 종료 후 50으로 원복 — 본 commit 포함 |
+| US daily collector FDR end-boundary off-by-one 버그 발견 (다른 세션) | main에 hotfix `a1ebce3` 적용. 본 phase1 브랜치는 `git merge origin/main`로 병합 — 본 commit `271ff55` 머지 commit |
+| token_spike 임계 조정 (24K→50K 등) | task #18로 1.3 후속 처리 예정 |
+
 ### 다음 단계
 
-**1.3.9-A** 백필 시작 전 사용자 결정 필요 사항:
-1. Q-002 PROD 적용 상태 (현재 미적용 — 1.3.7 PROD 검증 직전 처리 필요)
-2. 백필 대상 7거래일 윈도우 선정 (예: 2026-04-28 ~ 2026-05-06)
-3. Max 플랜 5시간 윈도우 한도 인지 + 백필 실행 시점 합의
+**1.3.9-B 자연 운영 검증 (Q-003 PROD 적용 후)**:
+- 다음 자동 트리거 시각(US 16:00 / KR 21:00 KST)에 정상 실행 관찰
+- Get-ScheduledTaskInfo LastRunResult=0 확인
+- daily_analysis 신규 행 + llm_calls 호출 + sync_log marker 확인
+- 1~2거래일 트리거 안정성 검증 후 1.3.10으로 이동
+
+**Phase 1 종료 게이트 §9.1 잔여 항목** (1.3.9-B 후):
+- Q-003 PROD 적용 완료
+- 백필 + 자연 운영 누적 데이터 검토
+- 사용자 정성 평가 ("쓸만하다")
+- 헌법 §2.1, §2.2, §2.5 위배 없음 (Auditor 세션)
 
 ## 주간 운영 메모
 
