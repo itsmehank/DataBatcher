@@ -155,8 +155,11 @@ class USIndexCollector(BaseCollector):
         import FinanceDataReader as fdr
 
         start_str = str(start) if not isinstance(start, str) else start
-        end_str = str(end) if not isinstance(end, str) else end
-        df = fdr.DataReader(symbol, start=start_str, end=end_str)
+        # FDR.DataReader treats `end` as exclusive; pass logical_end + 1 day
+        # so the last trading day on/before logical_end is included. The
+        # subsequent _clip_to_requested_range trims any row > logical_end.
+        fdr_end_str = (pd.to_datetime(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        df = fdr.DataReader(symbol, start=start_str, end=fdr_end_str)
         df = self._normalize_price_frame(df, symbol, market, source="fdr")
         return self._clip_to_requested_range(df, start, end)
 
