@@ -1609,6 +1609,7 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 
 - **§M 분류 불안정** (ALTO 등): 같은 종목이 5일 내 ignore↔watch 전환. Phase 2 초반 자연 누적 데이터에서 통계 집계 후 revisit_condition 필드 추가 여부 결정.
 - **B.5.5 ETF 오통과 6건** (EMF, RMT, CEE, KF, CAF): Q-004와 별도로 ADR-013 §4 확장 시 함께 처리.
+- **ADR 봉인 원칙 정합성 검토 필요**: Phase 1 종료 후 main 동기화(`_meta/` sync, 2026-05-08) 시점에 `_meta/04_DECISIONS.md`의 ADR-010, ADR-011에 본문 수정이 발견됨. ADR 봉인 원칙(`04_DECISIONS.md` 헤더)과의 정합성 검토 필요. Architect 후속 세션에서 처리 예정 — '결정 변경 vs 결정 보강·현실 반영'의 ADR 갱신 정책 명문화 검토.
 
 ---
 
