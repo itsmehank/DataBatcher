@@ -2,7 +2,8 @@
 
 > 이 문서는 프로젝트 진행 중 내린 주요 결정과 그 사유를 기록한다.  
 > 모든 결정은 시간 순서로 추가되며, 한 번 기록된 결정은 삭제하지 않는다.  
-> 결정을 번복할 때는 새 ADR을 작성하고, 기존 ADR의 상태를 "Superseded"로 표시한다.
+> 결정의 핵심 의미를 변경할 때는 새 ADR을 작성하고, 기존 ADR의 상태를 "Superseded"로 표시한다.  
+> 단 implementation detail 정밀화·부수 항목 추가·관계 명시·사후 관찰 추가에 한해 본문 수정을 허용하며, 변경 이력 표기 의무를 진다 (ADR-014 §1·§3).
 
 ---
 
@@ -941,9 +942,9 @@ ADR-010의 환경 인벤토리(DEV·PROD)는 변경 없음. PROD 환경에 Task 
 ## ADR-013: 미너비니 스크리너에서 ETF 제외 (사용자 정책 명문화)
 
 - **날짜**: 2026-05-02
-- **상태**: Accepted
+- **상태**: Accepted (§1·§4는 ADR-015로 확장됨 — 2026-05-09)
 - **결정자**: 사용자 + Architect (Phase 1 1.1.15 외부 평가 결과 반영)
-- **관련 ADR**: ADR-009 (스크리너 결과 테이블 + 분석 LLM 흐름)
+- **관련 ADR**: ADR-009 (스크리너 결과 테이블 + 분석 LLM 흐름), ADR-015 (적용 범위 확장 + us_symbol_master 보강)
 
 ### 컨텍스트
 
@@ -1048,5 +1049,316 @@ ADR-013 적용 후에도 v2 프롬프트의 ETF Pre-Check는 **그대로 유지*
 
 ---
 
-*새로운 결정이 있을 때마다 ADR-010, ADR-011... 형태로 추가한다.*
+## ADR-014: ADR 갱신 정책 — 본문 수정의 경계 명문화
+
+- **날짜**: 2026-05-09
+- **상태**: Accepted
+- **결정자**: 사용자 + Architect 협의 (Phase 1 종료 후 부수 발견 처리)
+- **관련 ADR**: ADR-005 (거버넌스 SSoT), ADR-010 §1·§6 (본문 수정 사례), ADR-011 §1·§3 (본문 수정 사례), ADR-012 (ADR-011 §1 부분 개정 사례)
+
+### 컨텍스트
+
+본 문서(`04_DECISIONS.md`) 헤더는 ADR 봉인 원칙을 다음과 같이 명시했다:
+
+> "모든 결정은 시간 순서로 추가되며, 한 번 기록된 결정은 삭제하지 않는다. 결정을 번복할 때는 새 ADR을 작성하고, 기존 ADR의 상태를 'Superseded'로 표시한다."
+
+이 원칙은 결정의 역사적 기록(history of decisions)을 왜곡하지 않기 위한 보호장치다. 그러나 Phase 1 진행 중 ADR-010·ADR-011 본문에 다음 수정이 실제로 발생했다 (`phase1_progress.md` "Phase 1 종료 보고 — Phase 2 인계 항목"에서 부수 발견으로 식별):
+
+| ADR | 수정 유형 | 시점 | 내용 |
+|---|---|---|---|
+| ADR-010 §1 | 결정 보강 | Phase 1.1, 2026-04-28 | raw SQL 위치 결정 추후 정밀화 (`apps/ingest-databatcher/scripts/migrations/` → `db/migrations/sql/`) |
+| ADR-010 §6 | 결정 추가 | Phase 1.1, 2026-05-02 | alembic.ini 자격증명 처리 결정 추가 |
+| ADR-011 §3 | 결정 보강 | Phase 1.1.4-b, 2026-04-29 | cost_usd 필드 처리 표 — CLI 모드 NULL 허용 + 참고값 저장 가능 명시 |
+| ADR-011 헤더 | 메타 갱신 | 2026-04-26 | 상태에 "§1은 ADR-012로 부분 개정됨" 표기 |
+
+이러한 수정은 헤더 원칙의 문언과 충돌할 수 있다. 동시에, 실용적으로는 다음 같은 본문 수정이 거버넌스에 가치를 더한다:
+- 결정 시점에는 추상적이었던 implementation detail이 적용 시점에 정밀화됨
+- 결정이 적용된 후 사후 관찰 사실이 결과/영향 섹션에 추가됨
+- 다른 ADR과의 관계가 새 ADR 작성 시 명시됨
+
+본 ADR은 갱신 정책을 명문화하여 헤더 원칙과 실제 운영 사이의 모순을 해소한다.
+
+### 결정
+
+**ADR 본문 수정은 다음 조건을 모두 충족하는 경우에 한해 허용한다. 그 외에는 새 ADR + Superseded 패턴을 강제한다.**
+
+#### 1. 허용되는 본문 수정 유형 (4 카테고리)
+
+**(a) Implementation Detail 정밀화** (가장 흔한 케이스)
+- 결정 시점에 "구현 시점에 결정"으로 두었던 사항이 후속 작업에서 정밀화될 때
+- 예: ADR-010 §1의 raw SQL 위치 — 본 ADR 시점에는 `apps/ingest-databatcher/scripts/migrations/`였으나 Phase 1.1 진행 중 `db/migrations/sql/`로 정밀화
+- 조건: 핵심 결정의 의미는 불변, 구현 위치/형식만 변경
+
+**(b) 결정의 부수 항목 추가** (확장)
+- 같은 결정 영역 안에서 새로 결정 필요한 항목이 발견될 때
+- 예: ADR-010 §6 — alembic.ini 자격증명 처리는 ADR-010의 "마이그레이션 일원화" 결정 영역 안의 부수 결정
+- 조건: 핵심 결정과 같은 영역 / 자연스러운 연속선상 / 핵심 결정을 부정하지 않음
+
+**(c) 다른 ADR과의 관계 명시**
+- 후속 ADR이 본 ADR을 참조/개정/Supersede할 때 헤더의 "관련 ADR" 또는 "상태" 갱신
+- 예: ADR-011 헤더에 "§1은 ADR-012로 부분 개정됨" 추가, ADR-013 헤더에 "§1·§4는 ADR-015로 확장됨" 추가
+- 조건: 사실 기록만 (해석·의도 변경 금지)
+
+**(d) 결과/영향 섹션의 사후 관찰 추가**
+- 결정이 적용된 후 관측된 실제 영향 추가
+- 예: ADR-013 §"회고 (Phase 1 종료 후 점검 항목)" — 적용 후 점검 결과를 본문에 누적 가능
+- 조건: 원래의 "결정"·"사유" 섹션은 불변
+
+#### 2. 금지되는 변경 (반드시 새 ADR + Superseded)
+
+다음 변경은 본문 수정으로 처리할 수 없다:
+
+- **핵심 결정의 의미 변경** — 예: "ETF 제외"를 "ETF 포함"으로 변경
+- **사유의 핵심 변경** — 당시 판단 근거의 사후 재서술 (역사 왜곡)
+- **결정자/날짜 변경** — 역사 기록의 무결성 침해
+- **부분 개정** — 한 ADR의 §N만 다른 결정으로 대체하려 할 때 → ADR-012 패턴(별도 ADR로 부분 supersede 명시)을 따른다
+
+#### 3. 변경 이력 표기 의무
+
+본문 수정 시 다음 둘 중 하나의 형식으로 변경 사실을 명시:
+
+**형식 A — 인라인 표기** (작은 변경, 권장 기본)
+- 변경된 절 본문에 변경 시점·사유 inline 명시
+- 예: `**Raw SQL 위치 결정 (Phase 1 1.1, 2026-04-28)**: ...`
+
+**형식 B — 변경 이력 섹션** (큰 변경 또는 다중 변경 누적)
+- ADR 본문 끝에 `### 변경 이력` 섹션 추가
+- 표 형식: 일자 / 변경 유형(허용 4 카테고리 중 하나) / 영향 절 / 사유
+
+ADR 헤더의 "상태" 필드는 다음 표기를 허용:
+- `Accepted` — 변경 없음
+- `Accepted (Phase N N.N에서 본문 일부 갱신 — YYYY-MM-DD)` — 본문 수정 발생, 형식 B 권장
+- `Accepted (§N은 ADR-XXX로 확장됨 — YYYY-MM-DD)` — 다른 ADR이 부분 개정/확장
+- `Superseded by ADR-XXX` — 전체 supersede
+
+#### 4. 04_DECISIONS.md 헤더 갱신
+
+본 ADR 채택과 동시에 `04_DECISIONS.md` 헤더의 봉인 원칙 문언을 다음으로 갱신한다 (본 ADR 시행과 함께 일괄 처리):
+
+> "모든 결정은 시간 순서로 추가되며, 한 번 기록된 결정은 삭제하지 않는다. 결정의 핵심 의미를 변경할 때는 새 ADR을 작성하고, 기존 ADR의 상태를 'Superseded'로 표시한다. 단 implementation detail 정밀화·부수 항목 추가·관계 명시·사후 관찰 추가에 한해 본문 수정을 허용하며, 변경 이력 표기 의무를 진다 (ADR-014 §1·§3)."
+
+#### 5. 기존 본문 수정 사례의 소급 정합화
+
+ADR-014 채택 시점에서, 이미 본문 수정이 발생한 ADR-010·ADR-011은 다음을 만족시킨다:
+
+| ADR | 변경 절 | 카테고리 | 이력 표기 형식 |
+|---|---|---|---|
+| ADR-010 §1 | raw SQL 위치 | (a) Implementation Detail | 형식 A — "Raw SQL 위치 결정 (Phase 1 1.1, 2026-04-28)" ✅ 이미 적용 |
+| ADR-010 §6 | alembic.ini 자격증명 | (b) 부수 항목 추가 | 형식 A — "(Phase 1 1.1, 2026-05-02)" ✅ 이미 적용 |
+| ADR-011 §3 | cost_usd 처리 표 | (a) Implementation Detail | 형식 A — "(Phase 1.1.4-b, 2026-04-29 명시)" ✅ 이미 적용 |
+| ADR-011 헤더 | 상태 표기 | (c) 관계 명시 | "§1은 ADR-012로 부분 개정됨" ✅ 이미 적용 |
+
+위 4건은 본 ADR 기준으로 모두 허용 카테고리에 부합 + 인라인 이력 표기 충족. 별도 변경 이력 섹션 추가 없이 현 상태 유지.
+
+### 사유
+
+**왜 옵션 1(절대 금지)을 채택하지 않는가**:
+- 절대 금지는 이상적이나 비현실적: implementation detail 갱신마다 새 ADR 작성하면 ADR 수가 폭증
+- 작은 보강(예: 디렉토리 경로 정밀화)을 supersede ADR로 처리하면 ADR 그래프가 파편화되어 추적 어려움
+- 거버넌스 비용 > 정확성 효익
+
+**왜 옵션 3(현행 묵인)을 채택하지 않는가**:
+- 묵인은 헤더 원칙과 실제 운영 사이의 모순 잔존
+- 미래의 Builder/Architect/Auditor가 무엇이 허용·금지인지 판단 기준 없음
+- ADR-005의 "거버넌스 명문화" 정신과 모순
+
+**왜 옵션 2(허용하되 명문화)가 최선인가**:
+- 실용성과 무결성의 균형
+- 4 카테고리는 거버넌스 관점에서 "사실 기록·정밀화"이지 "역사 변경"이 아님
+- 변경 이력 표기 의무로 추적성 확보 — Auditor가 본 ADR 기준으로 위반 여부 점검 가능
+- ADR-005의 "영속 문서 기반 거버넌스" 정신 부합
+
+**왜 헤더를 직접 갱신하는가 (§4)**:
+- 헤더 원칙 문언과 본 ADR 결정이 일치하지 않으면 미래 독자가 혼란
+- 헤더 갱신은 본 ADR 시행과 동시에 이뤄져야 함 (정합성 즉시 확보)
+
+**왜 기존 사례를 소급 정합화하는가 (§5)**:
+- ADR-010·ADR-011의 본문 수정은 모두 §1의 4 카테고리에 부합
+- 추가 변경 이력 섹션 작성은 비용 대비 효익 낮음 (인라인 표기로 충분)
+- 본 ADR이 채택된 시점부터의 향후 수정에만 새로운 형식적 요건을 적용 — 거버넌스 비용 합리화
+
+### 결과 / 영향
+
+**Builder의 새 책임**:
+- ADR 본문 수정 시 본 ADR §1의 허용 카테고리 확인 후 진행
+- 허용 외 변경은 새 ADR 작성으로 처리 (Architect 세션에서 결정)
+- 변경 이력 표기 (형식 A 또는 B) 필수
+
+**Architect의 새 책임**:
+- ADR 본문 수정 시 본 ADR §1·§3 부합 확인
+- 헤더 상태 필드 갱신 책임
+- 옵션 2의 부수 효과 감지 (예: 한 ADR에 본문 수정이 누적되어 사실상 "다른 ADR"이 됐을 때 → 새 ADR로 분리 권고)
+
+**Auditor의 새 책임**:
+- Phase 종료 감사 시 본 ADR §1·§3 위반 사례 점검
+- 핵심 결정 변경이 본문 수정으로 처리된 케이스 발견 시 시정 권고
+
+**연관 문서 갱신 (본 ADR 시행과 동시)**:
+- `_meta/04_DECISIONS.md` 헤더 — §4에 따라 봉인 원칙 문언 갱신 ✅ 본 세션 처리
+
+**소급 적용 범위**:
+- ADR-010·ADR-011의 기존 본문 수정 4건은 본 ADR 카테고리에 부합 (§5 표) — 별도 조치 없음
+- 향후 모든 ADR 본문 수정은 본 ADR §1·§3 적용
+
+---
+
+## ADR-015: ADR-013 정책 확장 — Fund Vehicle 분류 범위 명확화 + us_symbol_master 정확성 보강
+
+- **날짜**: 2026-05-09
+- **상태**: Accepted
+- **결정자**: 사용자 + Architect 협의 (Phase 1 1.3.10 발견 + Phase 2 sprint 진입 결정)
+- **관련 ADR**: ADR-013 (ETF 제외 정책 — 본 ADR이 §1·§4 확장), ADR-014 (관계 명시 카테고리 적용)
+
+### 컨텍스트
+
+ADR-013 (2026-05-02)은 미너비니 스크리너에서 ETF를 제외하는 사용자 정책을 명문화했다. 적용 후 Phase 1 진행 중 다음 두 차례 추가 사례가 발견됐다.
+
+#### 발견 1: B.5.5 sample 6건 (Phase 1.2 트랙 B, 2026-05-05)
+
+B.5.5 sample 추출 시 `us_symbol_master.symbol_type='STOCK'` 필터를 적용했는데도 LLM v2가 ETF로 판정한 종목 6건:
+- EMF, RMT, CEE (2회), KF, CAF
+
+해석: 모두 closed-end fund (CEF) 또는 country fund 계열로, 명목상 STOCK으로 등록됐으나 실제로는 fund vehicle.
+
+#### 발견 2: 1.3.10 운영 자연 발견 12건 (2026-05-08, Q-004 등록)
+
+5/6 US 자연 운영 데이터에서 12건 추가 발견:
+- VRTL, SOXL, MVLL, MUU, MULL, AMDG, AMDL, AMUU, KORU, INTW, DLLL, BWET
+
+해석: leveraged ETF (SOXL, KORU 등 -3x bull/bear) + 신규 ETF / ETF-like vehicle. us_symbol_master.symbol_type 분류가 외부 소스(FDR/yfinance) 단계에서 부정확.
+
+#### 공통 패턴
+
+ADR-013은 `symbol_type='ETF'` 필터를 채택했는데, **us_symbol_master의 symbol_type 분류 자체가 불완전**하다. 다음 카테고리가 STOCK으로 잘못 등록됐을 가능성이 높음:
+
+1. **Closed-end fund (CEF)** — EMF, RMT, CEE, KF, CAF 패턴
+2. **Leveraged/Inverse ETF** — SOXL, KORU, AMDL, AMUU, MVLL, MUU, MULL, AMDG (3x bull/bear 시리즈)
+3. **신규 ETF** (~6개월 내 상장) — VRTL, INTW, DLLL, BWET 후보
+4. **Preferred stock·Depositary Receipt** — 본 발견 표본에는 없으나 잠재 가능성
+
+LLM v2의 ETF Pre-Check가 conf=1.00 안전망으로 정상 작동 중 (즉각 위험 없음). 그러나 ADR-013의 적용 범위가 좁아 운영 비용·노이즈 잔존.
+
+### 결정
+
+**ADR-013의 적용 범위와 us_symbol_master 정확성 보강 정책을 다음으로 확장한다.**
+
+#### 1. 적용 범위 확장 — Fund Vehicle 4 카테고리 명확화
+
+ADR-013 §1의 "ETF 종목 제외"를 다음 4 카테고리로 명확화:
+
+| 카테고리 | 정의 | 식별 단서 (heuristic) |
+|---|---|---|
+| 1. ETF (기존) | Exchange-Traded Fund | `symbol_type='ETF'` |
+| 2. Leveraged/Inverse ETF | 2x/3x 또는 inverse ETF | 심볼 suffix (L/U/UU/D), name "Bull/Bear", AUM·issuer 패턴 |
+| 3. Closed-end Fund (CEF) | Closed-end fund / country fund | 심볼 패턴 (XX, CEE 등), name suffix " Fund" |
+| 4. ADR/Depositary Receipt (낮은 우선순위) | Depositary Receipt | 발행국이 비-US, name suffix " ADR" |
+
+이 카테고리 모두 미너비니/O'Neil 방법론(개별 leadership stock + earnings catalyst + accumulation)의 직접 적용 대상이 아니므로 스크리너에서 제외 대상.
+
+본 ADR 시행 후 미너비니 스크리너의 upstream 필터는 4 카테고리 모두를 제외 (정확한 SQL/JOIN 구현은 Builder가 Phase 2 sprint에서 결정 — 본 ADR은 정책 결정만).
+
+#### 2. us_symbol_master 분류 정확성 보강
+
+`us_sync_symbol_master.py` (계층 1 (1) 데이터 적재)에 다음 보강 로직 추가 (Phase 2 sprint):
+
+**(a) 외부 소스 다중 검증**
+- FDR/yfinance 단일 소스 의존 → 다중 소스 cross-check (예: NASDAQ trader screener, ETF.com, ICI database)
+- 분류 불일치 시 ETF/CEF/LEVERAGED_ETF로 안전한 쪽 채택
+
+**(b) 휴리스틱 재분류**
+- 심볼 패턴 기반 (예: -L/-U/-UU/-D suffix → leveraged 의심)
+- Name 기반 ("ETF", "Fund", "Trust", "Bull", "Bear" → fund vehicle)
+- 거래량·AUM 기반 (특정 임계값 미달 시 의심)
+
+**(c) Manual override 테이블**
+- `us_symbol_master_override` 테이블 신설 (Phase 2 마이그레이션, ADR-010 §1의 3종 산출물 패턴 적용)
+- (symbol, override_type, reason, set_by, set_at) 형식
+- 자동 재분류로 잡히지 않는 케이스 사용자 수동 정정용
+
+#### 3. Q-004 처리 (즉시 적용)
+
+Phase 1.3.10에서 발견된 12건을 일괄 ETF 정정 (Q-004 운영 큐). B.5.5 발견 6건(EMF, RMT, CEE, KF, CAF)은 본 ADR 시행 시점에 별도 점검 후 Q-004 또는 후속 큐로 처리.
+
+**Q-004 적용 절차 보강**:
+- `symbol_type='ETF'` 일괄 적용 후, Phase 2 sprint에서 `LEVERAGED_ETF`/`CEF` 등으로 세분화 정정 (필요 시)
+- Q-004 완료 시 점검: us_minervini_update.py 재실행 후 12건이 스크리너 결과에서 제외 확인
+
+#### 4. 안전망 유지 (ADR-013 §3 그대로 계승)
+
+ADR-013 §3의 "v2 프롬프트 ETF Pre-Check 유지"를 그대로 계승. 이유:
+- us_symbol_master 분류가 100% 정확할 보장 없음
+- 신규 상장 ETF/CEF (예: BWET처럼 최근 출시) 발견 지연 가능
+- 사용자 수동 분석 (`run_single_symbol.py`) 시 다중 안전망
+
+LLM Pre-Check 비용은 토큰 소량 (응답 1회 즉시 종료) — 안전망으로서 비용 효율 우수.
+
+#### 5. 회고 항목 (Phase 2 종료 시 점검)
+
+다음을 Phase 2 종료 게이트에 포함:
+- us_symbol_master 분류 정확도 측정 (예: 100건 random sample 외부 소스 cross-check 일치율)
+- 본 ADR §1의 4 카테고리 모두에 대한 false positive·false negative 측정
+- LLM Pre-Check가 잡아낸 fund vehicle 비율 (스크리너 통과 후 LLM에서 reject되는 비율)
+
+본 항목은 Phase 2 brief의 sprint 항목으로 등록.
+
+### 사유
+
+**왜 ADR-013 본문 수정이 아닌 새 ADR로 처리하는가**:
+- ADR-014 §1 (a) Implementation Detail 정밀화 또는 (b) 부수 항목 추가로 본문 수정도 가능했음
+- 그러나 본 ADR은 다음 영역에서 ADR-013을 의미 있게 확장:
+  - 적용 범위 확장 (1 카테고리 → 4 카테고리)
+  - us_symbol_master 정확성 보강 (계층 1 (1) 코드 변경 동반)
+  - Manual override 테이블 신설 (스키마 변경 동반)
+- 단순한 implementation detail이 아니라 새 정책 영역 확장 → 별도 ADR이 더 깨끗
+- ADR-014 §1 (c) "관계 명시" 카테고리로 ADR-013 헤더에 "§1·§4는 ADR-015로 확장됨" 인라인 표기 추가 (본 세션)
+
+**왜 4 카테고리로 명확화하는가**:
+- 단일 `symbol_type='ETF'` 필터는 us_symbol_master 분류 정확도에 100% 의존 → 취약
+- 4 카테고리 명문화로 us_sync_symbol_master.py 코드의 분류 책임 명확화
+- LLM Pre-Check는 "ETF or fund vehicle"을 통합 판정하므로 4 카테고리 모두 같은 처리
+
+**왜 manual override 테이블을 신설하는가**:
+- 자동 분류 (소스 cross-check + 휴리스틱)에는 한계 존재
+- 사용자가 발견한 오분류는 즉시 정정 가능해야 함 — 매번 ADR 작성은 과잉
+- override 테이블은 ADR-005 SSoT 원칙과 부합 (DB가 SSoT)
+
+**왜 즉시 적용이 아닌 Phase 2 sprint로 미루는가** (§2):
+- Q-004 정정 (12건 일괄 ETF 변경)은 즉시 적용 가능 — 본 ADR 시점에 운영 큐 그대로 처리
+- 그러나 us_sync_symbol_master.py 보강·override 테이블 신설은 코드 변경·마이그레이션 동반 → Phase 2 sprint
+- ADR-013의 "긴급도 분리" 패턴 계승 (정책 즉시 명문화 + 구현 sprint 분리)
+
+### 결과 / 영향
+
+**Phase 2 brief 영향 (필수)**:
+- Phase 2B (Phase 1 인계 sprint) 내 신규 sprint 항목으로 등록:
+  - "Sprint X: ADR-015 구현 — fund vehicle 분류 보강"
+  - 작업: us_sync_symbol_master.py 보강 + 휴리스틱 + override 테이블 마이그레이션 + Q-004 후속 정밀화
+
+**ADR-013 본문 갱신 (ADR-014 §1 (c) 카테고리)**:
+- ADR-013 헤더에 "§1·§4는 ADR-015로 확장됨 — 2026-05-09" 인라인 표기 ✅ 본 세션 처리
+- 본문 수정은 헤더 한 줄만, 핵심 결정은 불변
+
+**Q-004 처리 영향**:
+- Q-004 적용 절차에 본 ADR §3 보강 한 줄 추가 (즉시 적용에는 영향 없음 — Q-004 그대로 처리 가능)
+
+**연관 문서 갱신 필요**:
+- `_meta/04_DECISIONS.md` — 본 ADR-015 추가 ✅ 본 세션
+- `_meta/04_DECISIONS.md` ADR-013 헤더 — 인라인 표기 ✅ 본 세션
+- `_meta/06_CURRENT_STATE.md` — ADR 목록 + 미해결 이슈 §J 처리 상태 갱신 (본 세션)
+- `_meta/operational_queue.md` Q-004 — ADR-015 §3 보강 한 줄 추가 (본 세션)
+- `_meta/phases/phase2_brief.md` — Sprint X 등록 (본 세션 신규 작성)
+
+**Phase 2 sprint 우선순위**:
+- 본 ADR 구현 sprint는 Phase 2B 안에서 보통 우선순위
+- Q-004 즉시 적용으로 노이즈는 제거되므로 긴급도 낮음
+- Phase 2A (메일+엑셀)와 병행 가능
+
+**ADR-013과의 관계**:
+- ADR-013은 그대로 유효 (Supersede 아님)
+- 본 ADR은 ADR-013의 §1 (적용 범위)·§4 (데이터 정리)를 확장
+- ADR-013의 §2 (구현 위치 옵션)·§3 (Pre-Check 유지)·§5 (회고)는 그대로 적용
+
+---
+
+*새로운 결정이 있을 때마다 ADR-016, ADR-017... 형태로 추가한다.*
 
