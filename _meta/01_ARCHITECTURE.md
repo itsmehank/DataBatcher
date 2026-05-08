@@ -205,7 +205,7 @@ LLM/에이전트의 판단이 실제 매매로 이어지는 모든 경로에는 
 | -------------- | ----------------------------- | ----------- |
 | 시세 데이터    | pykrx (KR), FDR (US), yfinance (보조), Binance API (크립토) | 무료, 각 시장 커버 |
 | 증권사 API     | 미정 (Phase 6 진입 시 결정)   | 한국투자증권 KIS, 키움 등 |
-| LLM            | Anthropic API                 | Claude Code CLI는 약관·안정성 문제로 운영 환경에 부적합 (ADR-003) |
+| LLM            | Anthropic API or Claude Code CLI (Phase 1 기본: CLI + Max 플랜, ADR-011) | API는 ADR-003 원칙. Phase 1은 비용 절감 목적의 조건부 예외로 CLI를 기본 백엔드로 채택 (ADR-011). API 백엔드도 추상화로 지원하며 약관 위반 징후 시 즉시 전환 가능 (ADR-012 §3.3). 2026-10-24 또는 사용자 판단 시 재검토. |
 | DB             | MySQL (Docker)                | Phase 0에서 구축 완료 |
 | 이메일         | SMTP (Gmail 앱 비밀번호)     | 무료, 신뢰성 |
 | 외부 접속      | Cloudflare Tunnel 또는 Tailscale | 포트포워딩 불필요, 보안 (Phase 3에서 도입) |
@@ -226,7 +226,7 @@ LLM/에이전트의 판단이 실제 매매로 이어지는 모든 경로에는 
 
 **선택적 클라우드 사용**:
 - 외부 접속이 필요한 부분(대시보드 외부 노출)은 Cloudflare Tunnel 또는 Tailscale로 처리 (Phase 3)
-- LLM 호출은 Anthropic 클라우드 API 사용 (Phase 1부터)
+- LLM 호출은 Anthropic 클라우드 API 또는 Claude Code CLI 사용 (Phase 1 기본: CLI + Max 플랜, ADR-011)
 
 ---
 

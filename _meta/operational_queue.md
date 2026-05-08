@@ -49,11 +49,131 @@
 
 ## 대기 중인 작업
 
-(현재 대기 중인 항목 없음. Q-002, Q-003은 Phase 1 1.1·1.3 단계에서 정식 등록 예정 — `_meta/phases/phase1_brief.md` §4.4, §8.7 참조.)
+### Q-004: us_symbol_master ETF 정정 12건 — symbol_type STOCK→ETF 정정 (등록: 2026-05-08)
+
+**배경**: ADR-013은 Minervini 스크리너에서 ETF를 upstream 필터로 제외하나, us_symbol_master에서 12개 종목이 `symbol_type='STOCK'`으로 잘못 분류되어 필터를 우회함. LLM Pre-Check가 `etf_methodology_mismatch` (conf=1.00)로 안전망 역할을 수행 중 — 즉각 위험 없음. 1.3.10 정성 평가 중 발견 (§10.4 1번 예외로 Builder 직접 등록).  
+**관련 ADR**: ADR-013 (ETF 제외 정책) — Phase 2에서 Architect 세션이 ADR-013 확장(스크리너 upstream 필터 보강)과 함께 처리.  
+**위험도**: 낮음 (UPDATE — 12행 symbol_type 변경, 롤백 가능)  
+**예상 소요**: 5분 미만 (SQL 1건 + 미너비니 스크리너 재실행 확인)  
+**우선순위**: 보통 (LLM Pre-Check 안전망 작동 중이므로 즉시 처리 불필요; Phase 1 종료 후 Architect 세션에서 ADR-013 확장과 함께 처리)  
+**타이밍 윈도우**: US cron(08:00~14:00) 직후를 피하면 어느 시각이든 안전
+
+**대상 종목 (12건)**:
+
+| 심볼 | 현재 symbol_type | 정정 후 |
+|---|---|---|
+| VRTL | STOCK | ETF |
+| SOXL | STOCK | ETF |
+| MVLL | STOCK | ETF |
+| MUU | STOCK | ETF |
+| MULL | STOCK | ETF |
+| AMDG | STOCK | ETF |
+| AMDL | STOCK | ETF |
+| AMUU | STOCK | ETF |
+| KORU | STOCK | ETF |
+| INTW | STOCK | ETF |
+| DLLL | STOCK | ETF |
+| BWET | STOCK | ETF |
+
+**적용 절차**:
+
+```powershell
+# 1. 사전 확인 — 12건 STOCK 분류 현황
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
+  -e "SELECT symbol, symbol_type FROM trade.us_symbol_master WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') ORDER BY symbol;"
+
+# 2. UPDATE 실행
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" trade `
+  -e "UPDATE us_symbol_master SET symbol_type = 'ETF' WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') AND symbol_type = 'STOCK';"
+
+# 3. 적용 후 확인 — 12건 모두 ETF로 변경됨 확인
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" `
+  -e "SELECT symbol, symbol_type FROM trade.us_symbol_master WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') ORDER BY symbol;"
+
+# 4. (선택) Minervini 스크리너 재실행 — 12건이 스크리너 결과에서 제외되는지 확인
+#    Phase 2 Architect 세션에서 ADR-013 확장 정책 확정 후 지시에 따라 실행
+```
+
+**완료 기준**:
+- 12건 `symbol_type` 모두 `ETF`로 변경됨 (SELECT 결과 확인)
+- (선택) `us_minervini_update.py` 재실행 후 12건이 Minervini 스크리너 대상에서 제외됨
+
+**롤백 방법**:
+
+```powershell
+docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD" trade `
+  -e "UPDATE us_symbol_master SET symbol_type = 'STOCK' WHERE symbol IN ('VRTL','SOXL','MVLL','MUU','MULL','AMDG','AMDL','AMUU','KORU','INTW','DLLL','BWET') AND symbol_type = 'ETF';"
+```
+
+**메모**:
+- 발견 경위: 1.3.10 정성 평가 중 daily_analysis_us에서 `etf_methodology_mismatch` warn 12건 확인. LLM Pre-Check가 conf=1.00으로 정확히 포착 — ADR-013 안전망 작동 중.
+- 근본 원인: us_sync_symbol_master.py가 외부 소스(FDR/yfinance)에서 가져온 데이터에서 ETF가 STOCK으로 잘못 분류됨. ADR-013 upstream 필터 보강(Phase 2)으로 재발 방지 예정.
+- 본 큐 항목은 §10.4 1번 예외에 따라 1.3 단계 한정으로 Builder가 직접 등록.
+
+---
+
+(추가 항목은 위쪽으로 — 최신순)
 
 ---
 
 ## 완료된 작업
+
+### Q-003: Phase 1 LLM 분석 모듈 운영 환경 적용 — Task Scheduler 등록 + 첫 자동 실행 검증 ✅ (등록: 2026-05-07, 완료: 2026-05-08)
+
+**관련 ADR**: ADR-009 (스키마), ADR-011 (CLI 백엔드), ADR-012 (자동 트리거 + 모니터링 4종)
+**관련 commit**: `phase1/1.3-daily-analysis` 브랜치, anthropic_client.py Windows 호환 fix 포함
+**적용 일시**: 2026-05-08 KST
+
+**수행 내역**:
+1. `apps/llm-analysis/.env` 생성 — 루트 `.env`의 `DATABASE_URL` 복사 (gitignored)
+2. `apps/llm-analysis/venv` 생성 + 의존성 설치 (pydantic, PyYAML, anthropic, SQLAlchemy, PyMySQL, python-dotenv)
+3. dry-run 성공 (`--dry-run`, exit=0)
+4. 첫 실제 실행 성공 (`--region US --date 2026-05-05 --limit 1`)
+   - AMDG → ignore (conf=1.0), `daily_analysis_us` 행 생성, `llm_calls` id=7 기록, `sync_log` success
+5. `install_task.ps1` 실행 → LLMAnalysis_US(16:00 KST) + LLMAnalysis_KR(21:00 KST) 등록, State=Ready
+6. Windows 호환 버그 fix: `anthropic_client.py` `ClaudeCodeCLIBackend` — Windows에서 `claude`가 `.cmd` 파일이라 `subprocess.run(['claude', ...])` 실패 + 프롬프트가 길어 cmd 명령줄 한계 초과. `cmd /c claude ... -p` + `input=prompt` (stdin) 방식으로 수정.
+
+**검증 결과**:
+- ✅ `daily_analysis_us` 행 1개 생성 (AMDG, 2026-05-05, ignore, conf=1.0)
+- ✅ `llm_calls` id=7 기록 (analysis_5_us, 22864 prompt tokens, 323 completion, error=NULL)
+- ✅ `sync_log` `llm_analysis_us` status='success'
+- ✅ `Get-ScheduledTask LLMAnalysis_*` — US/KR 두 작업 State=Ready
+- ✅ `NextRunTime`: LLMAnalysis_US=2026-05-08 16:00, LLMAnalysis_KR=2026-05-08 21:00
+- ⏳ 첫 자동 실행 (`LastRunResult=0`) — 2026-05-08 16:00 KST 이후 확인 예정
+
+**작업 환경**:
+- PROD (Windows + PowerShell, `C:\Users\sengo\project\github\DataBatcher`)
+
+**메모**:
+- `requirements.txt` 인코딩 문제(cp949 + UTF-8 한글 주석)로 `pip install -r` 실패 → 패키지 직접 지정 설치.
+- Windows에서 `anthropic_client.py` 코드 fix 발생 (예상 못 했던 작업). commit에 포함.
+- ADR-011 §4 + ADR-012 §3.3 약관 위반 징후 발생 시 즉시 사용자에 보고 + ADR-012 §4 절차로 API 백엔드 전환 검토.
+
+---
+
+### Q-002: Phase 1 DB 마이그레이션 적용 — daily_analysis_kr, daily_analysis_us, llm_calls ✅ (등록: 2026-04-28, 완료: 2026-05-07)
+
+**관련 commit**: `phase1/1.3-daily-analysis` 브랜치 HEAD `57b6d48` 기준 적용  
+**관련 ADR**: ADR-009 (LLM 분석 테이블 설계), ADR-010 (마이그레이션 3종 산출물)  
+**Alembic revision**: `20260428_000001` (down_revision: `20260424_000001`)  
+**raw SQL 파일**: `db/migrations/sql/20260428_000001_add_daily_analysis_and_llm_calls.sql`  
+**적용 일시**: 2026-05-07 KST  
+**적용 방식**: raw SQL 직접 실행 (`Get-Content ... | docker exec -i mysql-standalone-mysql mysql ...`)  
+**Alembic**: 이번에도 생략 (미해결 이슈 §G — PROD `alembic_version` 동기화 미해결). raw SQL만 적용.
+
+**검증 결과**:
+- ✅ `daily_analysis_kr` DESCRIBE: symbol/date(PK), market, classification, confidence, reasoning, pattern, risk_flags(JSON), entry_params(JSON), screen_config_hash, llm_call_id, created_at — phase1_brief §4.1 스키마 일치
+- ✅ `daily_analysis_us` DESCRIBE: 동일 구조 — phase1_brief §4.2 스키마 일치
+- ✅ `llm_calls` DESCRIBE: id(PK AUTO_INCREMENT), timestamp, module, model, prompt_tokens, completion_tokens, cost_usd, request_payload(JSON), response_payload(JSON), duration_ms, error — phase1_brief §4.3 스키마 일치
+
+**작업 환경**:
+- PROD (Windows + PowerShell, `C:\Users\sengo\project\github\DataBatcher`)
+- DB: `mysql-standalone-mysql` Docker 컨테이너 (MySQL 8.4.8)
+
+**메모**:
+- Q-003 선행 조건 충족 완료.
+
+---
 
 ### Q-001: P0.5 마이그레이션 적용 ✅ (등록: 2026-04-24, 완료: 2026-04-26)
 

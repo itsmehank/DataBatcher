@@ -429,7 +429,7 @@ P0.5 스크리너 개편 작업 중 Builder가 다음 세 가지 구조적 문�
   ├── ① Alembic 버전 파일 (필수, 실 적용 수단)
   │     db/migrations/versions/YYYYMMDD_NNNNNN_<설명>.py
   ├── ② Raw SQL 파일 (필수, 사람이 검토할 명세)
-  │     apps/ingest-databatcher/scripts/migrations/<설명>.sql
+  │     db/migrations/sql/YYYYMMDD_NNNNNN_<설명>.sql
   └── ③ 운영 작업 큐 항목 (필수, 운영 환경 적용 절차)
        _meta/operational_queue.md 의 "대기 중인 작업"에 Q-NNN 추가
 ```
@@ -438,6 +438,12 @@ P0.5 스크리너 개편 작업 중 Builder가 다음 세 가지 구조적 문�
 - ①은 "어떻게 자동 적용할까"
 - ②는 "사람이 무엇이 바뀌는지 한눈에 본다"
 - ③은 "운영 환경에서는 언제·어떻게 직접 적용할까"
+
+**Raw SQL 위치 결정 (Phase 1 1.1, 2026-04-28)**: 신규 raw SQL은 `db/migrations/sql/`에 둔다. 본 ADR 채택 시점(2026-04-24)에는 `apps/ingest-databatcher/scripts/migrations/` 표기였으나, Phase 1.1 진행 중 다음 사유로 위치 변경:
+- 본 ADR §2의 정신("기존 디렉토리에 새 raw SQL 추가하지 않는다")과 부합
+- Alembic 버전 파일(`db/migrations/versions/`)과 물리적 근접 — 함께 검토·관리 용이
+- 앱 독립성 — `db/`는 특정 앱(ingest-databatcher)에 종속되지 않음 (LLM 분석 테이블 등은 ingest-databatcher 작업 결과 아님)
+- 첫 적용 사례: `db/migrations/sql/20260428_000001_add_daily_analysis_and_llm_calls.sql` (Phase 1 1.1.1)
 
 #### 2. 기존 `scripts/migrations/*.sql`의 운명 (Q1)
 
@@ -479,6 +485,28 @@ P0.5 스크리너 개편 작업 중 Builder가 다음 세 가지 구조적 문�
 - 가능하면 **DEV·PROD가 같은 alembic 상태**가 되도록 정리
 
 이 정리 작업은 Q-NNN 번호를 부여한 새 큐 항목으로 등록한다 (현재 시점에는 Q-001 뒤에 큐로 추가될 예정).
+
+#### 6. alembic.ini 자격증명 처리 (Phase 1 1.1, 2026-05-02)
+
+**`db/migrations/alembic.ini`의 `sqlalchemy.url`은 placeholder를 두지 않고, `.env`의 `DATABASE_URL`을 단일 SSoT로 참조한다.**
+
+배경:
+- Phase 1 1.1 진행 중 alembic.ini의 `sqlalchemy.url = root:root@...` placeholder가 실제 DEV 자격증명(`.env`의 `DATABASE_URL = hank:1234!`)과 불일치.
+- 현재는 alembic이 DATABASE_URL 환경변수를 우선 읽는 동작으로 정상 동작 중. 그러나 두 곳에 자격증명 정보가 있어 신규 셋업 시 혼란 가능.
+
+결정:
+- **(a) alembic.ini의 url을 env 참조 방식으로 변경한다** (예: alembic env.py에서 `DATABASE_URL` 읽어 sqlalchemy.url을 동적 설정).
+- placeholder는 제거 또는 주석 처리.
+- **자격증명의 단일 SSoT는 `.env`의 `DATABASE_URL`**로 명문화.
+
+근거:
+- ADR-005 SSoT 원칙 부합 (자격증명 출처 1개)
+- "환경변수 안 셋팅 시 alembic 명령 실패"는 정상 동작 (실패가 더 안전)
+- Builder·Architect 모두 `.env`만 보면 됨
+
+후속 작업:
+- 실제 코드 변경(alembic.ini·env.py)은 Phase 1.2 또는 별도 Builder 세션에서 처리. 본 결정 자체는 ADR로 명문화 완료.
+- PROD 환경의 alembic.ini 상태도 같은 시점에 점검·일치.
 
 ### 사유
 
@@ -593,13 +621,20 @@ CLI 백엔드도 모든 호출을 `llm_calls` 테이블에 기록한다. 단, �
 | `model` | API 응답에서 정확 | CLI 호출 시 설정값 그대로 |
 | `prompt_tokens` | API 응답에서 정확 | tiktoken 또는 추정 |
 | `completion_tokens` | API 응답에서 정확 | tiktoken 또는 추정 |
-| `cost_usd` | 정확 계산 | NULL (Max 플랜은 정액제) |
+| `cost_usd` | 정확 계산 | NULL 허용. 또한 CLI가 stdout으로 회신하는 참고값(Max 플랜 토큰 환산 추정치) 저장 가능 (Phase 1 1.1.4-b 결정, 선택지 β) |
 | `request_payload` | 정확 | 정확 (CLI에 전달한 프롬프트) |
 | `response_payload` | 정확 (구조화 JSON) | CLI stdout 캡처 (마크다운 펜스 등 후처리) |
 | `duration_ms` | 정확 | 정확 (subprocess wall time) |
 | `error` | 정확 | stderr 캡처 또는 파싱 실패 메시지 |
 
 추정 토큰 수를 사용한 경우 별도 컬럼이 아니라 `request_payload` JSON 안에 메타로 기록 (`{"prompt_tokens_estimated": true}`).
+
+**`cost_usd`의 의미 (Phase 1.1.4-b, 2026-04-29 명시)**:
+- API 모드: 실제 API 청구액 (정확)
+- CLI 모드 NULL: Max 플랜은 정액제 — 호출당 한계비용이 0에 수렴
+- CLI 모드 참고값: CLI가 stdout으로 회신하는 토큰 환산 추정치를 그대로 저장. 회계상 청구액 아님. **운영 모니터링·트렌드 관측용**.
+- 두 모드 식별 메타: `request_payload` JSON 안에 `cost_source` 키로 명시 (`"api_billing"` / `"cli_estimate"` / `"max_plan_billing"`)
+- ADR-012 §3.4의 cost 임계 모니터링은 이 참고값으로도 동작 가능
 
 #### 4. 약관 위험 인식
 
@@ -655,7 +690,7 @@ CLI → API 전환 시:
 
 **Phase 1 brief 변경**:
 - §5 디렉토리 구조: `core/anthropic_client.py`를 백엔드 추상화로 설계
-- §7 비용 정책: CLI 모드의 `cost_usd` NULL 허용
+- §7 비용 정책: CLI 모드의 `cost_usd` NULL 허용. CLI 참고값(stdout 토큰 환산) 저장도 허용 (1.1.4-b β안). `cost_source` 메타로 두 모드 식별.
 - §8 배치 통합: 자동 cron 진입점이 아닌 사용자 트리거 진입점 우선 설계
 - 1.1 단계: Haiku vs Sonnet 비교는 **API 비용 시뮬레이션**이 주 목적이었으므로 우선순위 하향. CLI 모드에서는 Max 플랜 한 모델 안에서 운영.
 
@@ -899,6 +934,117 @@ ADR-010의 환경 인벤토리(DEV·PROD)는 변경 없음. PROD 환경에 Task 
 - `_meta/01_ARCHITECTURE.md` 외부 의존성 표 — Anthropic API/CLI 표기 그대로, 본 ADR은 별도 변경 없음
 - `_meta/06_CURRENT_STATE.md` — ADR-012 추가, 미해결 이슈 §E(ADR-011 재검토 일정)에 ADR-012 내용 반영
 - `_meta/05_GLOSSARY.md` Part C — 변경 없음
+
+---
+
+
+## ADR-013: 미너비니 스크리너에서 ETF 제외 (사용자 정책 명문화)
+
+- **날짜**: 2026-05-02
+- **상태**: Accepted
+- **결정자**: 사용자 + Architect (Phase 1 1.1.15 외부 평가 결과 반영)
+- **관련 ADR**: ADR-009 (스크리너 결과 테이블 + 분석 LLM 흐름)
+
+### 컨텍스트
+
+Phase 1 1.1.13 단계에서 미너비니 트렌드 템플릿을 통과한 표본 5종목(US 시장)을 분석 LLM v1으로 호출했다. 외부 평가(Web Claude Minervini Evaluator 프로젝트)에서 5종목 중 2개(BWET, CLSM)가 **ETF**임이 확인됐다.
+
+발견된 문제:
+
+1. **방법론 불일치 (methodology mismatch)**: Mark Minervini의 SEPA·Trend Template와 William O'Neil의 CAN SLIM은 **개별 주식의 institutional accumulation·earnings catalyst·leadership** 개념 위에 구성된 방법론이다. ETF는 sector-rotation 또는 thematic 노출을 제공하는 fund vehicle이므로 위 개념들이 직접 적용되지 않는다. 평가 LLM이 책 인용으로 재확인:
+   - Minervini, *Trade Like a Stock Market Wizard* (Ch. 5 Trend Template, Ch. 10 VCP) — 개별 leadership 종목 대상
+   - O'Neil, *How to Make Money in Stocks* (CAN SLIM) — C(quarterly earnings), A(annual earnings), N(new product/management)는 ETF에 부재
+
+2. **잘못된 entry 분류 발생**: v1에서 CLSM(ETF)을 `entry`로 분류한 사용자 정책 위반 발생. CLSM의 22주 flat base는 8:1 reverse split의 데이터 artifact였고, 분석 LLM이 ETF임을 인지 못 함.
+
+3. **운영 비용 낭비**: 스크리너가 ETF를 거르지 않으면 ETF가 매일 미너비니 통과 종목으로 들어가 분석 LLM이 호출됨. 매 호출당 Max 플랜 한도 + 시간 소비. ETF 분석 결과는 사용자에게 가치 없음 (분석 대상 아님).
+
+Phase 1 1.1.15에서 분석 LLM 프롬프트 v2에 ETF Pre-Check를 추가하여 즉시 `ignore` 처리하는 방식으로 임시 대응 했다. 그러나 이는 **분석 LLM 호출 자체를 막지 못한다** — ETF가 분석 LLM에 도달한 시점에 이미 비용 발생.
+
+### 결정
+
+**미너비니 스크리너 결과(`minervini_screen_results_kr`, `minervini_screen_results_us`)에서 ETF 종목을 제외한다.**
+
+#### 1. 적용 범위
+
+- **US 시장**: `us_symbol_master.symbol_type = 'ETF'` 행을 스크리닝 결과에서 제외
+- **KR 시장**: `symbol_master`의 ETF 식별 컬럼 활용 (Phase 1.2 또는 본 ADR 구현 시점에 정확한 컬럼명·값 확인). KR 미너비니 통과 결과에서도 동일하게 ETF 제외.
+
+#### 2. 구현 위치 (옵션)
+
+다음 중 하나로 구현 (Builder가 결정):
+
+**옵션 (a)**: 스크리너 자체에서 거름 (권장)
+- `kr_minervini_update.py`, `us_minervini_update.py`의 SELECT 쿼리에 `JOIN <symbol_master>` + `WHERE symbol_type != 'ETF'` 추가
+- 장점: ETF가 `minervini_screen_results_*` 테이블에 아예 들어가지 않음. 가장 깨끗.
+- 단점: 미너비니 통과한 ETF를 별도로 보고 싶다면 별도 쿼리 필요 (현재 그런 요구 없음)
+
+**옵션 (b)**: 분석 LLM 호출 직전에 거름
+- `run_daily_analysis.py`에서 `minervini_screen_results_*`를 읽을 때 ETF 필터링
+- 장점: 스크리너 자체는 그대로
+- 단점: 데이터 흐름 두 단계 필요. ETF가 미너비니 통과 결과에는 남음.
+
+**제언**: 옵션 (a) 채택. ETF 분석 안 한다는 정책이 명확하므로 데이터 자체에서 제거하는 게 일관성 측면에서 우월.
+
+#### 3. 분석 LLM 프롬프트의 ETF Pre-Check (안전망 유지)
+
+ADR-013 적용 후에도 v2 프롬프트의 ETF Pre-Check는 **그대로 유지**한다 (제거하지 않는다). 이유:
+
+- 다중 안전망 — 스크리너가 거르지 못한 ETF (예: 분류 누락)가 흘러들어도 LLM이 잡음
+- 사용자가 수동으로 종목을 분석에 넣을 때(`run_single_symbol.py --symbol XXXX`) ETF 보호
+- 추가 비용 거의 없음 (Pre-Check는 응답 1회만 회신, 토큰 소량)
+
+#### 4. 데이터 정리
+
+본 ADR 구현 시점 이전에 이미 `minervini_screen_results_*`에 들어간 ETF 행은 다음 중 선택:
+
+- **(i) 그대로 둠**: 과거 이력 보존. 신규 분석에는 ETF 안 들어감.
+- **(ii) 일괄 삭제**: 과거 ETF 행을 DELETE. 깨끗하지만 이력 손실.
+
+**제언**: (i). ADR-013 시행일 이후로만 ETF 제외. 과거 결과는 historical record로 보존. ETF 행이 daily_analysis로 흐를 일은 없으므로(분석 LLM 호출 자체를 막을 것) 무해.
+
+### 사유
+
+**왜 정책으로 명문화하는가**:
+- "ETF는 분석 안 함"은 사용자가 일관되게 적용할 정책이고, 코드 한 군데 수정으로 보장 가능
+- 명문화하지 않으면 미래 Builder가 다시 ETF를 포함시킬 수 있음 (예: 새 종목 마스터 만들 때 type 필터 누락)
+- ADR-005 "거버넌스의 명문화" 정신 부합
+
+**왜 Phase 1.2 진입 전에 처리하는가**:
+- 1.2 entry 후보 검증 시 ETF가 섞이면 검증 데이터 오염
+- 1.3 누적 검증에서 매일 ETF가 분석되면 약 30~50종목 중 일부가 ETF로 노이즈
+- 1.1.15 외부 평가에서 이미 발견된 명확한 정책 — 미루지 말고 즉시 명문화
+
+**KR 시장 ETF 처리를 본 ADR에 함께 포함하는 이유**:
+- 정책 일관성. KR/US 비대칭 두지 않음
+- KR ETF는 별도 마스터(symbol_master ETF 컬럼) 점검 필요하지만 정책 자체는 동일
+
+### 결과 / 영향
+
+**Phase 1 1.2 진입 전 작업**:
+- 코드 변경: 옵션 (a) 채택 시 `kr_minervini_update.py`, `us_minervini_update.py` 수정
+- 운영 큐 항목: 본 ADR에 따른 코드 변경은 DB 스키마 변경 없으므로 별도 큐 불필요. 머지·배포 절차로 충분.
+- 검증: 코드 변경 후 다음 daily cron에서 `minervini_screen_results_us`에 ETF 행 부재 확인
+
+**Phase 1 1.1.15 결과 영향 없음**:
+- 본 ADR 시행 이전에 분석된 BWET·CLSM v2 결과는 그대로 보존
+- v2의 ETF Pre-Check가 정책과 일관 동작 입증
+
+**연관 문서 갱신 필요**:
+- `_meta/01_ARCHITECTURE.md` — 계층 1 (3) 템플릿 필터 책임에 "ETF 제외" 명시 필요 시
+- `_meta/05_GLOSSARY.md` Part B.1 — `minervini_screen_results_*` 설명에 "ETF 제외 (ADR-013)" 명시
+- `_meta/phases/phase1_brief.md` — 1.2 entry 후보 준비 단계에 "ETF는 자동 제외됨" 안내
+- `_meta/06_CURRENT_STATE.md` — ADR-013 추가, 미해결 이슈 정리
+
+**구현 시점**:
+- Phase 1.2 시작 직후 또는 1.2 진행 중 (Builder 작업)
+- 가능하면 1.2의 entry 후보 종목 정의 시점과 같이 처리
+
+### 회고 (Phase 1 종료 후 점검 항목)
+
+- 1.3 누적 검증에서 ETF 행이 daily_analysis로 흘러들어간 사례가 있는가?
+- 사용자가 수동으로 ETF를 분석한 경우 v2 ETF Pre-Check가 작동했는가?
+- 본 ADR 시행 후 분석 LLM 호출 빈도가 의미 있게 줄어들었는가? (예: 매일 30~50건 → 25~45건 등)
 
 ---
 
