@@ -602,56 +602,56 @@ Return ONLY valid JSON matching this schema:
 - Do not invent risk flags not in the prior analysis.
 ````
 
-#### v1 production lock 결과 (Phase 1.2 트랙 B 종료, 2026-05-05)
+#### v1.1 production lock 결과 (Phase 1.3.0 종료, 2026-05-07)
 
-본 §6.3 본문은 **brief 작성 시점(2026-04-26)의 초기 설계안 v0**이다. Phase 1.2 트랙 B 진행 중 다음 주요 변경이 있었다.
+본 §6.3 본문은 **brief 작성 시점(2026-04-26)의 초기 설계안 v0**이다. Phase 1 진행 중 다음 두 차례 주요 변경이 있었다.
 
-**1. JSON 출력 스키마 — 7필드 v0 → 13필드 v1**
+**1. v0 → v1 재설계 (Phase 1.2 트랙 B, 2026-05-05, commit `f88bc52`)**
 
-위 본문의 7필드(`pivot_price`, `stop_loss_price`, `stop_loss_pct`, `suggested_weight_pct`, `volume_confirmation`, `expected_target.conservative/optimistic`, `valid_until`)는 1.2 트랙 B B.1 사전 자문 hybrid 적용 단계에서 13필드로 재설계됐다.
+위 본문의 7필드(`pivot_price`, `stop_loss_price`, `stop_loss_pct`, `suggested_weight_pct`, `volume_confirmation`, `expected_target.conservative/optimistic`, `valid_until`)는 1.2 트랙 B B.1 사전 자문 hybrid 적용 단계에서 **13필드로 재설계**됐다.
 
-신규 13필드의 정확한 정의는 `_meta/05_GLOSSARY.md` Part B.2 `entry_params` 섹션 참조. 핵심 차이:
+핵심 차이:
 - `volume_confirmation` 객체 → `breakout_volume_requirement` enum 문자열로 단순화 (예: `"ge_1.4x_50day_avg"`)
 - `expected_target.conservative/optimistic` 객체 → `expected_target_price` + `expected_target_pct` 단일값으로 단순화 (1차 sell-half 기준만)
 - `valid_until` ISO 날짜 → `entry_window_days` int + `max_chase_pct_from_pivot` float로 분리 (시간·가격 차원 분리)
 - 신규 추가: `pattern_basis`, `notes`, `known_warnings`, `other_warnings`
 
-**2. stop_loss_pct 범위 [-8, -5] → [-10, -5] 확장**
+**2. v1 → v1.1 minor revision (Phase 1.3.0, 2026-05-07, commit `7a1dd98`)**
+
+NVST B.5.5 1차 Evaluator 평가에서 도출된 (6) 함수 표기·투명성 문제 3건을 v1.1로 minor revision 발행. 13필드 → **16필드** + KnownWarning enum 10 → 12.
+
+| Fix | 항목 | 변경 |
+|---|---|---|
+| 1 | dual stop_pct 분리 (transparency) | `stop_loss_pct` rename → `stop_loss_pct_from_pivot` + `stop_loss_pct_from_current_price` 신규 둘 다 emit. \|from_current_price\| > 7.5 시 `stop_distance_from_current_price_exceeds_book_limit` known_warning auto-emit |
+| 2 | `trigger_price` schema-level 분리 | `pivot_price`(raw) + `trigger_price`(buffered, default `pivot * 1.001`) 둘 다 emit. (5) reasoning과 (6) 구조 필드 간 ambiguity 제거 |
+| 3 | breakout volume mismatch auto-warning | `observed_breakout_volume_ratio` 신규 (LLM이 chart에서 자동 추출). observed < requirement threshold(1.3/1.4/1.5) 시 `breakout_volume_below_requirement` known_warning auto-emit (size 조정과 무관) |
+
+**스키마 신규 4필드**: `current_price` (분석 시점 종가 echo), `trigger_price` (buffered), `stop_loss_pct_from_current_price`, `observed_breakout_volume_ratio`.
+
+**v1.1 검증 결과**:
+- 단위 테스트 53/53 통과 (test_entry_params 53건, v1.1 신규 14건)
+- NVST 합성 검증 6/6 OK (auto-emit 2종 모두 정상 trigger)
+- v1.1 LLM 호출 메타: model=claude-sonnet-4-5, duration 107.9s, prompt 31,498 tokens, completion 5,492 tokens
+
+**3. stop_loss_pct 범위 [-8, -5] → [-10, -5] 확장** (v1 시점 변경)
 
 위 본문 Constraints의 `must be between -8.0 and -5.0`은 **사전 자문 §0.6 채택으로 [-10.0, -5.0]으로 확장**됐다. 사유:
 - 책 절대 한도(O'Neil 7-8%, Minervini 10% "uncle point")의 더 보수적인 한도까지 허용
 - 단, 일반적으로는 5~8% 범위 내가 권장. -8 ~ -10은 risk_flag 기반 logical stop이 handle low 등 구조적 위치에 자연 도달할 때만 사용
-- `apps/llm-analysis/models/entry_params.py`의 Pydantic 검증과 일치
+- v1.1에서는 `stop_loss_pct_from_pivot`에 동일 제약 유지
 
-**3. v1 production lock 시점**
+**4. v1.1 production lock 시점 SSoT**
 
-- 단위 테스트 98/98 통과
-- B.5.5 sample (2026-01-12~16, n=400, 5거래일×80) 진행 결과 entry 1건(NVST) 발생 → (6) 호출 1건 성공
-- NVST 호출 결과 두 차례 외부 평가 (Web Claude Minervini Evaluator 프로젝트)
-  - 1차 (시스템 검증): partially_agree, needs-tuning
-  - 2차 (운영자 시각): NVST 자체는 약한 setup, (6) 함수 산식은 합리적
-- 1.2 게이트 통과 — (6) 함수 산식 합리성 입증 (NVST는 검증 표본으로만 사용)
-
-**4. v1.1 fix 예정 사항 — 1.3 진입 전 필수**
-
-NVST B.5.5 1차 Evaluator 평가에서 (6) 함수의 표기·투명성 문제 3가지 도출. 1.3 진입 전 (6) 프롬프트를 v1.1로 수정한다.
-
-| # | 항목 | 현 상태 (v1) | v1.1 수정 |
-|---|---|---|---|
-| 1 | stop_pct dual reporting | `stop_loss_pct`는 pivot 기준 단일값 | `stop_loss_pct_from_pivot` + `stop_loss_pct_from_current_price` 둘 다 emit. 후자가 7~8% 초과 시 `known_warnings`에 자동 추가 (예: NVST의 -7.58% 케이스) |
-| 2 | breakout volume 자동 warning | `breakout_volume_requirement` 미달 시에도 `known_warnings`에 자동 발행 안 됨. size 조정만으로 silence | `breakout_volume_requirement` vs 실제 관측 거래량 mismatch 시 `known_warnings`에 자동 추가 (size 조정과 무관하게) |
-| 3 | (5)/(6) pivot 일치성 | (5) 출력이 trigger 버퍼 포함된 pivot, (6) 출력은 raw pivot — 두 stage가 다른 숫자 emit | schema-level reconcile. trigger 버퍼 별도 필드로 분리 또는 buffer 제거 |
-
-구체 구현은 1.3 단계 시작 직후 Builder 세션에서 처리. 06_CURRENT_STATE 미해결 이슈 §L 참조.
+코드의 실제 SSoT는 다음:
+- 프롬프트 v1.1: `apps/llm-analysis/prompts/calculate_entry_params_v1_1.md` (v1 보존됨)
+- Pydantic 모델: `apps/llm-analysis/models/entry_params.py` (v1.1 auto-emit validator 포함)
+- Result parser: `apps/llm-analysis/core/result_parser.py` (v1 → v1.1 legacy 매핑)
+- Settings: `apps/llm-analysis/config/settings.yaml`의 `prompts.calculate_entry_params: v1_1`
+- 스키마 정의: `_meta/05_GLOSSARY.md` Part B.2 entry_params (v1.1 production lock 본문)
 
 **5. v0 본문 보존 정책**
 
-위 §6.3 v0 본문은 **brief의 시간적 SSoT 보존을 위해 그대로 둔다**. 코드의 실제 SSoT는 다음:
-- 프롬프트 v1: `apps/llm-analysis/prompts/calculate_entry_params_v1.md`
-- Pydantic 모델: `apps/llm-analysis/models/entry_params.py`
-- 스키마 정의: `_meta/05_GLOSSARY.md` Part B.2
-
-브리프 본문 v0과 코드 v1의 차이는 본 "v1 production lock 결과" 섹션이 명시한 4가지 항목으로 구성된다.
+위 §6.3 v0 본문은 **brief의 시간적 SSoT 보존을 위해 그대로 둔다** (ADR-014 §1 (a) Implementation Detail 정밀화 카테고리 — 구현 정밀화 이력 보존). 브리프 본문 v0과 코드 v1.1의 차이는 본 "v1.1 production lock 결과" 섹션이 명시한 5가지 항목으로 구성된다.
 
 ### 6.4 프롬프트 버저닝
 
@@ -780,6 +780,31 @@ ADR-011 결정에 따라 Phase 1을 세 단계로 쪼갠다. 각 단계 종료 �
 - 운영 큐 항목 모두 "완료" 섹션으로 이동
 
 **소요 추정**: 1.3.1~1.3.8 작업 4~5일 + 1.3.9 7거래일 운영 + 1.3.10~11 검토 1~2일 = **약 2주**
+
+#### 1.3 실제 운영 결과 (Phase 1 종료 후 본문 통합, 2026-05-09)
+
+**실제 진행 기간**: 2026-05-06 ~ 2026-05-08 (약 3일, 추정 2주의 0.2배 — 7거래일 누적 운영을 백필 + 자연 운영 혼합 방식으로 단축)
+
+**백필 + 자연 운영 혼합 방식 채택**:
+
+원래 계획(매일 사용자 트리거 7거래일 = 7일 소요)을 다음 혼합 방식으로 압축:
+
+- **1.3.9-A 백필** (2026-05-07): KR(4/23~5/4 7거래일) + US(4/24~5/4 7거래일) → 141행 + 158회 LLM 호출. 사용자가 한 번에 강제 트리거하여 누적 데이터 확보.
+- **1.3.9-B 자연 운영** (2026-05-06 US): Q-003 PROD 적용 후 첫 자동 트리거 → 26행. Task Scheduler 정상 작동 검증.
+- **합계**: 167행 (KR 70 + US 97), §9.1 게이트 8번 기준(50행 이상)의 3.3배.
+
+**채택 사유**:
+- 백필만 사용 시 자동 트리거 환경(ADR-012) 검증 불가
+- 자연 운영만 사용 시 7거래일 자연 누적까지 7일 소요 + entry 발생 변동성 큼
+- 혼합으로 "데이터 체적 충분 + 자동 운영 검증 동시 달성"
+
+**한계**: §9.2 기준 1 (entry 10개 70%+ 표본)의 정식 충족은 entry 자연 발생률(B.5.5 기준 0.25%)과 167행 표본 크기 정합으로 entry 0건 → 운용적 완화 처리 (대체 평가 7건 100% 합리, Evaluator 객관 검증). Phase 2에서 자연 누적 entry-side 평가 sprint 별도 진행.
+
+**커밋 트레일**:
+- 1.3.0 (v1.1 fix): `7a1dd98`
+- 1.3.1~1.3.8 (메인 진입점·모니터링·Q-003 등록): `39992ff`
+- 1.3.9 (PROD 적용 + Windows fix + 백필): `d5f359d`, merge `ccdc54e`
+- 1.3.10~11 (정성 평가 + 종료 보고): `phase1/1.3-daily-analysis` 브랜치 HEAD
 
 ---
 
@@ -1564,9 +1589,9 @@ phase1_brief.md §9.1의 1.1 게이트 체크리스트를 모두 통과해야 1.
 
 ### 11.4-bis Phase 1.2 트랙 B에서 실제 발견된 이슈와 처리 방향
 
-§11.4가 추정 표라면 본 항목은 1.2 트랙 B 진행 중 **실제로 발견된 이슈**다. 1.3 진입 전후 또는 1.3 누적 검증 중 처리한다.
+§11.4가 추정 표라면 본 항목은 1.2 트랙 B 진행 중 **실제로 발견된 이슈**다. 1.3 진입 전후 또는 1.3 누적 검증 중 처리됐고, **본 4 항목 모두 Phase 1 종료 시점에 처리 결과를 본문 통합한다 (2026-05-09)**.
 
-#### 11.4-bis.1 (5) v2 분류 보수성 — 1.3 누적으로 systemic 평가
+#### 11.4-bis.1 (5) v2 분류 보수성 — 1.3 누적 평가 결과 (Phase 2 sprint로 이관)
 
 **배경**: B.5.5 NVST를 entry로 분류한 v2 결정에 대해 두 번째 Evaluator(운영자 시각)가 진입 보류 권고. 4가지 약점:
 1. Breakout 거래량 1.03× (책 기준 1.4× 미달)
@@ -1576,37 +1601,57 @@ phase1_brief.md §9.1의 1.1 게이트 체크리스트를 모두 통과해야 1.
 
 **의심**: v2가 약한 setup도 entry로 통과시키는 보수성 부족 가능. 단 1건 표본으로 systemic 판정 불가.
 
-**처리 (1.3 운영 중 자동 모니터링)**:
-- entry 분류 종목들의 RS rating 분포 (90+ 비율)
-- breakout volume 1.4× 이상 비율
-- lone signal vs leadership group 신호
-- catalyst 시점과 분석 시점 거리
+**Phase 1.3 운영 결과 (2026-05-08, 167행 누적)**:
+- entry 분류: **0건** (KR 70 + US 97에서 모두 watch/ignore/timeout)
+- 해석: B.5.5 자연 발생률(0.25%) × 167행 = expected 0~1건 → 통계적으로 정합. froth 시장 환경(2026-04~05)도 정합. **systemic 보수성 부족으로 판정할 표본 부재** — 오히려 v2 보수성이 시장 환경과 부합한 것일 수 있음.
+- 대체 평가: Evaluator 1차 평가에서 표본 7건(NVDA·VRT·NVMI·CDNS×2·HOOD·ALTO) 100% "합리적" 검증. ignore reasoning에서 구체 수치 + 미너비니 원칙 명시 일관 적용 확인.
 
-부족 systemic 시 v2.1 또는 v3 작업 검토. 본 항목은 1.3 종료 시 평가. 06_CURRENT_STATE 미해결 이슈 §K 참조.
+**처리**: **Phase 2B Sprint "entry-side 평가" + "(5) prompt v3 검토"로 이관**. 자연 누적 데이터(Phase 2 시장 환경에서 entry 발생)에서 §9.2 기준 1 (entry 10개 70%+) 정식 충족 + systemic 평가 → v3 작업 여부 결정. 06_CURRENT_STATE 미해결 이슈 §K 참조.
 
-#### 11.4-bis.2 (6) 함수 v1.1 fix 3가지 — 1.3 진입 전 필수
+#### 11.4-bis.2 (6) 함수 v1.1 fix 3가지 — 완료 (Phase 1.3.0)
 
 **배경**: NVST B.5.5 1차 Evaluator 평가에서 (6) 함수의 표기·투명성 문제 3가지 도출.
 
-**항목**: 본 brief §6.3 "v1 production lock 결과" §4 표 참조.
+**항목**: 본 brief §6.3 "v1.1 production lock 결과" §2 표 참조.
 
-**처리**: Builder 세션 1.3 코드 작업과 함께 (6) 프롬프트 v1.1 작업. 1.3 진입 전 필수. 06_CURRENT_STATE 미해결 이슈 §L 참조.
+**Phase 1.3.0 처리 결과 (commit `7a1dd98`, 2026-05-07)**: ✅ **완료**
+1. ✅ dual stop_pct 분리 (`stop_loss_pct_from_pivot` rename + `stop_loss_pct_from_current_price` 신규 + auto-emit warning)
+2. ✅ `trigger_price` schema-level 분리 (pivot raw + trigger buffered 둘 다 emit)
+3. ✅ `observed_breakout_volume_ratio` 신규 + auto-emit warning
 
-#### 11.4-bis.3 ETF 잘못 통과 6건 — us_symbol_master 또는 ADR-013 정책 확장
+EntryParams 13 → 16필드, KnownWarning enum 10 → 12종 (auto-emit 2종 추가). 단위 테스트 53/53 통과 + NVST 합성 검증 6/6 OK. 06_CURRENT_STATE 미해결 이슈 §L 해소.
 
-**배경**: B.5.5 sample 추출 시 `symbol_type='STOCK'` 필터 적용했는데도 v2가 ETF로 판정한 종목 6건 발생: EMF, RMT, CEE(2회), KF, CAF.
+#### 11.4-bis.3 ETF 잘못 통과 — ADR-015로 처리됨 (해소)
 
-**해석**: us_symbol_master의 symbol_type 분류가 일부 부정확하거나, ADR-013 정책 범위가 좁음. preferred stock·ADR·closed-end fund 등이 STOCK으로 등록됐을 가능성.
+**배경**:
+- B.5.5 sample 6건 (EMF, RMT, CEE×2, KF, CAF) — closed-end fund 계열
+- Phase 1.3.10 자연 운영 12건 (VRTL, SOXL, MVLL, MUU, MULL, AMDG, AMDL, AMUU, KORU, INTW, DLLL, BWET) — leveraged ETF 다수, Q-004 등록
 
-**처리**: 1.3 진입 전 또는 1.3 중 us_symbol_master 정정. ADR-013 §1 적용 범위 확장 검토 (ADR로 격상 여부 판단). 06_CURRENT_STATE 미해결 이슈 §J 참조.
+**해석 (확장됨)**: us_symbol_master의 symbol_type 분류가 외부 소스(FDR/yfinance) 단계에서 부정확. closed-end fund / leveraged ETF / 신규 ETF / preferred stock·ADR 등이 STOCK으로 등록됐을 가능성.
 
-#### 11.4-bis.4 EA 분류 불안정 — 1.3 모니터링
+**처리 (2026-05-09)**: ✅ **ADR-015 채택으로 정책 명문화 + Phase 2 sprint로 구현 이관**
+- ADR-015 §1: Fund Vehicle 4 카테고리 명확화 (ETF / Leveraged ETF / CEF / ADR)
+- ADR-015 §2: us_sync_symbol_master.py 보강 (다중 소스 cross-check + 휴리스틱 + override 테이블 신설) — Phase 2B Sprint
+- ADR-015 §3: Q-004 적용 절차 보강 (일괄 ETF 처리 후 Phase 2 sprint에서 세분화 정정)
+- ADR-013 §3 안전망 (LLM Pre-Check) 그대로 계승
 
-**배경**: B.5.5에서 EA 종목이 3회 평가 모두 다른 결과 (1/13 watch → 1/14 ignore → 1/15 timeout).
+06_CURRENT_STATE 미해결 이슈 §J 해소.
 
-**해석**: 시장 변화로 실제 분류 변동(정상) 또는 v2 응답 일관성 부족(LLM 자체 노이즈) 둘 중 하나.
+#### 11.4-bis.4 분류 불안정 — Phase 1.3 추가 사례 (Phase 2 sprint 모니터링)
 
-**처리**: 1.3 누적 데이터에서 multi-evaluated 종목의 분류 일관성 모니터링. 다수 사례 발생 시 v2 안정성 진단. 06_CURRENT_STATE 미해결 이슈 §M 참조.
+**배경 (B.5.5)**: EA 종목이 3회 평가 모두 다른 결과 (1/13 watch → 1/14 ignore → 1/15 timeout).
+
+**Phase 1.3 추가 사례 (2026-05-08)**:
+- ALTO 4시점 toggle: 4/28 ignore conf=0.75 → 5/1 watch 0.75 → 5/4 ignore 0.80 → 5/6 ignore 0.90
+- NVST 추가 사례: B.5.5 entry → 2026-05-07 ignore (1.3.0 v1.1 검증 합성 호출, 약 4개월 후)
+- 기타 multi-evaluated 종목들 일부 toggle 관찰
+
+**해석 가능성**:
+- 시장 변화로 실제 분류 변동 (정상) — ALTO의 경우 conf 점진 증가는 일관성 패턴
+- v2 응답 일관성 부족 (LLM 자체 노이즈)
+- 분류 경계 정량화 미흡 — `phase1_classification_logic_review.md` §1.2 "watch vs ignore 경계 모호 케이스" 정합
+
+**처리**: **Phase 2B Sprint "분류 안정성 모니터링" + "(5) prompt v3"으로 이관**. 자연 누적 데이터에서 multi-evaluated 종목의 분류 일관성 정량 측정 (예: revisit_condition 필드 추가 검토, watch ↔ ignore toggle 빈도 통계, conf 변화 추적). 06_CURRENT_STATE 미해결 이슈 §M 참조.
 
 ### 11.5 본 brief에서 의식적으로 두루뭉술하게 둔 부분
 
