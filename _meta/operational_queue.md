@@ -52,10 +52,10 @@
 ### Q-004: us_symbol_master ETF 정정 12건 — symbol_type STOCK→ETF 정정 (등록: 2026-05-08)
 
 **배경**: ADR-013은 Minervini 스크리너에서 ETF를 upstream 필터로 제외하나, us_symbol_master에서 12개 종목이 `symbol_type='STOCK'`으로 잘못 분류되어 필터를 우회함. LLM Pre-Check가 `etf_methodology_mismatch` (conf=1.00)로 안전망 역할을 수행 중 — 즉각 위험 없음. 1.3.10 정성 평가 중 발견 (§10.4 1번 예외로 Builder 직접 등록).  
-**관련 ADR**: ADR-013 (ETF 제외 정책) — Phase 2에서 Architect 세션이 ADR-013 확장(스크리너 upstream 필터 보강)과 함께 처리.  
+**관련 ADR**: ADR-013 (ETF 제외 정책) + **ADR-015 (Fund Vehicle 4 카테고리 명확화 + us_symbol_master 정확성 보강, 2026-05-09 채택)**. 본 큐는 ADR-015 §3에 따라 일괄 ETF 처리하고, Phase 2B sprint에서 LEVERAGED_ETF/CEF로 세분화 정정 가능.  
 **위험도**: 낮음 (UPDATE — 12행 symbol_type 변경, 롤백 가능)  
 **예상 소요**: 5분 미만 (SQL 1건 + 미너비니 스크리너 재실행 확인)  
-**우선순위**: 보통 (LLM Pre-Check 안전망 작동 중이므로 즉시 처리 불필요; Phase 1 종료 후 Architect 세션에서 ADR-013 확장과 함께 처리)  
+**우선순위**: 보통 (LLM Pre-Check 안전망 작동 중이므로 즉시 처리 불필요; Phase 2 sprint 진입 전 또는 sprint 내 처리)  
 **타이밍 윈도우**: US cron(08:00~14:00) 직후를 피하면 어느 시각이든 안전
 
 **대상 종목 (12건)**:
@@ -107,7 +107,8 @@ docker exec -i mysql-standalone-mysql mysql -u root -p"$env:MYSQL_ROOT_PASSWORD"
 
 **메모**:
 - 발견 경위: 1.3.10 정성 평가 중 daily_analysis_us에서 `etf_methodology_mismatch` warn 12건 확인. LLM Pre-Check가 conf=1.00으로 정확히 포착 — ADR-013 안전망 작동 중.
-- 근본 원인: us_sync_symbol_master.py가 외부 소스(FDR/yfinance)에서 가져온 데이터에서 ETF가 STOCK으로 잘못 분류됨. ADR-013 upstream 필터 보강(Phase 2)으로 재발 방지 예정.
+- 근본 원인: us_sync_symbol_master.py가 외부 소스(FDR/yfinance)에서 가져온 데이터에서 ETF가 STOCK으로 잘못 분류됨. **ADR-015 §2에 따라 us_sync_symbol_master.py 보강(다중 소스 cross-check + 휴리스틱 + override 테이블 신설)이 Phase 2B sprint로 등록됨** — 재발 방지 예정.
+- B.5.5 발견 6건(EMF, RMT, CEE, KF, CAF — closed-end fund 계열)은 본 Q-004 처리 후 별도 점검 큐로 처리 (ADR-015 §3 후속 정밀화에 포함).
 - 본 큐 항목은 §10.4 1번 예외에 따라 1.3 단계 한정으로 Builder가 직접 등록.
 
 ---
