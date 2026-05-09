@@ -381,50 +381,97 @@ CREATE TABLE llm_calls (
 
 #### `entry_params` (daily_analysis_*.entry_params)
 
-`classification='entry'`일 때만 채워짐. (6) `calculate_entry_params` v1 production lock 기준 (Phase 1.2 트랙 B, 2026-05-05). `apps/llm-analysis/models/entry_params.py`의 `EntryParams` Pydantic 모델과 일치.
+`classification='entry'`일 때만 채워짐. (6) `calculate_entry_params` **v1.1 production lock** 기준 (Phase 1.3.0, commit `c2114f7`, 2026-05-07). `apps/llm-analysis/models/entry_params.py`의 `EntryParams` Pydantic 모델과 일치.
 
 ```json
 {
   "pivot_price": 22.67,
+  "trigger_price": 22.69,
+  "current_price": 23.23,
   "stop_loss_price": 21.47,
-  "stop_loss_pct": -5.30,
+  "stop_loss_pct_from_pivot": -5.3,
+  "stop_loss_pct_from_current_price": -7.6,
   "suggested_weight_pct": 4.9,
   "expected_target_price": 27.20,
   "expected_target_pct": 20.0,
   "entry_window_days": 3,
   "max_chase_pct_from_pivot": 5.0,
   "breakout_volume_requirement": "ge_1.4x_50day_avg",
+  "observed_breakout_volume_ratio": 1.02,
   "pattern_basis": "cup_with_handle handle high $22.67",
   "notes": "Position size reduced 0.7x due to low_volume_breakout flag.",
-  "known_warnings": [],
+  "known_warnings": [
+    "stop_distance_from_current_price_exceeds_book_limit",
+    "breakout_volume_below_requirement"
+  ],
   "other_warnings": []
 }
 ```
 
-**필드 정의**:
+**필드 정의 (16필드)**:
 
 | 필드 | 타입 | 의미 |
 |---|---|---|
-| `pivot_price` | float | 베이스 돌파 기준선 (handle high 또는 base high) |
+| `pivot_price` | float | 베이스 돌파 기준선 raw (handle high 또는 base high) |
+| `trigger_price` | float | 매수 trigger (default `pivot_price * 1.001`, buffered). v1.1 신규 필드 — (5) reasoning과 (6) 구조 필드 간 ambiguity 제거 |
+| `current_price` | float | 분석 시점 종가 (input payload echo). v1.1 신규 필드 — stop_loss_pct_from_current_price 산출용 |
 | `stop_loss_price` | float | 손절 가격 |
-| `stop_loss_pct` | float | pivot 기준 stop 거리 (%, 음수). 범위 [-10, -5] (사전 자문 §0.6 채택). 책 기준 절대 한도 -7~-8% (O'Neil), Minervini 7-8% 룰 또는 risk_flag 기반 tightening |
-| `suggested_weight_pct` | float | 총 자산 대비 진입 비중 (%). 범위 [0, 25]. base 7~20% × risk_flag multipliers |
+| `stop_loss_pct_from_pivot` | float | pivot 기준 stop 거리 (%, 음수). 범위 [-10, -5] (사전 자문 §0.6 채택). v1의 `stop_loss_pct`에서 rename. 책 기준 절대 한도 -7~-8% (O'Neil), Minervini 7-8% 룰 또는 risk_flag 기반 tightening |
+| `stop_loss_pct_from_current_price` | float | **현 종가 기준** stop 거리 (%, 음수). v1.1 신규 필드. \|값\| > 7.5 시 `stop_distance_from_current_price_exceeds_book_limit` known_warning auto-emit |
+| `suggested_weight_pct` | float | 총 자산 대비 진입 비중 (%). 범위 [3, 25]. base 7~20% × risk_flag multipliers |
 | `expected_target_price` | float | 1차 목표가 (sell-half 또는 partial exit 기준) |
 | `expected_target_pct` | float | pivot 대비 target 거리 (%, 양수) |
 | `entry_window_days` | int | 분석 시점부터 buy zone 유효 일수 (보통 3~5거래일) |
 | `max_chase_pct_from_pivot` | float | pivot 위로 매수 가능한 최대 거리 (%). O'Neil "5% chase rule" 기반, 보통 5.0 |
-| `breakout_volume_requirement` | enum | 돌파 거래량 요건. 값: `"ge_1.4x_50day_avg"`, `"ge_1.5x_50day_avg"`, `"ge_2.0x_50day_avg"` 등 |
-| `pattern_basis` | string | 산출 근거가 된 base/pattern 정보 (예: "cup_with_handle handle high $X") |
-| `notes` | string | 산출 과정의 추가 설명 또는 특이사항 |
-| `known_warnings` | array | 책 기반 경고 (예: breakout volume 미달, RS rating 약함). v1.1 fix로 자동 발행 강화 예정 |
+| `breakout_volume_requirement` | enum | 돌파 거래량 요건. 값: `"ge_1.3x_50day_avg"` (tight VCP only), `"ge_1.4x_50day_avg"` (default), `"ge_1.5x_50day_avg"` (3c_cheat) |
+| `observed_breakout_volume_ratio` | float \| null | LLM이 chart에서 자동 추출한 실제 관측 비율. v1.1 신규 필드. observed < requirement threshold 시 `breakout_volume_below_requirement` known_warning auto-emit |
+| `pattern_basis` | enum | 산출 근거가 된 base 패턴. 값: `"flat_base"`, `"cup_with_handle"`, `"vcp"`, `"double_bottom"`, `"3c_cheat"` |
+| `notes` | string | 산출 과정의 추가 설명 또는 특이사항 (50~600자) |
+| `known_warnings` | array | operational decision 기반 경고 closed-set (Literal enum 12종, 아래 표 참조). v1.1에서 auto-emit 2종 추가 |
 | `other_warnings` | array | known_warnings 외 LLM이 자유롭게 식별한 위험 신호 |
 
-**v1.1 fix 예정 사항** (1.3 진입 전 필수, NVST B.5.5 1차 Evaluator 평가 반영, 06_CURRENT_STATE 미해결 이슈 §L 참조):
-1. `stop_loss_pct`를 두 viewpoint로 분리 — `stop_loss_pct_from_pivot` + `stop_loss_pct_from_current_price` 둘 다 emit. 후자가 7~8% 초과 시 known_warnings에 자동 추가.
-2. `breakout_volume_requirement` vs 실제 관측 거래량 mismatch 시 `known_warnings`에 자동 발행 (size 조정과 무관하게).
-3. (5) `analyze_chart` 출력의 pivot 가격과 (6) 출력의 `pivot_price` 일치성 schema-level reconcile (예: trigger 버퍼 별도 필드 분리 또는 buffer 제거).
+**`known_warnings` Literal enum 12종 (v1.1)**:
 
-**구 스키마(B.1 brief §6.3 v0)와의 차이**: brief v0의 `volume_confirmation`, `expected_target.conservative/optimistic`, `valid_until` 3필드는 1.2 트랙 B 사전 자문 hybrid 적용 단계에서 위 13필드로 재설계됐다. 변경 사유는 phase1_progress.md 1.2 트랙 B B.1 사전 자문 메모 + commit α `abbaeb2` 참조.
+`apps/llm-analysis/models/entry_params.py`의 `KnownWarning` Literal 타입 + `apps/llm-analysis/prompts/calculate_entry_params_v1_1.md` §8과 1:1 일치.
+v1 10종 보존 + v1.1에서 auto-emit 2종 (1·2번) 신규 추가 = 총 12종.
+
+| # | 값 | 발행 경로 | 의미 |
+|---|---|---|---|
+| 1 | `stop_distance_from_current_price_exceeds_book_limit` | **auto-emit** (Pydantic validator) | `abs(stop_loss_pct_from_current_price) > 7.5` — 현 종가 기준 실현 손실이 O'Neil 7~8% 책 한도 초과 |
+| 2 | `breakout_volume_below_requirement` | **auto-emit** (Pydantic validator) | `observed_breakout_volume_ratio`가 `breakout_volume_requirement` threshold(1.3/1.4/1.5) 미달 (size 조정과 무관) |
+| 3 | `absolute_stop_used_due_to_wide_handle` | LLM 판단 (operational decision) | absolute stop이 binding — logical stop (final-contraction-low − buffer)이 −10% 이상 악화 |
+| 4 | `logical_stop_exceeded_absolute_floor` | LLM 판단 (operational decision) | raw logical stop이 절대 바닥 −10%를 초과하여 −10%로 clamp됨 |
+| 5 | `size_floored_due_to_multiple_flags` | LLM 판단 (operational decision) | 누적 multiplier가 최종 비중을 3.0% 최솟값까지 압박 |
+| 6 | `size_reduced_due_to_late_stage` | LLM 판단 (operational decision) | `late_stage_base` risk_flag 존재 → 0.7× multiplier 적용 |
+| 7 | `size_reduced_due_to_thin_liquidity` | LLM 판단 (operational decision) | `thin_liquidity_us_only` risk_flag 존재 → 0.7× multiplier 적용 |
+| 8 | `pattern_basis_inferred_from_data` | LLM 판단 (operational decision) | `prior_analysis.pattern == "none"` + `classification == "entry"` — `flat_base` fallback 사용 |
+| 9 | `pattern_refined_to_3c_cheat` | LLM 판단 (operational decision) | `prior_analysis.pattern`이 `cup_with_handle`였으나 `3c_cheat`으로 정밀화 |
+| 10 | `extended_from_pivot_already` | LLM 판단 (operational decision) | `current_price > pivot_price * 1.03` — entry_window_days = 1로 단축 |
+| 11 | `breakout_volume_requirement_relaxed` | LLM 판단 (operational decision) | `ge_1.3x_50day_avg` 선택 (tight VCP 전용, 완화된 요건) |
+| 12 | `stop_buffer_increased_for_shake_protection` | LLM 판단 (operational decision) | logical stop을 visible base low보다 의도적으로 낮게 배치 (round number shakeout 방어) |
+
+**v1.1 production lock 결과 (Phase 1.3.0, 2026-05-07)**:
+
+NVST B.5.5 1차 Evaluator 평가에서 도출된 (6) 함수 표기·투명성 문제 3건을 v1.1로 minor revision 발행. 변경 사항:
+
+| Fix | 항목 | 변경 |
+|---|---|---|
+| 1 | dual stop_pct 분리 (transparency) | `stop_loss_pct` rename → `stop_loss_pct_from_pivot` + `stop_loss_pct_from_current_price` 둘 다 emit + auto-emit warning |
+| 2 | `trigger_price` schema-level 분리 | `pivot_price`(raw) + `trigger_price`(buffered) 둘 다 emit |
+| 3 | breakout volume mismatch auto-warning | `observed_breakout_volume_ratio` 신규 emit + auto-emit warning |
+
+**검증**: 단위 테스트 53/53 통과 (test_entry_params 53건, v1.1 신규 14건). NVST 합성 검증 6/6 OK (auto-emit 2종 모두 trigger).
+
+**산출물**:
+- `apps/llm-analysis/prompts/calculate_entry_params_v1_1.md` (v1 보존)
+- `apps/llm-analysis/models/entry_params.py` 갱신 (auto-emit validator)
+- `apps/llm-analysis/core/result_parser.py` 갱신 (v1 → v1.1 legacy 매핑)
+- `apps/llm-analysis/config/settings.yaml`: `prompts.calculate_entry_params: v1` → `v1_1`
+
+**구 스키마와의 차이**:
+- brief v0 (7필드) → v1 (13필드) → v1.1 (16필드)
+- v0 → v1: phase1_progress.md 1.2 트랙 B B.1 사전 자문 메모 + commit `dd09e2d` 참조
+- v1 → v1.1: phase1_progress.md 1.3.0 메모 + commit `c2114f7` 참조
 
 ### B.3 모듈 함수 시그니처
 
