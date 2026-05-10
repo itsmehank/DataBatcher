@@ -1499,6 +1499,34 @@ phase1_brief.md §9.1의 1.1 게이트 체크리스트를 모두 통과해야 1.
 5. **부분 실패 허용 (§7.6)**: 배치 실행 중 일부 종목 실패는 전체 중단 사유 아님. 끝까지 진행 후 요약 보고.
 6. **헌법 §2.2 준수**: apps/llm-analysis/는 apps/ingest-databatcher/ 함수를 import하지 않는다.
 
+#### §10.4-bis 운영 작업 큐 등록 권한 — Architect 정석 + Builder 직접 등록 1번 예외 (2026-05-10 보강)
+
+§10.4의 정석 절차는 Architect 세션이 운영 큐 항목을 등록하고 Builder가 적용한다. 단 다음 1번 예외에 한해 Builder의 직접 등록을 허용한다.
+
+**예외 조건**:
+
+Phase 작업 진행 중 Builder가 코드·운영 작업을 수행하면서 즉시 처리가 필요한 부수 발견을 한 경우. 예시:
+- Phase 1.3.8: Q-003 (Task Scheduler `LLMAnalysis_KR/US` 등록 + 첫 실행 검증) — Builder가 자동 트리거 코드 작업과 함께 운영 큐 등록
+- Phase 1.3.10: Q-004 (us_symbol_master ETF 정정 12건) — Builder가 정성 평가 중 ADR-013 안전망 데이터에서 발견
+
+**예외 적용 시 Builder 의무**:
+
+(a) `_meta/operational_queue.md` 항목 본문에 "§10.4 1번 예외 적용" 명시적 사유 기록  
+(b) 적용 범위 (예: 본 Phase 단계 한정) 명시  
+(c) Architect 사후 확인을 위한 메모 (Architect 차기 세션 인계)
+
+**Architect 의무**:
+
+차기 세션에서 본 예외 적용 사례를 검토하여 정상 절차로 흡수 (큐 항목을 정식 검토 또는 관련 ADR 격상). 예: Q-004 → ADR-015 (Fund Vehicle 4 카테고리 명확화 + us_symbol_master 정확성 보강) 격상 처리됨 (2026-05-09).
+
+**적용 사례**:
+
+본 1번 예외는 Phase 1 1.3 단계에서 Q-003·Q-004 두 건에 적용됐다. 두 건 모두 Builder의 사유·범위 기록 + Architect 사후 흡수가 정상 작동. Auditor 감사 (2026-05-10 `_meta/phases/phase1_audit.md` §2.5 점검 5.c) PASS with FINDING (예외 자체의 본문 명문화 누락) — 본 절(2026-05-10 보강)로 정식 명문화하여 F-2 해소.
+
+**Phase 2 이후 적용**:
+
+본 1번 예외는 Phase 2 이후에도 동일 조건으로 적용 가능. 단, 사용 빈도가 높아지면 §10.4 정석 절차 자체 재검토 (별도 ADR로 격상).
+
 ---
 
 ## §11. 미해결 질문 / Phase 1 후로 미루는 것
