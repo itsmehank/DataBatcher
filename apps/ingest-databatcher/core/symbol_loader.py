@@ -95,7 +95,7 @@ def load_symbols_with_details(
         )
 
     sql = f"""
-        SELECT symbol, name, market FROM symbol_master
+        SELECT symbol, name, market, symbol_type FROM symbol_master
         WHERE status = '{status}'
     """
 
@@ -110,6 +110,6 @@ def load_symbols_with_details(
     with engine.connect() as conn:
         result = conn.execute(text(sql))
         return [
-            {"symbol": row[0], "name": row[1], "market": row[2]}
+            {"symbol": row[0], "name": row[1], "market": row[2], "symbol_type": row[3]}
             for row in result
         ]

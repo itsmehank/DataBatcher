@@ -1,0 +1,79 @@
+# apps/llm-analysis/config/settings.yaml
+# Phase 1 LLM 분석 레이어 설정
+# ADR-011 (CLI 백엔드), ADR-012 (자동 트리거 + 모니터링)
+
+# 데이터베이스 (ingest-databatcher와 동일한 DB 사용)
+database:
+  url: ${DATABASE_URL}    # 환경 변수 우선
+
+# LLM 백엔드 선택 (ADR-011 §2)
+llm_analysis:
+  backend: "cli"          # "cli" | "api" — Phase 1 기본은 CLI (Max 플랜)
+
+# Anthropic 모델 및 호출 설정
+anthropic:
+  model_analysis: "claude-sonnet-4-5"   # (5) 차트 분석용
+  model_entry: "claude-sonnet-4-5"      # (6) 진입 파라미터용
+  temperature: 0
+  max_tokens: 2000
+  timeout_seconds: 120
+
+  # 재시도 정책
+  retry:
+    max_attempts: 3
+    backoff_base_sec: 2
+    backoff_max_sec: 30
+
+  # API 모드 토큰 단가 (API 전환 대비, CLI 모드에서는 cost_usd = NULL)
+  pricing:
+    input_per_1k_tokens: 0.003    # Sonnet 기준
+    output_per_1k_tokens: 0.015
+
+# 일일 호출 상한 — ADR-012 §3.1: 자동 트리거 환경에서 hard_stop 강제
+daily_call_limits:
+  enabled: true
+  kr: 50
+  us: 500
+  hard_stop_on_exceed: true   # true: 한도 초과 시 즉시 중단 (ADR-012 §3.1)
+
+# 비용 알림 임계값
+cost_alerts:
+  daily_threshold_usd: 5.00
+  monthly_threshold_usd: 60.00
+
+# 결과 캐싱
+caching:
+  skip_if_exists: true          # 같은 (symbol, date) 결과 이미 있으면 재호출 안 함
+  force_recompute_flag: "--force-recompute"
+
+# 분석 모듈 활성화 — 킬 스위치 (ADR-012 §5)
+modules:
+  analyze_chart: true           # (5) 차트 분석·분류
+  calculate_entry_params: true  # (6) 진입 파라미터 산출
+
+# 프롬프트 버전 — 버전 변경 시 새 파일 생성 + ADR 기록 (brief §6.4)
+prompts:
+  analyze_chart: "v2"
+  calculate_entry_params: "v1_1"
+
+# 입력 데이터 범위
+input_data:
+  daily_lookback_days: 252      # 일봉 1년치
+  weekly_lookback_weeks: 156    # 주봉 3년치 (장기 베이스 인식용)
+  include_indicators:
+    - "sma_50_close"
+    - "sma_150_close"
+    - "sma_200_close"
+    - "rs_line"
+  include_conditions_met: true  # minervini_screen_results의 conditions_met JSON
+  include_sector: true          # symbol_master.sector
+
+# 자동 트리거 권장 시각 (ADR-012 §2) — SSoT는 Windows Task Scheduler 등록값
+# 이 필드는 운영 의도 문서화 목적이며, Python 프로세스는 읽지 않음
+analysis_trigger:
+  kr:
+    recommended_time_kst: "21:00"
+    rationale: "KR daily(19:00 시작, 최대 19:30 종료) + 미너비니(~19:40) + ~1h20m 안전 마진 (정시 보정)"
+  us:
+    recommended_time_kst: "16:00"
+    rationale: "US daily(08:00 시작, 최대 14:00 종료) + 미너비니(~14:10) + ~1h50m 안전 마진 (정시 보정)"
