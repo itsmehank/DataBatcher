@@ -10,9 +10,9 @@
 
 **완료된 Phase**: Phase 0 + P0 정합성 검토 + P0.5 스크리너 개편 + **Phase 1 완료**
 
-**진행 중인 Phase**: 없음 (**Phase 2 진입 준비**)
+**진행 중인 Phase**: **Phase 2 — 일일 리포트 (메일+엑셀) + Phase 1 인계 sprint** (Sprint 1 진입, 브랜치 `phase2/sprint1-excel`)
 
-**다음 시작할 단계**: **Phase 2 — 일일 리포트 (메일+엑셀) + Phase 1 인계 sprint** (Phase 2 brief 작성 완료, Auditor 세션 통과 후 Builder 세션 진입)
+**다음 시작할 단계**: **Phase 2 Sprint 1 — excel_exporter.py + 시트 3개 + CLI + 단위 테스트** (`phase2_brief.md` §3 Sprint 1 명세)
 
 ---
 
@@ -47,7 +47,8 @@
 **Phase 1 종료 시점 봉인**:
 - Builder 작업 commit: 1.3.11 종료 보고 (`phase1/1.3-daily-analysis` 브랜치)
 - _meta/만 main 사전 머지: commit `eb09b80` (Web Claude 동기화 정합성 확보)
-- 코드 (apps/, db/) 머지 대기: Auditor PASS 후 통합 머지 예정
+- 코드 (apps/, db/) 통합 머지: commit `5125d71` (main, 2026-05-10) — Auditor PASS 후 완료
+- Q-004 PROD 자연 완료: commit `0da41cd` (운영 큐 "완료된 작업" 이동 + Sprint F #6 PROD=main 원칙 명문화 동반)
 
 ---
 
@@ -59,12 +60,12 @@
 - [x] 거버넌스 드리프트 일괄 갱신 (06_CURRENT_STATE / 05_GLOSSARY B.2 / phase1_brief §6.3·§11.4-bis / operational_queue Q-004)
 - [x] Phase 2 brief 작성 (`_meta/phases/phase2_brief.md`) — Phase 2A 메일+엑셀 + Phase 2B Phase 1 인계 sprint
 
-**Phase 2 진입 직전 조건**:
-- [ ] Auditor 세션 PASS (헌법 §2.1·§2.2·§2.5·§3.1·§4 점검 — phase1_brief §9.3 5종)
-- [ ] Auditor 산출물 `_meta/phases/phase1_audit.md` commit
-- [ ] Phase 1 코드 머지 (apps/, db/ — Auditor PASS 후 통합 머지)
-- [ ] Phase 2 brief 사용자 승인
-- [ ] Q-004 적용 (us_symbol_master 12건 정정) — Phase 2 sprint 진입 전 또는 Phase 2 sprint 내 처리
+**Phase 2 진입 직전 조건** (모두 충족, 2026-05-11 봉인):
+- [x] Auditor 세션 PASS (헌법 §2.1·§2.2·§2.5·§3.1·§4 점검 — phase1_brief §9.3 5종) — `phase1_audit.md` + `phase1_audit_addendum.md` (F-1·F-2 모두 PASS 전환)
+- [x] Auditor 산출물 `_meta/phases/phase1_audit.md` commit — 2026-05-10
+- [x] Phase 1 코드 머지 (apps/, db/) — commit `5125d71` (main, 2026-05-10)
+- [x] Phase 2 brief 사용자 승인 — 2026-05-11 Architect 세션에서 사용자 명시 승인
+- [x] Q-004 적용 — commit `0da41cd` (자연 완료, 운영 큐 "완료된 작업" 이동)
 
 ---
 
