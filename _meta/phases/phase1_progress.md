@@ -1544,7 +1544,7 @@ LLM 응답이 v1_1 프롬프트의 example notes 구조를 거의 그대로 따�
 - **run_daily_analysis.py** (1.3.1~1.3.8): KR/US 분리, 일일 상한 hard stop, skip_if_exists 캐싱, dry-run, force-recompute, 부분 실패 스킵, show_cost_summary.py. ADR-012 §3 모니터링 4종 완전 구현.
 - **Q-003 PROD 적용** (2026-05-08, commit `14d6877`): Windows 호환 버그 fix (`anthropic_client.py` cmd stdin 방식) 포함. Task Scheduler LLMAnalysis_US/KR 등록 완료. 첫 실행 검증 (AMDG, daily_analysis_us 1행, llm_calls id=7).
 - **1.3.9-A 백필**: KR(4/23~5/4) + US(4/24~5/4) 7거래일 141행. 158회 LLM 호출 (에러율 9.5%).
-- **1.3.9-B 자연 운영**: US 2026-05-06 26행.
+- **1.3.9-B 자연 운영**: US 2026-05-06 26행. (※ 사후 확인 2026-05-11 Sprint F #7-b: `SELECT COUNT(*) FROM daily_analysis_us WHERE date='2026-05-06'` 결과 122행. Phase 1.3 종료 시점(2026-05-08) 본 기록값 26행은 그 시점 사실이며, Phase 1 종료 이후 자연 운영(Q-003 daily cron)에서 추가 누적 결과로 추정. ADR-014 §1 (d) 결과/영향 사후 관찰 추가 카테고리 첫 명시 사례. phase1_progress 봉인 본문 보존 + footnote 보강.)
 - **총 167행**, 헌법 §2.5 충족 (전량 llm_calls 기록).
 - **Q-004 등록**: us_symbol_master ETF 12건 오분류 발견 → 운영 큐 등록 (1.3.10).
 
