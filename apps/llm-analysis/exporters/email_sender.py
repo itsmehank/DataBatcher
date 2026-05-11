@@ -464,6 +464,52 @@ def append_dispatch_log(
         raise RuntimeError(f"Failed to append dispatch log to {log_path}: {exc}") from exc
 
 
+def read_last_dispatch_for_region(
+    region: Region,
+    log_path: Path | str = DEFAULT_LOG_PATH,
+) -> EmailDispatchRecord | None:
+    """Return the most recent dispatch record for ``region`` from the JSONL log.
+
+    Returns ``None`` if the log is missing, empty, or has no record for the
+    region. Unparseable lines are skipped silently — the log is operational
+    metadata, not authoritative state.
+    """
+    log_path = Path(log_path)
+    if not log_path.exists():
+        return None
+    last: EmailDispatchRecord | None = None
+    try:
+        with log_path.open("r", encoding="utf-8") as fp:
+            for raw in fp:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    data = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if data.get("region") != region:
+                    continue
+                try:
+                    last = EmailDispatchRecord(**data)
+                except TypeError:
+                    continue
+    except OSError:
+        return None
+    return last
+
+
+def build_prior_failure_warning(prior: EmailDispatchRecord | None) -> str | None:
+    """Return a one-line warning if the prior dispatch for this region failed.
+
+    Returns ``None`` for sent/dry_run/None — only ``failed`` triggers a warning.
+    """
+    if prior is None or prior.status != "failed":
+        return None
+    err = prior.error_message or "원인 미상"
+    return f"⚠️ 직전 발송 실패: {err} ({prior.timestamp})"
+
+
 # ── company-name lookup (optional, falls back to symbol-only) ────────────────
 
 
@@ -549,6 +595,13 @@ def dispatch_daily_email(
         now=now,
     )
 
+    # Graceful fallback (Sprint 3) — prepend a warning if the prior dispatch
+    # for this region failed, so the next sent email surfaces the gap.
+    prior = read_last_dispatch_for_region(region, log_path=log_path)
+    warning = build_prior_failure_warning(prior)
+    if warning:
+        body = f"{warning}\n\n{body}"
+
     if dry_run:
         record = EmailDispatchRecord(
             timestamp=(now or datetime.now().astimezone()).isoformat(timespec="seconds"),
@@ -590,6 +643,8 @@ __all__ = [
     "build_email_body",
     "send_email",
     "append_dispatch_log",
+    "read_last_dispatch_for_region",
+    "build_prior_failure_warning",
     "dispatch_daily_email",
     "fetch_company_names",
     "DEFAULT_LOG_PATH",

@@ -37,7 +37,9 @@ from exporters.email_sender import (
     _build_message,
     append_dispatch_log,
     build_email_body,
+    build_prior_failure_warning,
     dispatch_daily_email,
+    read_last_dispatch_for_region,
     send_email,
 )
 from exporters.excel_exporter import DailyAnalysisRow
@@ -592,6 +594,252 @@ class TestDispatchDailyEmail:
                 session_factory=lambda: _FakeSession([]),
                 log_path=tmp_path / "logs" / "x.jsonl",
             )
+
+
+# ── 5b. graceful fallback (Sprint 3) ────────────────────────────────────────
+
+
+def _failed_record(region: str, ts: str, error: str = "boom") -> EmailDispatchRecord:
+    return EmailDispatchRecord(
+        timestamp=ts,
+        region=region,
+        date="2026-05-06",
+        recipient="r@test",
+        subject="prev",
+        attached_filename="prev.xlsx",
+        attached_size_bytes=1,
+        status="failed",
+        smtp_response=None,
+        error_message=error,
+        retry_count=2,
+    )
+
+
+def _sent_record(region: str, ts: str) -> EmailDispatchRecord:
+    return EmailDispatchRecord(
+        timestamp=ts,
+        region=region,
+        date="2026-05-06",
+        recipient="r@test",
+        subject="prev",
+        attached_filename="prev.xlsx",
+        attached_size_bytes=1,
+        status="sent",
+        smtp_response="ok",
+        error_message=None,
+        retry_count=0,
+    )
+
+
+class TestReadLastDispatchForRegion:
+    def test_missing_log_returns_none(self, tmp_path):
+        assert read_last_dispatch_for_region("us", tmp_path / "absent.jsonl") is None
+
+    def test_returns_latest_for_region(self, tmp_path):
+        log = tmp_path / "d.jsonl"
+        append_dispatch_log(_sent_record("us", "2026-05-10T00:00:00+09:00"), log)
+        append_dispatch_log(_failed_record("us", "2026-05-11T00:00:00+09:00"), log)
+        append_dispatch_log(_sent_record("kr", "2026-05-11T22:00:00+09:00"), log)
+        rec = read_last_dispatch_for_region("us", log)
+        assert rec is not None
+        assert rec.status == "failed"
+        assert rec.timestamp == "2026-05-11T00:00:00+09:00"
+
+    def test_other_region_returns_none(self, tmp_path):
+        log = tmp_path / "d.jsonl"
+        append_dispatch_log(_sent_record("us", "2026-05-10T00:00:00+09:00"), log)
+        assert read_last_dispatch_for_region("kr", log) is None
+
+    def test_unparseable_lines_skipped(self, tmp_path):
+        log = tmp_path / "d.jsonl"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(
+            "not-json\n"
+            + json.dumps({"region": "us", "garbage": True}) + "\n"
+            + json.dumps(_sent_record("us", "2026-05-10T00:00:00+09:00").to_jsonable())
+            + "\n",
+            encoding="utf-8",
+        )
+        rec = read_last_dispatch_for_region("us", log)
+        assert rec is not None
+        assert rec.status == "sent"
+
+
+class TestBuildPriorFailureWarning:
+    def test_none_input(self):
+        assert build_prior_failure_warning(None) is None
+
+    def test_sent_returns_none(self):
+        assert build_prior_failure_warning(_sent_record("us", "2026-05-10T00:00:00+09:00")) is None
+
+    def test_dry_run_returns_none(self):
+        rec = EmailDispatchRecord(
+            timestamp="2026-05-10T00:00:00+09:00",
+            region="us",
+            date="2026-05-10",
+            recipient="r@test",
+            subject="s",
+            attached_filename="x.xlsx",
+            attached_size_bytes=1,
+            status="dry_run",
+            smtp_response=None,
+            error_message=None,
+            retry_count=0,
+        )
+        assert build_prior_failure_warning(rec) is None
+
+    def test_failed_emits_warning(self):
+        rec = _failed_record("us", "2026-05-10T00:00:00+09:00", error="SMTPAuthError")
+        line = build_prior_failure_warning(rec)
+        assert line is not None
+        assert "직전 발송 실패" in line
+        assert "SMTPAuthError" in line
+        assert "2026-05-10T00:00:00+09:00" in line
+
+    def test_failed_without_error_message(self):
+        rec = _failed_record("us", "2026-05-10T00:00:00+09:00")
+        rec.error_message = None
+        line = build_prior_failure_warning(rec)
+        assert line is not None
+        assert "원인 미상" in line
+
+
+class TestDispatchFallbackIntegration:
+    @pytest.fixture
+    def excel_file(self, tmp_path):
+        path = tmp_path / "daily_analysis_2026-05-06_us.xlsx"
+        path.write_bytes(b"PK")
+        return path
+
+    def test_prior_failed_warning_prepended_to_body(
+        self, excel_file, tmp_path, monkeypatch
+    ):
+        from exporters import email_sender as mod
+
+        monkeypatch.setattr(mod, "fetch_daily_analysis", lambda *_a, **_k: [_row("AAA")])
+        monkeypatch.setattr(mod, "fetch_company_names", lambda *_a, **_k: {})
+
+        log_path = tmp_path / "logs" / "dispatch.jsonl"
+        append_dispatch_log(
+            _failed_record("us", "2026-05-10T00:00:00+09:00", error="timeout"),
+            log_path,
+        )
+
+        captured_body: dict = {}
+
+        def fake_send(**kwargs):
+            captured_body["body"] = kwargs["body"]
+            return EmailDispatchRecord(
+                timestamp="2026-05-11T00:00:00+09:00",
+                region="us",
+                date=kwargs["target_date"].isoformat(),
+                recipient=kwargs["recipient"],
+                subject=kwargs["subject"],
+                attached_filename=Path(kwargs["attachment_path"]).name,
+                attached_size_bytes=Path(kwargs["attachment_path"]).stat().st_size,
+                status="sent",
+                smtp_response="ok",
+                error_message=None,
+                retry_count=0,
+            )
+
+        monkeypatch.setattr(mod, "send_email", fake_send)
+
+        dispatch_daily_email(
+            region="us",
+            target_date=date(2026, 5, 6),
+            recipient="r@test",
+            excel_path=excel_file,
+            smtp_config=_make_config(),
+            session_factory=lambda: _FakeSession([]),
+            log_path=log_path,
+        )
+        body = captured_body["body"]
+        assert body.startswith("⚠️ 직전 발송 실패: timeout")
+        assert "(2026-05-10T00:00:00+09:00)" in body
+
+    def test_prior_sent_no_warning(self, excel_file, tmp_path, monkeypatch):
+        from exporters import email_sender as mod
+
+        monkeypatch.setattr(mod, "fetch_daily_analysis", lambda *_a, **_k: [_row("AAA")])
+        monkeypatch.setattr(mod, "fetch_company_names", lambda *_a, **_k: {})
+
+        log_path = tmp_path / "logs" / "dispatch.jsonl"
+        append_dispatch_log(_sent_record("us", "2026-05-10T00:00:00+09:00"), log_path)
+
+        captured_body: dict = {}
+
+        def fake_send(**kwargs):
+            captured_body["body"] = kwargs["body"]
+            return EmailDispatchRecord(
+                timestamp="2026-05-11T00:00:00+09:00",
+                region="us",
+                date=kwargs["target_date"].isoformat(),
+                recipient=kwargs["recipient"],
+                subject=kwargs["subject"],
+                attached_filename=Path(kwargs["attachment_path"]).name,
+                attached_size_bytes=Path(kwargs["attachment_path"]).stat().st_size,
+                status="sent",
+                smtp_response="ok",
+                error_message=None,
+                retry_count=0,
+            )
+
+        monkeypatch.setattr(mod, "send_email", fake_send)
+
+        dispatch_daily_email(
+            region="us",
+            target_date=date(2026, 5, 6),
+            recipient="r@test",
+            excel_path=excel_file,
+            smtp_config=_make_config(),
+            session_factory=lambda: _FakeSession([]),
+            log_path=log_path,
+        )
+        assert "직전 발송 실패" not in captured_body["body"]
+
+    def test_other_region_failure_does_not_warn(
+        self, excel_file, tmp_path, monkeypatch
+    ):
+        from exporters import email_sender as mod
+
+        monkeypatch.setattr(mod, "fetch_daily_analysis", lambda *_a, **_k: [])
+        monkeypatch.setattr(mod, "fetch_company_names", lambda *_a, **_k: {})
+
+        log_path = tmp_path / "logs" / "dispatch.jsonl"
+        # KR previously failed — US dispatch must NOT carry the warning.
+        append_dispatch_log(_failed_record("kr", "2026-05-10T22:00:00+09:00"), log_path)
+
+        captured_body: dict = {}
+
+        def fake_send(**kwargs):
+            captured_body["body"] = kwargs["body"]
+            return EmailDispatchRecord(
+                timestamp="2026-05-11T17:00:00+09:00",
+                region="us",
+                date=kwargs["target_date"].isoformat(),
+                recipient=kwargs["recipient"],
+                subject=kwargs["subject"],
+                attached_filename=Path(kwargs["attachment_path"]).name,
+                attached_size_bytes=Path(kwargs["attachment_path"]).stat().st_size,
+                status="sent",
+                smtp_response="ok",
+                error_message=None,
+                retry_count=0,
+            )
+
+        monkeypatch.setattr(mod, "send_email", fake_send)
+
+        dispatch_daily_email(
+            region="us",
+            target_date=date(2026, 5, 6),
+            recipient="r@test",
+            excel_path=excel_file,
+            smtp_config=_make_config(),
+            session_factory=lambda: _FakeSession([]),
+            log_path=log_path,
+        )
+        assert "직전 발송 실패" not in captured_body["body"]
 
 
 # ── 6. CLI argument parsing ────────────────────────────────────────────────
