@@ -26,8 +26,28 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
+# Python stdout/stderr 인코딩 강제 — Windows cp949 환경에서 한글/em dash 출력 시
+# UnicodeEncodeError로 wrapper가 exit=1 되는 것을 방지 (run_daily_analysis.py의
+# HALT 메시지 등이 em dash — 포함).
+$env:PYTHONIOENCODING = "utf-8"
+
 # Repo root 결정 (본 파일은 apps/llm-analysis/ops/scheduler/windows/ 에 위치)
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..")).Path
+
+# apps/llm-analysis/.env 를 환경 변수로 export — DATABASE_URL, ANTHROPIC_API_KEY 등.
+# Task Scheduler는 사용자 셸 환경을 상속하지 않으므로 wrapper가 명시적 로드 필요.
+$envFile = Join-Path $repoRoot "apps\llm-analysis\.env"
+if (Test-Path -LiteralPath $envFile) {
+    Get-Content -LiteralPath $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $kv = $line -split "=", 2
+            $k = $kv[0].Trim()
+            $v = $kv[1].Trim().Trim('"').Trim("'")
+            if ($k) { Set-Item -Path "env:$k" -Value $v }
+        }
+    }
+}
 
 # Python 인터프리터: llm-analysis venv 우선, 없으면 시스템 python
 $venvPython = Join-Path $repoRoot "apps\llm-analysis\venv\Scripts\python.exe"
@@ -44,7 +64,10 @@ if (-not (Test-Path -LiteralPath $logDir)) {
 }
 
 $startedAt = Get-Date
-$dateStr = if ($Date) { $Date } else { $startedAt.ToString("yyyy-MM-dd") }
+# 로그 표기용 — 실제 분석 날짜는 -Date 명시 시에만 Python에 전달 (아래 pyArgs 참조).
+# -Date 미지정 시 run_daily_analysis.py 가 region별 최신 screen 날짜를 자동 선택한다.
+# (US는 KST 16:00 = ET 03:00로 KST 오늘 ET screen 데이터가 없음 — 자동 선택이 옳다.)
+$dateStr = if ($Date) { $Date } else { "(auto:region-latest-screen)" }
 $logFile = Join-Path $logDir ("llm_analysis_{0}_{1}.log" -f $Region.ToLower(), $startedAt.ToString("yyyyMMdd_HHmmss"))
 
 function Write-Log {
@@ -69,9 +92,11 @@ if (-not (Test-Path -LiteralPath $scriptPath)) {
 
 $pyArgs = @(
     $scriptPath,
-    "--region", $Region,
-    "--date", $dateStr
+    "--region", $Region
 )
+# -Date 가 명시된 경우에만 --date 전달. 미지정 시 _resolve_date가 region별
+# minervini_screen_results_{region} 의 최신 날짜를 자동 선택한다.
+if ($Date) { $pyArgs += @("--date", $Date) }
 if ($DryRun) { $pyArgs += "--dry-run" }
 if ($ForceRecompute) { $pyArgs += "--force-recompute" }
 if ($Limit -gt 0) { $pyArgs += "--limit"; $pyArgs += "$Limit" }
