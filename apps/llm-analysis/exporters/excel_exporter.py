@@ -267,12 +267,84 @@ class ExcelExporter:
                 cells.append("")
         return cells
 
-    # ── Sheet 2/3 (Step 1.B.2-b에서 구현) ──────────────────────────────────────
+    # ── Sheet 2: Watch 후보 ───────────────────────────────────────────────────
 
     def _build_sheet_watch(self, ws: Worksheet) -> None:
-        # Step 1.B.2-b에서 구현. 본 commit에서는 placeholder 1행.
-        ws.append(["Step 1.B.2-b에서 구현 예정"])
+        headers = self.SHEET2_COLS
+        ws.append(headers)
+        _style_header(ws, len(headers))
+
+        # 컬럼 width (가독성)
+        widths = {
+            "symbol": 12, "market": 10, "confidence": 10,
+            "reasoning": 60, "pattern": 18, "risk_flags": 36,
+            "classification_change_signal": 36,
+        }
+        for idx, name in enumerate(headers, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = widths.get(name, 16)
+
+        watch_rows = [r for r in self.rows if r.classification == "watch"]
+
+        if not watch_rows:
+            ws.append(["본 거래일 watch 후보 없음"] + [""] * (len(headers) - 1))
+            ws.freeze_panes = "A2"
+            return
+
+        for row in watch_rows:
+            ws.append([
+                row.symbol,
+                row.market,
+                row.confidence,
+                row.reasoning or "",
+                row.pattern or "",
+                _format_risk_flags_multiline(row.risk_flags),
+                "",  # classification_change_signal — Sprint 1에서는 빈 cell (후속 sprint 정밀화)
+            ])
+
+        # wrap_text on reasoning / risk_flags / classification_change_signal
+        wrap_cols = {"reasoning", "risk_flags", "classification_change_signal"}
+        for col_idx, name in enumerate(headers, start=1):
+            if name not in wrap_cols:
+                continue
+            for excel_row_idx in range(2, len(watch_rows) + 2):
+                ws.cell(row=excel_row_idx, column=col_idx).alignment = _WRAP_TOP
+
+        ws.freeze_panes = "A2"
+
+    # ── Sheet 3: 전체 분석 ────────────────────────────────────────────────────
 
     def _build_sheet_all(self, ws: Worksheet) -> None:
-        # Step 1.B.2-b에서 구현. 본 commit에서는 placeholder 1행.
-        ws.append(["Step 1.B.2-b에서 구현 예정"])
+        headers = self.SHEET3_COLS
+        ws.append(headers)
+        _style_header(ws, len(headers))
+
+        widths = {
+            "symbol": 12, "region": 8, "market": 10, "classification": 12,
+            "confidence": 10, "pattern": 18, "risk_flags": 30, "reasoning": 60,
+        }
+        for idx, name in enumerate(headers, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = widths.get(name, 16)
+
+        if not self.rows:
+            ws.append(["본 거래일 분석 결과 없음"] + [""] * (len(headers) - 1))
+            ws.freeze_panes = "A2"
+            return
+
+        for row in self.rows:
+            ws.append([
+                row.symbol,
+                row.region,
+                row.market,
+                row.classification,
+                row.confidence,
+                row.pattern or "",
+                _format_risk_flags_summary(row.risk_flags),
+                _truncate_reasoning(row.reasoning, limit=200),
+            ])
+
+        # wrap_text only on reasoning (요약 컬럼은 짧음)
+        reasoning_col = headers.index("reasoning") + 1
+        for excel_row_idx in range(2, len(self.rows) + 2):
+            ws.cell(row=excel_row_idx, column=reasoning_col).alignment = _WRAP_TOP
+
+        ws.freeze_panes = "A2"
