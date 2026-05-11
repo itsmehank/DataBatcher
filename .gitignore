@@ -48,6 +48,9 @@ build/
 dist/
 *.egg-info/
 
+# Phase 2 Sprint 1 — daily Excel exporter output
+apps/llm-analysis/out/
+
 # Test / coverage artifacts
 .coverage
 coverage.xml
