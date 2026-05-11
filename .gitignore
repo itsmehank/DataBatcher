@@ -51,6 +51,10 @@ dist/
 # Phase 2 Sprint 1 — daily Excel exporter output
 apps/llm-analysis/out/
 
+# Phase 2 Sprint 2 — SMTP dispatch log & local .env are already covered by
+# the global `logs/`, `.env`, and `.env.*` rules above (with `!.env.example`
+# exception). Listed here only for discoverability.
+
 # Test / coverage artifacts
 .coverage
 coverage.xml
