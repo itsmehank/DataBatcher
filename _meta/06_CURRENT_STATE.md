@@ -10,9 +10,9 @@
 
 **완료된 Phase**: Phase 0 + P0 정합성 검토 + P0.5 스크리너 개편 + **Phase 1 완료**
 
-**진행 중인 Phase**: **Phase 2 — 일일 리포트 (메일+엑셀) + Phase 1 인계 sprint** (Sprint 1 진입, 브랜치 `phase2/sprint1-excel`)
+**진행 중인 Phase**: **Phase 2 (Sprint 1 완료, Sprint F·Sprint 2 진입 준비)**
 
-**다음 시작할 단계**: **Phase 2 Sprint 1 — excel_exporter.py + 시트 3개 + CLI + 단위 테스트** (`phase2_brief.md` §3 Sprint 1 명세)
+**다음 시작할 단계**: Sprint 1 main 통합 머지 완료 (commit `6733778`, 2026-05-11). 다음 — **Sprint F (운영 부수 정리) 또는 Sprint 2 (SMTP 발송)**. 진행 순서는 `phase2_brief.md` §4 권고 따름.
 
 ---
 
@@ -66,6 +66,7 @@
 - [x] Phase 1 코드 머지 (apps/, db/) — commit `5125d71` (main, 2026-05-10)
 - [x] Phase 2 brief 사용자 승인 — 2026-05-11 Architect 세션에서 사용자 명시 승인
 - [x] Q-004 적용 — commit `0da41cd` (자연 완료, 운영 큐 "완료된 작업" 이동)
+- [x] Sprint 1 main 통합 머지 완료 (2026-05-11, merge commit `6733778`; phase2/sprint1-excel 9 commit 통합)
 
 ---
 
