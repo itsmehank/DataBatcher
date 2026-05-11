@@ -417,10 +417,39 @@ Sprint B/D 결과:
 
    예상 소요: 0일 (명문화만)
 
+7. **거버넌스 문서 사실 정정 — 코드 SSoT 정합화** ✅ 완료 (2026-05-11)
+
+   ADR-014 §1 (a)·(d) 카테고리 통합 처리 sprint. 코드 본질 불변, 거버넌스 문서 카운트·관찰 사후 정정.
+   본 항목은 Phase 2 Sprint 1 진입 시 Builder SSoT 점검·시각 검증에서 발견된 두 건의 사실 오류를 통합 정정한다.
+
+   **7-a: EntryParams 16→17 필드 카운트 정정** ✅ 완료 (commit `c07b37a`)
+
+   - 발견 경위: Phase 2 Sprint 1 1.A 진입 시 Builder SSoT 점검 (L1·L2·L3) + Sprint 1 머지 후 Architect 사후 점검 (L4) + Sprint F #7 commit 1 진행 중 Builder 잔존 grep (L6).
+   - 코드 SSoT: `apps/llm-analysis/models/entry_params.py` EntryParams Pydantic 모델 17필드 (v1 13필드 + v1.1 신규 4필드 `trigger_price`, `current_price`, `stop_loss_pct_from_current_price`, `observed_breakout_volume_ratio`).
+   - 정정 위치 5건 일괄 처리: L1 `entry_params.py` docstring (module + class) / L2·L3 `_meta/05_GLOSSARY.md` / L4 `_meta/06_CURRENT_STATE.md` / L6 `_meta/phases/phase2_brief.md` Sprint 1 명세.
+   - **L5 backlog 이관**: `_meta/phases/phase1_brief.md` line 621·1650 "13 → 16필드" 표기. phase1_brief Phase 1 종료 시점 SSoT 봉인 보존 우선. 차후 phase1_brief 갱신 필요 사항 발생 시 함께 처리 또는 Phase 2 종료 시 재검토.
+   - **정정 불가** (Auditor 봉인): `_meta/phases/phase1_audit.md` line 74 "16필드" — Auditor 산출물 시간적 봉인 원칙 (§6.3 + addendum 정신). 사실 자체만 `phase2_progress.md`에 기록.
+   - 카테고리: ADR-014 §1 (a) Implementation Detail 정밀화.
+
+   **7-b: 5/6 US 26→122 사실 정정** ✅ 완료 (commit `83fcf76`)
+
+   - 발견 경위: Phase 2 Sprint 1 1.C.2 sample 시각 검증.
+   - 사실 확인: `SELECT COUNT(*) FROM daily_analysis_us WHERE date='2026-05-06';` → 122행.
+   - 처리: `phase1_progress.md` §1.3.10 line 1547 본문에 인라인 괄호 footnote 추가 (봉인 본문 보존 + 사후 관찰 보강). 핵심 위치 1곳만 처리, 기타 표·헤더 위치(line 1231·1239·1412)는 본 commit 범위 밖.
+   - 카테고리: ADR-014 §1 (d) 결과/영향 사후 관찰 추가 — 본 항목이 (d) 카테고리 첫 명시 사례.
+
+   **완료 기준**:
+   - ✅ 7-a 5 위치 정정 + phase2_progress.md SSoT 발견 위치 카운트 정합 (3→5)
+   - ✅ 7-b phase1_progress §1.3.10 line 1547 footnote
+   - ✅ 단위 테스트 회귀 0건 (149/149 passed)
+   - ✅ ADR-014 §5 형식 A 인라인 이력 표기 패턴 준수
+
+   **실제 소요**: 0.5일.
+
 **의존성**: 항목별 독립
 
 **완료 기준**:
-- 6종 모두 처리 (완료 또는 명시적 backlog 이관)
+- 7종 모두 처리 (완료 또는 명시적 backlog 이관)
 - 각 결정 ADR 또는 brief 갱신
 
 **예상 소요**: 항목별 0.5~1일 (총 2~4일)
@@ -527,7 +556,7 @@ Phase 1 §9.1 양식 계승. 다음 모두 충족 시 Phase 2 종료:
 
 1. ✅ Sprint 1·2·3 (Phase 2A 메일+엑셀) 모두 production 가동 + 7거래일 자동 발송 검증
 2. ✅ Sprint C (ADR-015 구현) 완료 + 회고 측정 결과 보고
-3. ✅ Sprint F (운영 부수 6종) 모두 처리 (완료 또는 명시적 backlog 이관)
+3. ✅ Sprint F (운영 부수 7종) 모두 처리 (완료 또는 명시적 backlog 이관)
 4. ✅ Sprint A (entry-side 평가) 처리 — 정식 충족 또는 운용적 완화 사유 명시
 5. ✅ Sprint B (Evaluator 6종) 처리 결과 보고
 6. ✅ Sprint D (분류 안정성 모니터링) 결과 보고
