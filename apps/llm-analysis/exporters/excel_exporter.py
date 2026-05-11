@@ -215,35 +215,35 @@ class ExcelExporter:
         entry_rows = [r for r in self.rows if r.classification == "entry"]
 
         if not entry_rows:
+            # 안내 행 분기 — 데이터 행과 시각 구분 위해 회색 fill 적용
             empty_row = ["본 거래일 entry 후보 없음"] + [""] * (len(headers) - 1)
             ws.append(empty_row)
-            ws.freeze_panes = "A2"
-            return
+            for col_idx in range(1, len(headers) + 1):
+                ws.cell(row=2, column=col_idx).fill = _EMPTY_FILL
+        else:
+            # entry 행 분기
+            for row in entry_rows:
+                ws.append(self._render_entry_row(row, headers))
 
-        for row in entry_rows:
-            ws.append(self._render_entry_row(row, headers))
+            # entry_params None 종목 회색 fill (전체 row)
+            for excel_row_idx, dao_row in enumerate(entry_rows, start=2):
+                if dao_row.entry_params is None:
+                    for col_idx in range(1, len(headers) + 1):
+                        ws.cell(row=excel_row_idx, column=col_idx).fill = _EMPTY_FILL
 
-        # entry_params None 종목 회색 fill (전체 row)
-        for excel_row_idx, dao_row in enumerate(entry_rows, start=2):
-            if dao_row.entry_params is None:
-                for col_idx in range(1, len(headers) + 1):
-                    ws.cell(row=excel_row_idx, column=col_idx).fill = _EMPTY_FILL
+            # multi-line/wrap_text 적용 (known_warnings, other_warnings, reasoning, notes)
+            wrap_cols = {"known_warnings", "other_warnings", "reasoning", "notes"}
+            for col_idx, name in enumerate(headers, start=1):
+                if name not in wrap_cols:
+                    continue
+                for excel_row_idx in range(2, len(entry_rows) + 2):
+                    ws.cell(row=excel_row_idx, column=col_idx).alignment = _WRAP_TOP
 
-        # multi-line/wrap_text 적용 (known_warnings, other_warnings, reasoning, notes)
-        wrap_cols = {"known_warnings", "other_warnings", "reasoning", "notes"}
-        for col_idx, name in enumerate(headers, start=1):
-            if name not in wrap_cols:
-                continue
-            for excel_row_idx in range(2, len(entry_rows) + 2):
-                ws.cell(row=excel_row_idx, column=col_idx).alignment = _WRAP_TOP
-
-        # Hidden columns (ENTRY_CONTEXTUAL_COLS)
+        # 공통 후처리 — entry 유무와 무관하게 hidden + freeze 적용 (시각 속성 일관성)
         hidden_start = len(self.ENTRY_CORE_COLS) + len(self.ENTRY_EXTRA_COLS) + 1
         for i in range(len(self.ENTRY_CONTEXTUAL_COLS)):
             letter = get_column_letter(hidden_start + i)
             ws.column_dimensions[letter].hidden = True
-
-        # frozen: header 행 + symbol 컬럼
         ws.freeze_panes = "B2"
 
     def _render_entry_row(self, row: DailyAnalysisRow, headers: list[str]) -> list:

@@ -292,6 +292,45 @@ def test_empty_entry_shows_guidance_row(tmp_path):
     assert ws.cell(row=2, column=1).value == "본 거래일 entry 후보 없음"
 
 
+def test_sheet1_empty_entry_has_hidden_contextual_columns(tmp_path):
+    """Sprint 1.D 회귀 방지: 안내 행 케이스에서도 CONTEXTUAL 컬럼 M~T hidden."""
+    rows = [_watch_row(), _ignore_row()]  # entry 0건
+    exp = ExcelExporter(rows=rows, target_date=date(2026, 5, 11), region="us")
+    out = exp.export(out_dir=tmp_path)
+    wb = load_workbook(out)
+    ws = wb["Entry 후보"]
+    hidden = {"M", "N", "O", "P", "Q", "R", "S", "T"}
+    visible = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"}
+    for letter in hidden:
+        assert ws.column_dimensions[letter].hidden is True, f"안내 행 케이스 {letter} should be hidden"
+    for letter in visible:
+        assert ws.column_dimensions[letter].hidden is False, f"안내 행 케이스 {letter} should be visible"
+
+
+def test_sheet1_empty_entry_has_freeze_B2(tmp_path):
+    """Sprint 1.D 회귀 방지: 안내 행 케이스에서도 freeze_panes == 'B2'."""
+    rows = []  # entry/watch/ignore 모두 0건
+    exp = ExcelExporter(rows=rows, target_date=date(2026, 5, 11), region="us")
+    out = exp.export(out_dir=tmp_path)
+    wb = load_workbook(out)
+    ws = wb["Entry 후보"]
+    assert ws.freeze_panes == "B2"
+
+
+def test_sheet1_empty_entry_guidance_row_has_gray_fill(tmp_path):
+    """Sprint 1.D 회귀 방지: 안내 행 회색 fill(#F2F2F2) 전체 20 cell 적용."""
+    rows = [_ignore_row()]  # entry 0건
+    exp = ExcelExporter(rows=rows, target_date=date(2026, 5, 11), region="us")
+    out = exp.export(out_dir=tmp_path)
+    wb = load_workbook(out)
+    ws = wb["Entry 후보"]
+    for col_idx in range(1, 21):
+        cell = ws.cell(row=2, column=col_idx)
+        rgb = cell.fill.fgColor.rgb if cell.fill and cell.fill.fgColor else None
+        assert rgb and "F2F2F2" in str(rgb).upper(), \
+            f"안내 행 col {col_idx} 회색 fill 미적용: {rgb}"
+
+
 def test_empty_watch_shows_guidance_row(tmp_path):
     rows = [_nvst_entry_row(), _ignore_row()]  # watch 0건
     exp = ExcelExporter(rows=rows, target_date=date(2026, 5, 11), region="us")

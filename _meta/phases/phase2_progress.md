@@ -81,22 +81,50 @@
 **1.C.3 phase2_progress.md** (본 commit):
 - 본 문서 신규 작성
 
+### 1.D 시각 검증 발견 사항 수정 (commit `<1.D commit>`)
+
+Architect 세션(2026-05-11)에서 openpyxl 정밀 점검 시각 검증 시 발견:
+- Sheet 1 안내 행 케이스에서 hidden M~T + freeze B2 미적용 (entry 0건 sample 3건 모두)
+- Builder smoke test는 mock entry 있는 케이스에서 정상 동작 → 단위 테스트 커버리지 부족 신호 (안내 행 분기 시각 속성 미커버)
+
+원인:
+- `_build_sheet_entry()` 안내 행 분기에서 `ws.freeze_panes = "A2"; return` early return으로 hidden/freeze 적용 코드 skip
+- entry 행 분기에서만 hidden + `freeze = "B2"` 적용
+
+수정 (`_build_sheet_entry()`):
+- early return 제거, 두 분기 모두 메서드 끝까지 흐르도록 if/else 구조 변경
+- hidden(M~T) + `freeze = "B2"`를 두 분기 공통 후처리로 이동
+- 안내 행 cell 20개 전체 회색 fill(#F2F2F2) 적용 — 데이터 행 부재 시각 단서 (Builder 결정, 명세 모호 부분)
+
+단위 테스트 3건 추가 (`tests/test_excel_exporter.py`):
+- `test_sheet1_empty_entry_has_hidden_contextual_columns` — 안내 행 케이스에서 M~T hidden + A~L visible
+- `test_sheet1_empty_entry_has_freeze_B2` — 빈 rows 케이스 freeze_panes == "B2"
+- `test_sheet1_empty_entry_guidance_row_has_gray_fill` — 안내 행 20 cell #F2F2F2
+
+회귀 점검: 전체 pytest **149 passed** (146 베이스라인 + 3 신규, 회귀 0건).
+
+sample 재생성 후 시각 속성 직접 검증 (3개 모두 정합):
+- `freeze=B2, hidden=['M','N','O','P','Q','R','S','T']`
+- 안내 행 cell A2: `fill=00F2F2F2`, `value='본 거래일 entry 후보 없음'`
+
 ### 완료 기준 (phase2_brief §3 Sprint 1)
 
 - [x] 임의 거래일 엑셀 생성 성공 (sample 3건)
-- [ ] 사용자 시각 검증 통과 ("메일에서 열어 핵심 정보 파악 가능") — 사용자 검증 대기
+- [x] 사용자 시각 검증 통과 — Web Claude Architect 세션 openpyxl 정밀 점검 (2026-05-11). 발견 사항 2건 1.D commit으로 해소.
 - [x] entry_params 17필드 모두 표기 (CORE 7 frozen + EXTRA 2 frozen + CONTEXTUAL 8 hidden + warnings 2 frozen)
-- [x] 단위 테스트 14/14 통과 + 회귀 0건 (146 total passed)
+- [x] 단위 테스트 17/17 통과 + 회귀 0건 (149 total passed)
 
 ### Sprint 1 commit 트레일
 
 ```
-8d66cd7  phase2 sprint1.C.1: run_excel_export.py CLI 진입점
-d87c18f  phase2 sprint1.B.3: ExcelExporter 단위 테스트 14건
-be7a907  phase2 sprint1.B.2-b: Sheet 2 'Watch 후보' + Sheet 3 '전체 분석' 빌더
-976eab6  phase2 sprint1.B.2-a: Sheet 1 'Entry 후보' 빌더 + export() + 헬퍼
-2ac48b2  phase2 sprint1.B.1: daily_analysis DAO
-d3abc1a  phase2 sprint1.A: excel_exporter 골격 + openpyxl 의존성
+<1.D commit>  phase2 sprint1.D: Sheet 1 안내 행 시각 속성 일관성 수정
+32a1dba       phase2 sprint1.C.3: phase2_progress.md 신규 작성
+8d66cd7       phase2 sprint1.C.1: run_excel_export.py CLI 진입점
+d87c18f       phase2 sprint1.B.3: ExcelExporter 단위 테스트 14건
+be7a907       phase2 sprint1.B.2-b: Sheet 2 'Watch 후보' + Sheet 3 '전체 분석' 빌더
+976eab6       phase2 sprint1.B.2-a: Sheet 1 'Entry 후보' 빌더 + export() + 헬퍼
+2ac48b2       phase2 sprint1.B.1: daily_analysis DAO
+d3abc1a       phase2 sprint1.A: excel_exporter 골격 + openpyxl 의존성
 ```
 
 ### 외부 평가 / 결정
