@@ -97,7 +97,7 @@
 **산출물**:
 - `apps/llm-analysis/exporters/excel_exporter.py` — `daily_analysis_kr/us` + 부수 정보를 엑셀로 출력
 - 엑셀 템플릿 디자인 — 시트 3개:
-  - Sheet 1 "Entry 후보" — `classification='entry'` 종목 + entry_params 16필드 + key reasoning 발췌
+  - Sheet 1 "Entry 후보" — `classification='entry'` 종목 + entry_params 17필드 + key reasoning 발췌
   - Sheet 2 "Watch 후보" — `classification='watch'` 종목 + reasoning 요약 + revisit 단서
   - Sheet 3 "전체 분석" — KR + US 전 분석 결과 (classification, confidence, key_facts 일부)
 - 단위 테스트 — sample 데이터로 엑셀 생성 정확성 검증
@@ -108,7 +108,7 @@
 **완료 기준**:
 - 임의 거래일에 대해 엑셀 생성 성공
 - 엑셀이 사용자가 메일에서 열어 핵심 정보 파악할 수 있는 형태
-- entry_params 16필드 모두 표기 (단, 너무 빽빽하면 핵심 6~8필드만 + 나머지는 contextual)
+- entry_params 17필드 모두 표기 (단, 너무 빽빽하면 핵심 6~8필드만 + 나머지는 contextual)
 
 **예상 소요**: 1~2일
 

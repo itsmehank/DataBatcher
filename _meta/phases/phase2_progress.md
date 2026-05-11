@@ -21,14 +21,18 @@
 
 **EntryParams 16→17 필드 카운트 오류**:
 - 코드 SSoT: `apps/llm-analysis/models/entry_params.py` 실제 17필드
-- 거버넌스 문서 카운트: 16필드로 표기 (3 위치)
-  - `apps/llm-analysis/models/entry_params.py` docstring "16개 필드"
-  - `_meta/05_GLOSSARY.md` Part B.2 line 411 "필드 정의 (16필드)"
-  - `_meta/05_GLOSSARY.md` Part B.2 line 472 "v1.1 (16필드)"
+- 거버넌스 문서 카운트: 16필드로 표기 (5 위치 — L5 backlog 별도, phase1_audit 봉인 위치 1건 정정 불가)
+  - L1 `apps/llm-analysis/models/entry_params.py` docstring "16개 필드" (line 5 module + line 107 class)
+  - L2 `_meta/05_GLOSSARY.md` Part B.2 "필드 정의 (16필드)"
+  - L3 `_meta/05_GLOSSARY.md` Part B.2 "v1.1 (16필드)"
+  - L4 `_meta/06_CURRENT_STATE.md` "Phase 1에서 완료된 것" 16필드 (Architect 2026-05-11 사후 발견)
+  - L6 `_meta/phases/phase2_brief.md` Sprint 1 명세 line 100·111 "entry_params 16필드" (Builder 2026-05-11 commit 1 진행 중 추가 발견 — 사용자 결정에 따라 commit 1 일괄 포함)
+  - L5 (backlog) `_meta/phases/phase1_brief.md` §6.3·§11.4-bis.2 — phase1_brief 봉인 보존 우선, 차후 갱신 동반 처리
+  - (정정 불가) `_meta/phases/phase1_audit.md` line 74 — Auditor 산출물 시간적 봉인 (§6.3 + addendum 동일 정신). 사실 자체만 본 위치에 기록
 - 발견 경위: Phase 2 Sprint 1 1.A 진입 시 Builder SSoT 점검 (phase2_brief §11.2 정신 직접 적용)
 - 컬럼 스킴 영향 없음 — Sprint 1 ENTRY 컬럼 스킴이 17필드 모두 cover (CORE 7 + CONTEXTUAL 8 + warnings 2 = 17)
 - 카테고리: ADR-014 §1 (a) Implementation Detail 정밀화 (코드 실제 17, 문서 카운트만 오류 — 결정 본질 불변)
-- 처리: Sprint F backlog #7 등록 (Sprint 1 범위 밖) — 별도 Architect 명령으로 거버넌스 문서 정정 예정
+- 처리: Sprint F #7-a로 정정 완료 (2026-05-11, 4 위치 일괄) — phase2_brief Sprint F #7 본문 참조
 
 **DB 세션 import path 정정** (Step 1.A 진입 시):
 - Architect 원 명령: `from db.session import get_session`

@@ -408,7 +408,7 @@ CREATE TABLE llm_calls (
 }
 ```
 
-**필드 정의 (16필드)**:
+**필드 정의 (17필드)**:
 
 | 필드 | 타입 | 의미 |
 |---|---|---|
@@ -469,7 +469,7 @@ NVST B.5.5 1차 Evaluator 평가에서 도출된 (6) 함수 표기·투명성 �
 - `apps/llm-analysis/config/settings.yaml`: `prompts.calculate_entry_params: v1` → `v1_1`
 
 **구 스키마와의 차이**:
-- brief v0 (7필드) → v1 (13필드) → v1.1 (16필드)
+- brief v0 (7필드) → v1 (13필드) → v1.1 (17필드)
 - v0 → v1: phase1_progress.md 1.2 트랙 B B.1 사전 자문 메모 + commit `dd09e2d` 참조
 - v1 → v1.1: phase1_progress.md 1.3.0 메모 + commit `c2114f7` 참조
 

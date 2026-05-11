@@ -2,7 +2,7 @@
 EntryParams Pydantic 모델 — calculate_entry_params() (6) 응답 검증.
 
 본 모델은 prompts/calculate_entry_params_v1_1.md 의 §9 Output Schema 와
-§Validation ranges 를 코드로 강제한다. v1.1 기준 16개 필드.
+§Validation ranges 를 코드로 강제한다. v1.1 기준 17개 필드.
 
 v1 → v1.1 변경 (Phase 1.3.0, NVST B.5.5 1차 Evaluator 평가 반영):
   1. stop_loss_pct → stop_loss_pct_from_pivot (rename) + stop_loss_pct_from_current_price (new)
@@ -104,7 +104,7 @@ _BREAKOUT_VOLUME_THRESHOLD: dict[str, float] = {
 
 class EntryParams(BaseModel):
     """
-    calculate_entry_params() (6) 출력. v1.1 기준 16개 필드.
+    calculate_entry_params() (6) 출력. v1.1 기준 17개 필드.
 
     - 가격 필드는 Decimal (2 decimal places)
     - pct 필드는 float (1 decimal place 허용)

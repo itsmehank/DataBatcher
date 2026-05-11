@@ -108,7 +108,7 @@
 **LLM 분석 레이어 (계층 2)**:
 - (5) `analyze_chart()` v2 production lock — `apps/llm-analysis/prompts/analyze_chart_v2.md`
 - (6) `calculate_entry_params()` v1.1 production lock — `apps/llm-analysis/prompts/calculate_entry_params_v1_1.md`
-  - 16필드 (rename 1 + new 4: `current_price`, `trigger_price`, `stop_loss_pct_from_current_price`, `observed_breakout_volume_ratio`)
+  - 17필드 (rename 1 + new 4: `current_price`, `trigger_price`, `stop_loss_pct_from_current_price`, `observed_breakout_volume_ratio`)
   - KnownWarning enum 12종 (auto-emit 2종: `stop_distance_from_current_price_exceeds_book_limit`, `breakout_volume_below_requirement`)
 
 **DB 스키마 (Q-002 PROD 적용 완료)**:
