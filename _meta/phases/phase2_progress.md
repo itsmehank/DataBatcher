@@ -81,7 +81,7 @@
 **1.C.3 phase2_progress.md** (본 commit):
 - 본 문서 신규 작성
 
-### 1.D 시각 검증 발견 사항 수정 (commit `<1.D commit>`)
+### 1.D 시각 검증 발견 사항 수정 (commit `54c2627`)
 
 Architect 세션(2026-05-11)에서 openpyxl 정밀 점검 시각 검증 시 발견:
 - Sheet 1 안내 행 케이스에서 hidden M~T + freeze B2 미적용 (entry 0건 sample 3건 모두)
@@ -117,7 +117,7 @@ sample 재생성 후 시각 속성 직접 검증 (3개 모두 정합):
 ### Sprint 1 commit 트레일
 
 ```
-<1.D commit>  phase2 sprint1.D: Sheet 1 안내 행 시각 속성 일관성 수정
+54c2627  phase2 sprint1.D: Sheet 1 안내 행 시각 속성 일관성 수정
 32a1dba       phase2 sprint1.C.3: phase2_progress.md 신규 작성
 8d66cd7       phase2 sprint1.C.1: run_excel_export.py CLI 진입점
 d87c18f       phase2 sprint1.B.3: ExcelExporter 단위 테스트 14건
