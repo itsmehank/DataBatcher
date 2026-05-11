@@ -5,3 +5,4 @@ anthropic>=0.40        # API 백엔드용 (1.1.6에서 검증)
 SQLAlchemy>=2.0        # DB 접근
 PyMySQL>=1.1
 python-dotenv>=1.0
+openpyxl>=3.1.0,<4.0   # Phase 2 Sprint 1 — Excel 리포트 생성
