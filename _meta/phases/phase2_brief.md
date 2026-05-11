@@ -550,30 +550,45 @@ Phase 1 §9.3 5종 양식 계승. Auditor 세션에서 Phase 2 종료 시 점검
 
 ## §9. 종료 게이트 (Phase 2 종료 조건)
 
-Phase 1 §9.1 양식 계승. 다음 모두 충족 시 Phase 2 종료:
+### 9.1 차단 조건 (Phase 2 종료 게이트)
 
-### 9.1 자동 점검 (Builder)
+ADR-016 위험 3등급제 채택(2026-05-11)으로 Phase 2 종료 차단 조건은 Phase 2A (본질)에 한정:
 
 1. ✅ Sprint 1·2·3 (Phase 2A 메일+엑셀) 모두 production 가동 + 7거래일 자동 발송 검증
-2. ✅ Sprint C (ADR-015 구현) 완료 + 회고 측정 결과 보고
-3. ✅ Sprint F (운영 부수 7종) 모두 처리 (완료 또는 명시적 backlog 이관)
-4. ✅ Sprint A (entry-side 평가) 처리 — 정식 충족 또는 운용적 완화 사유 명시
-5. ✅ Sprint B (Evaluator 6종) 처리 결과 보고
-6. ✅ Sprint D (분류 안정성 모니터링) 결과 보고
-7. ✅ Sprint E (prompt v3 검토) 결정 보고
-8. ✅ database_schema.md 갱신 (Sprint F 의무 명문화 후 첫 적용)
-9. ✅ 헌법 §2.1·§2.2·§2.5 위배 없음
-10. ✅ 운영 큐 항목 모두 "완료된 작업" 섹션 이동 (Q-004 처리 + Phase 2 새 항목 처리)
-11. ✅ `_meta/phases/phase2_progress.md` Phase 2 종료 보고 작성
+2. ✅ 헌법 §2.1·§2.2·§2.5 위배 없음 (C급 작업은 조건부 Auditor 면제 — ADR-016 §3)
+3. ✅ `_meta/phases/phase2_progress.md` Phase 2A 종료 보고 작성
+4. ✅ 단위 테스트 회귀 0건
+
+### 9.1-bis maintenance backlog (Phase 3 진입 차단 아님)
+
+다음 sprint는 maintenance backlog로 분리. 각각 만료일·후행 처리 부여:
+
+| Sprint | 등급 | 만료일·후행 처리 | 진행 방법 |
+|---|---|---|---|
+| Sprint C (ADR-015 fund vehicle) | B급 | Phase 3 종료 시까지 진행, 미진행 시 Phase 3 종료 보고에 사유 명시 | Builder 단독, PR 사유 1단락 |
+| Sprint A (entry 자연 누적) | B급 | 2026-06-08 도달 시 사용자가 (a) 진행 (b) 추가 연기 (c) drop + 운용적 완화 영구 채택 중 택1 | 백그라운드 |
+| Sprint B (Evaluator 6종) | B급 | Phase 3 시작 후 1개월 도달 시 사용자가 (a) 진행 (b) 일부 Phase 3 sprint에 통합 (c) drop 중 택1 | 일부 통합 가능 |
+| Sprint D (분류 안정성) | B급 | Phase 3 종료 시 진행 또는 사유 명시 | 분석 스크립트 |
+| Sprint E (prompt v3) | B급 | A·B·D 결과 후 결정. 결과 부족 시 자동 drop | 조건부 |
+| Sprint F (운영 부수) | C급 | Phase 3 진입 전 진행. 사용자 시점 자율 | 사용자 시점 |
+
+만료일 도달 시 사용자가 명시 결정 후 본 표 갱신. 결정 미명시 + 만료일 경과 시 `06_CURRENT_STATE.md`에 "결정 보류" 표기로 가시화.
 
 ### 9.2 정성 평가 (사용자)
 
 1. 사용자가 매일 아침 메일을 보고 "쓸만하다" 판단
 2. 메일 정보가 그날의 매매 결정에 충분 (정성 평가)
 
-### 9.3 Auditor 세션 (헌법 5종 점검)
+### 9.3 Auditor 세션 (헌법 5종 점검) — ADR-016 §3 조건부 가동
 
-phase1_brief §9.3 양식 계승 — Auditor 세션 prompt 별도 작성 (본 brief §10 참조).
+Phase 2A는 헌법 §2.1·§2.2 영역 무관 (메일·엑셀 발송, LLM→주문 경로 없음). §2.5는 발송 기록 JSONL 영구 보존 코드 패턴으로 충족.
+
+따라서 ADR-016 §3 대안 절차 적용:
+- Phase 2A 종료 시 Builder가 §2.1·§2.2·§2.5 비건드림 선언
+- Architect 1단락 확인
+- 정식 Auditor 세션 생략
+
+(원 §9.3 본문의 phase1_brief §9.3 양식 계승 절차는 §2.1·§2.2 영역을 건드린 Phase에 한정 적용. §10 Auditor 세션 의뢰 프롬프트는 보존 — 향후 A급 Phase 진입 시 활용)
 
 ---
 

@@ -8,11 +8,20 @@
 
 ## 현재 위치
 
-**완료된 Phase**: Phase 0 + P0 정합성 검토 + P0.5 스크리너 개편 + **Phase 1 완료**
+**완료된 Phase**: Phase 0 + P0 정합성 검토 + P0.5 스크리너 개편 + Phase 1 완료
 
-**진행 중인 Phase**: **Phase 2 (Sprint 1 완료, Sprint F·Sprint 2 진입 준비)**
+**진행 중인 Phase**: Phase 2A (메일+엑셀)
+- Sprint 1 (엑셀) — 완료, main 머지 6733778
+- Sprint 2 (SMTP 메일) — 진입 시점, C급 분류 (ADR-016)
 
-**다음 시작할 단계**: Sprint 1 main 통합 머지 완료 (commit `6733778`, 2026-05-11). 다음 — **Sprint F (운영 부수 정리) 또는 Sprint 2 (SMTP 발송)**. 진행 순서는 `phase2_brief.md` §4 권고 따름.
+**다음 시작할 단계**: Sprint 2 (SMTP 메일 발송)
+
+**Phase 2 정의 (ADR-016 채택 2026-05-11)**: Phase 2 = Phase 2A (Sprint 1·2·3). 원 phase2_brief의 Sprint A·B·C·D·E·F는 maintenance backlog로 분리 (`phase2_brief.md` §9.1-bis), Phase 3 진입 차단 조건 아님.
+
+**maintenance backlog 요약**:
+- Sprint C (fund vehicle, B급, Phase 3 종료 시까지)
+- Sprint A (entry 누적, B급, 2026-06-08 만료 시 사용자 결정)
+- Sprint B/D/E/F (B급·C급, 만료일 별도)
 
 ---
 
