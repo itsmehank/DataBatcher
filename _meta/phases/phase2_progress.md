@@ -137,4 +137,177 @@ d3abc1a       phase2 sprint1.A: excel_exporter 골격 + openpyxl 의존성
 
 ---
 
-(이후 Sprint 2·3, Sprint A·B·C·D·E·F 본 문서에 누적)
+## Sprint 2: SMTP 메일 발송 (`sprint2-email-sender` 브랜치 → main ff push)
+
+**시작**: 2026-05-12
+**완료**: 2026-05-12 (main 머지 commit `181e985`)
+**등급**: C급 (ADR-016 §6)
+
+### 2.A 산출물 (commit `181e985`, +1,467 lines / 5 files)
+
+**`apps/llm-analysis/exporters/email_sender.py`** (신규):
+- `SMTPConfig` (`from_env()` — `SMTP_USER`/`SMTP_PASSWORD` 필수, host/port/sender/STARTTLS/SSL 기본값 + 필수 누락 시 어느 변수인지 명시 ValueError)
+- `EmailDispatchRecord` (11 필드 dataclass: timestamp/region/date/recipient/subject/attached_filename/attached_size_bytes/status/smtp_response/error_message/retry_count)
+- `build_email_body(region, date, entry, watch, attached_filename, company_names, now)` → (subject, body). 본문 양식: subject `[StockAlert] {date} {KR|US} 분석 결과 (entry N, watch M)`, entry 후보 전체 (reasoning 200자 컷), watch top-3 (confidence DESC, reasoning 150자 컷)
+- `send_email(...)` SMTP 발송 + retry/exponential backoff. retryable: `SMTPServerDisconnected/Connect/Helo/Data`, `socket.timeout`, `ConnectionError`. `SMTPAuthenticationError`는 즉시 실패 (no retry). 예외 흡수 → `status`/`error_message` 필드로 표기
+- `append_dispatch_log(record, log_path)` JSONL append-only (UTF-8). 디스크 실패 시 `RuntimeError`로 escalate (silent loss 금지)
+- `dispatch_daily_email(...)` 고수준 통합 함수 — DB 조회 + body 빌드 + send (or dry-run) + JSONL 기록
+- `fetch_company_names(session, symbols, region)` `symbol_master`/`us_symbol_master`의 `name` 컬럼 best-effort 조회 (실패 시 빈 dict)
+- JSONL 경로: `DEFAULT_LOG_PATH = apps/llm-analysis/logs/email_dispatch.jsonl`
+
+**`apps/llm-analysis/run_email_send.py`** (신규):
+- CLI: `--date YYYY-MM-DD` (필수), `--region kr|us|both` (필수), `--to` (선택, env `SMTP_TO_DEFAULT` fallback), `--excel-path` (선택), `--excel-dir` (기본 `apps/llm-analysis/out`), `--dry-run`
+- `region='both'` 시 kr/us 2회 dispatch
+- exit code: 모두 sent/dry_run = 0, 1건이라도 failed = 1
+- excel 자동 추정: `<excel-dir>/daily_analysis_<date>_<region>.xlsx`, 부재 시 명시 에러로 `--excel-path` 요구
+
+**`apps/llm-analysis/tests/test_email_sender.py`** (신규, +701 lines, 36 케이스):
+- `TestSMTPConfigFromEnv` 6건 (defaults/overrides/missing user/missing password/non-int port/SSL-STARTTLS 상호배타)
+- `TestBuildEmailBody` 8건 (subject 매칭/entry 0건/watch 0건/watch top-3/truncation/company names/region 검증/entry block 필드)
+- `TestSendEmail` 7건 (성공 1회/retry then success/max retries/auth error 즉시/missing attach/backoff cap/message 구조)
+- `TestAppendDispatchLog` 4건 (디렉터리 자동 생성/append 모드/UTF-8/디스크 실패 RuntimeError)
+- `TestDispatchDailyEmail` 4건 (dry_run/send 경로/missing excel/invalid region)
+- `TestCLIArgs` 7건 (필수 인자/dry-run/`--to` fallback/누락 raise/both 2회 호출/실패 exit code)
+
+**`.env.example`**: SMTP_* 자격증명 키 8종 추가 (DB·Anthropic 키 보존)
+
+**`.gitignore`**: Phase 2 Sprint 2 주석 추가 (실 패턴 변경 없음 — root `.env`/`logs/` 규칙이 이미 커버)
+
+### 2.B 사용자 검증 (2026-05-12)
+
+DEV `.env` 작성 (Gmail 16자 앱 비밀번호) → 다음 검증 수행:
+- KR dry-run 2026-05-04 (10 ignore) — `[dry_run]` exit=0, JSONL 1건 기록
+- US dry-run 2026-05-07 (174 ignore + 2 watch: CGON 0.75, SHIP 0.72) — exit=0, JSONL 1건 기록
+- US 실 발송 2026-05-07 — `[sent]` SMTP ok, attach 27,450 bytes, retry=0
+- KR 실 발송 2026-05-04 — `[sent]` SMTP ok, attach 8,532 bytes, retry=0 (entry/watch 0건 케이스 본문 정합 확인)
+- 사용자 정성 평가: US/KR 양쪽 메일 수신 + 본문 가독성 + 첨부 엑셀 정상 → **PASS**
+
+### 2.C 단위 테스트
+
+- 회귀 점검: 전체 pytest **185 passed** (149 베이스라인 + 36 신규, 회귀 0건)
+
+### 2.D ADR-016 §4.1 사후 review
+
+§2.1·§2.2·§2.5 비건드림 확인 ✓ (commit `181e985` body 명시):
+- §2.1: SMTP 발송, LLM 호출 0건, 주문 실행 무관
+- §2.2: 계층 3 후처리. `daily_analysis_kr/us`를 read-only DAO로 소비
+- §2.5: JSONL은 운영 추적용. LLM 출력 보존 매체는 그대로 `llm_calls`/`daily_analysis_*`
+
+### Sprint 2 commit 트레일
+
+```
+181e985  feat(phase2): Sprint 2 (C급) — SMTP 메일 발송 + 단위 테스트
+```
+
+---
+
+## Sprint 3: 자동 발송 스케줄 (`sprint3-auto-email-schedule` 브랜치 → main ff push)
+
+**시작**: 2026-05-12
+**완료**: 2026-05-12 (main 머지 commit `e9bde20`)
+**등급**: C급 (ADR-016 §6)
+
+### 3.A 산출물 (commit `e9bde20`, +471 lines / 4 files)
+
+**`apps/llm-analysis/ops/scheduler/windows/run_email_today.ps1`** (신규):
+- PowerShell wrapper, `run_analysis_today.ps1` 양식 계승
+- 인자: `-Region {KR|US|BOTH}`, `-Date YYYY-MM-DD`, `-To`, `-DryRun`
+- `apps\llm-analysis\venv\Scripts\python.exe` 우선, 없으면 시스템 `python`
+- 로그: `logs/scheduler/email_send_<region>_<yyyymmdd_hhmmss>.log` (Phase 1 `LLMAnalysis_*` 로그 디렉터리 공유)
+- region 소문자 변환 + exit code propagate
+
+**`apps/llm-analysis/ops/scheduler/windows/install_email_task.ps1`** (신규):
+- Task Scheduler 등록 (`install_task.ps1` 양식 계승)
+- 기본 시각: `EmailSend_US 17:00 KST` / `EmailSend_KR 22:00 KST` — `LLMAnalysis_*` 종료 + 안전 마진. `-UsTime`/`-KrTime` 파라미터로 시각 조정 가능
+- idempotent re-install (`Get-ScheduledTask -ErrorAction SilentlyContinue` 후 `Unregister-ScheduledTask`)
+- `ExecutionTimeLimit` 30분 (메일 발송 작업 특성상 분석보다 짧음)
+- 통제권 메커니즘 명시 (`Disable-ScheduledTask`/`Enable-ScheduledTask`/`Unregister-ScheduledTask`)
+
+**`apps/llm-analysis/exporters/email_sender.py`** (수정, +55 lines): graceful fallback
+- `read_last_dispatch_for_region(region, log_path)` — JSONL 마지막 region 매칭 record 반환. 부재/빈 파일/파싱 실패 모두 `None` 안전 처리
+- `build_prior_failure_warning(prior)` — `status='failed'`인 경우만 `"⚠️ 직전 발송 실패: {error} ({timestamp})"` 1줄 반환. `sent`/`dry_run`/`None`은 `None` 반환
+- `dispatch_daily_email()`이 body 빌드 직후·send 직전에 prepend (sent/dry-run 양쪽 경로 동일 적용)
+
+**`apps/llm-analysis/tests/test_email_sender.py`** (수정, +248 lines, 12 케이스):
+- `TestReadLastDispatchForRegion` 4건 (missing log/latest for region/other region/unparseable lines skipped)
+- `TestBuildPriorFailureWarning` 5건 (None/sent/dry_run/failed emits/failed without error_message)
+- `TestDispatchFallbackIntegration` 3건 (prior failed warning prepended/prior sent no warning/other region failure 무영향)
+
+### 3.B 단위 테스트
+
+- 회귀 점검: 전체 pytest **197 passed** (185 베이스라인 + 12 신규, 회귀 0건)
+
+### 3.C ADR-016 §4.1 사후 review
+
+§2.1·§2.2·§2.5 비건드림 확인 ✓ (commit `e9bde20` body 명시):
+- §2.1: Task Scheduler 발송 자동화, LLM 호출 0건
+- §2.2: 계층 3 운영 자동화. 계층 1·2 코드 미수정
+- §2.5: ADR-012 자동 트리거 패턴 계승. `llm_calls`/`daily_analysis_*` 보존 매체 변경 없음. JSONL은 별도 운영 추적 (§4 사용자 통제권 부수)
+
+### Sprint 3 commit 트레일
+
+```
+e9bde20  feat(phase2): Sprint 3 (C급) — 자동 발송 스케줄 + graceful fallback
+```
+
+---
+
+## Phase 5: PROD Task Scheduler 등록 + wrapper fix (commit `7c02db1`)
+
+**시작·완료**: 2026-05-12 (사용자 PROD Windows 환경에서 진행, DEV 동기화 완료)
+**등급**: C급 (ADR-016 §2)
+
+### 5.A PROD Task Scheduler 등록
+
+- `install_email_task.ps1` 실행 → `EmailSend_KR 22:35` / `EmailSend_US 18:45` 등록 (기본 22:00/17:00에서 `-KrTime`/`-UsTime` 조정)
+- PROD 검증: KR/US dry-run 양쪽 exit=0, EmailSend KR dry-run(2026-05-11) 전체 exit=0
+- `EmailSend_KR`은 `LLMAnalysis_KR 21:00` 종료 + 1h35m 마진, `EmailSend_US`는 `LLMAnalysis_US 16:00` 종료 + 2h45m 마진. ADR-016 §6 발송 자동화 영역 정합
+
+### 5.B PROD 환경 특이 결함 5건 수정 (commit `7c02db1`, +74/-7 lines / 3 files)
+
+PROD Task Scheduler 점검 중 발견된 5건 일괄 수정.
+
+**`run_analysis_today.ps1` (3건)**:
+
+1. **US `--date today_KST` 강제 버그** — wrapper가 KST 오늘 날짜를 강제 전달 → ET 기준 데이터 미존재로 매일 `screened=0`. 수정: `-Date` 미명시 시 `--date` 인자 자체 미전달, `_resolve_date`가 region별 최신 screen 자동 선택
+2. **cp949 UnicodeEncodeError** — KR 한도 도달 시 em dash(`—`) 출력이 Windows cp949에서 인코딩 실패 → wrapper `exit=1`. 수정: `$env:PYTHONIOENCODING = "utf-8"` wrapper 시작점 설정
+3. **DATABASE_URL 미정** — Task Scheduler 셸이 사용자 환경 미상속. 수정: `apps\llm-analysis\.env` 파일 wrapper에서 명시적 파싱 → `Set-Item env:` (key=value 라인, 주석/공백 skip, 양 따옴표 strip)
+
+**`run_email_today.ps1` (1건 + 환경/인코딩 동일 패치)**:
+
+4. **Excel 사전 생성 누락** — 기존 wrapper는 `run_email_send.py`만 호출. 자동 트리거 환경에서 `out/daily_analysis_<date>_<region>.xlsx` 부재 시 exit 1. 수정: Step 1 `run_excel_export.py` 호출 → Step 2 `run_email_send.py` 호출. Step 1 실패 시 `[WARN]` 후에도 Step 2 진행 (`run_email_send.py` 자체 에러 처리에 위임)
+
+**`config/settings.yaml` (1건)**:
+
+5. **`daily_call_limits.us` 500 → 100** — KR 실측 평균 ~76s/건 기준 100건 ≈ 127분으로 `LLMAnalysis_US` Task `ExecutionTimeLimit(2h)` 내 완주. 500건 ~10.5h로 한도 초과 확실. 2026-05-12 인라인 주석 보존
+
+### 5.C DEV-PROD 환경 사각지대 메타 인계
+
+본 5건 모두 DEV(Mac) 단위 테스트로 사전 차단 불가능한 카테고리:
+
+| # | 사각지대 |
+|---|---|
+| 1 | US 시장 시간대 차이로 인한 가용 거래일 mismatch (KST vs ET) |
+| 2 | Windows cp949 코드페이지 (Mac UTF-8과 무관) |
+| 3 | Task Scheduler 환경 상속 부재 (사용자 셸과 분리) |
+| 4 | PROD 자동 트리거에서의 산출물 부재 (DEV 수동 실행은 단계 분리됨) |
+| 5 | 사용자별 처리 시간 실측 (LLM 호출 시간 환경 차이) |
+
+향후 Sprint 진행 시 PROD 검증 단계의 가치 인식. C급 작업이라도 DEV-PROD 환경 영향 산출물(`.ps1`, `settings.yaml` 시각/한도 등)은 PROD smoke test 1회 권고. 본 항목은 ADR-016 운영 메모로 보존, 별도 ADR화는 패턴 누적 후 검토.
+
+### 5.D ADR-016 §4.1 사후 review
+
+§2.1·§2.2·§2.5 비건드림 확인 ✓:
+- §2.1: 메일 발송·분석 자동화는 정보 전달, 주문 실행 아님
+- §2.2: wrapper 보강·설정값 조정, 계층 1·2 코드 미수정
+- §2.5: 신규 LLM 호출 0건, `daily_analysis_*`·`llm_calls` 테이블 미수정
+
+### Phase 5 commit 트레일
+
+```
+7c02db1  fix(phase2): LLMAnalysis/EmailSend wrapper 결함 5건 보강
+```
+
+---
+
+(이후 Sprint A·B·C·D·E·F maintenance backlog는 ADR-016 §9.1-bis 만료일·후행 처리에 따라 별도 진행 시 본 문서에 누적)
