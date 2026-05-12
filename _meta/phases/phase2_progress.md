@@ -310,4 +310,142 @@ PROD Task Scheduler 점검 중 발견된 5건 일괄 수정.
 
 ---
 
+## Phase 6: 모니터링 점검 스크립트 (commit `9bf9abc`)
+
+**시작·완료**: 2026-05-12
+**등급**: C급 (ADR-016 §6)
+
+### 6.A 산출물 (commit `9bf9abc`, +650 lines / 2 files)
+
+**`apps/llm-analysis/scripts/check_dispatch_health.py`** (신규):
+- JSONL(`apps/llm-analysis/logs/email_dispatch.jsonl`) 최근 N일 status 점검
+- `daily_analysis_kr/us` 테이블을 ground truth로 사용 — 분석 행이 없는 날은 발송 대상 아님 → 시장 calendar 의존성 회피 + 정확한 누락 감지
+- 같은 거래일 retry 시 최신 timestamp record로 status 판정 (실패 후 재발송 성공은 healthy 처리)
+- DB 미연결 시 누락 점검만 skip하고 JSONL 기반 status 보고는 유지
+- CLI: `--days N` (기본 7), `--region kr|us|both` (기본 both), `--log-path PATH`, `--today YYYY-MM-DD` (테스트용)
+- exit code: healthy 0 / 실패·누락·log 부재 시 1
+
+**출력 예시**:
+```
+[KR] 최근 7일 (2026-05-06 ~ 2026-05-12)
+  성공/dry_run 5건, 실패 0건, 누락 0건
+
+[US] 최근 7일 (2026-05-06 ~ 2026-05-12)
+  성공/dry_run 5건, 실패 0건, 누락 0건
+```
+
+실패·누락 발견 시:
+```
+  실패 내역:
+    - 2026-05-07 (retry=2): SMTPAuthenticationError: ...
+  누락 거래일 (분석 행 존재, 발송 기록 부재):
+    - 2026-05-08
+```
+
+**`apps/llm-analysis/tests/test_check_dispatch_health.py`** (신규, 22건):
+- `TestReadRecentRecords` 4건 (missing/empty/region·window filter/unparseable lines skipped)
+- `TestLatestStatusPerDate` 2건 (timestamp 갱신/distinct 보존)
+- `TestBuildRegionReport` 5건 (healthy/missing day/failed/DB unreachable/retry resent)
+- `TestFormatReport` 6건 (healthy/missing file/empty file/failure listed/missing listed/DB skip)
+- `TestMain` 5건 (healthy 0/failure 1/missing log 1/both regions/days 검증)
+
+### 6.B 단위 테스트
+
+- 회귀 점검: 전체 pytest **219 passed** (197 베이스라인 + 22 신규, 회귀 0건)
+
+### 6.C 사용 권고
+
+- 7거래일 모니터링 기간 동안 매일 1회 또는 주간 1회 실행
+- 기본 `--days 7 --region both`로 충분
+- exit code 1 발생 시 출력의 실패 내역·누락 거래일 확인 후 즉시 사용자 대응
+
+### 6.D ADR-016 §4.1 사후 review
+
+§2.1·§2.2·§2.5 비건드림 확인 ✓:
+- §2.1: read-only 보고 도구, 주문 실행 무관
+- §2.2: 계층 3 운영 도구, 계층 1·2 미터치
+- §2.5: 신규 LLM 호출 0건. `daily_analysis_*`·`llm_calls` 테이블은 SELECT만, 변경 없음. JSONL은 발송 기록 운영 추적 (§4 사용자 통제권 부수)
+
+### Phase 6 commit 트레일
+
+```
+9bf9abc  feat(phase2): Phase 6 (C급) — dispatch health 모니터링 스크립트
+```
+
+---
+
+## Phase 7: Phase 2A 본질 코드 작업 완료 보고
+
+**작성 시점**: 2026-05-12 (Builder 자체 보고, ADR-016 §3 조건부 Auditor 면제)
+
+### 7.A 산출물 요약 (Sprint 1·2·3 + Phase 5·6)
+
+| 항목 | commit | 등급 | 비고 |
+|---|---|---|---|
+| Sprint 1 엑셀 | merge `6733778` | C급 (소급) | openpyxl, 3 sheet, 17필드 |
+| Sprint 2 SMTP | `181e985` | C급 | 단위 테스트 36건 (149 → 185) |
+| Sprint 3 자동 발송 | `e9bde20` | C급 | PowerShell + graceful fallback (185 → 197) |
+| Phase 5 PROD 등록 + wrapper fix | `7c02db1` | C급 | DEV-PROD 환경 사각지대 5건 |
+| Phase 6 모니터링 스크립트 | `9bf9abc` | C급 | check_dispatch_health.py (197 → 219) |
+
+누계 단위 테스트: 132 (Phase 1 종료) → 149 (Sprint 1) → 185 (Sprint 2) → 197 (Sprint 3) → 219 (Phase 6). 회귀 0건 누적.
+
+### 7.B 7거래일 모니터링 시작 안내
+
+- **시작일**: 첫 PROD 자동 발송 거래일 (KR `EmailSend_KR 22:35` 또는 US `EmailSend_US 18:45` 중 먼저)
+- **종료일**: 누적 7거래일 (KR·US 합산 또는 region별 분리는 사용자 결정)
+- **점검 방법**: 매일 또는 주간 1회 `./apps/llm-analysis/venv/bin/python apps/llm-analysis/scripts/check_dispatch_health.py --days 7 --region both`
+- **PASS 기준**: 모든 region에서 실패 0건 + 누락 0건 (exit code 0)
+- **FAIL 시 대응**: 출력의 `error_message` 또는 누락 거래일 확인 후 사용자 시점 (`run_email_send.py --to ...` 수동 재발송 또는 PROD wrapper 점검)
+
+### 7.C 7거래일 중 병행 작업 정책 (A안 채택)
+
+Architect 세션 2026-05-12 결정: **A안 (보수, 거버넌스 정합)** 채택.
+
+- 7거래일 모니터링 기간 중 다른 코드 작업 정지
+- maintenance backlog (Sprint A·B·C·D·E·F) 및 Phase 3 본격 진입 모두 7거래일 PASS 후
+- Sprint A (entry-side 자연 누적)는 `LLMAnalysis_*` 자동 가동 중이라 자연 누적 — 별도 코드 작업 아님, A안과 충돌 없음
+- **예외**: 7거래일 중 PROD 결함 추가 발견 시 즉시 우선순위 변경 (병행 정책 일시 정지, wrapper fix 처리)
+
+### 7.D Phase 2A 종료 게이트 점검 (phase2_brief §9.1 차단 조건)
+
+ADR-016 채택 후 4개 조건:
+
+1. [⏳] Sprint 1·2·3 production 가동 + 7거래일 자동 발송 검증 — **진행 중** (PROD 가동 완료, 7거래일 누적 대기)
+2. [✅] 헌법 §2.1·§2.2·§2.5 위배 없음 (C급 ADR-016 §3 조건부 면제) — Sprint 1·2·3·Phase 5·6 모두 §4.1 사후 review 통과
+3. [⏳] `phase2_progress.md` Phase 2A 종료 보고 작성 — **7거래일 누적 후 Architect 세션에서 작성**
+4. [✅] 단위 테스트 회귀 0건 (132 → 219 누적, 회귀 0건)
+
+### 7.E 7거래일 PASS 후 사용자 행동 가이드
+
+1. `check_dispatch_health.py --days 7 --region both` 실행 결과 PASS 확인 (exit 0)
+2. Web Claude Architect 세션 의뢰 — Phase 2A 종료 보고 (B급)
+   - Architect 의뢰 시 산출물: 7거래일 모니터링 PASS 증빙(스크립트 출력) + 본 `phase2_progress.md`
+3. 본 종료 보고 작성 시:
+   - `06_CURRENT_STATE.md` Phase 2A 완료 반영
+   - `phase2_brief.md` §9.1 차단 조건 4건 모두 ✅ 처리
+   - Phase 3 진입 brief 또는 ADR 작업 (헌법 §2.1·§2.2 영역 진입 여부에 따라 A급 가능성 — 별도 평가)
+
+### 7.F maintenance backlog 상태 (ADR-016 §9.1-bis)
+
+| Sprint | 등급 | 만료일·후행 처리 | 현재 상태 |
+|---|---|---|---|
+| Sprint A (entry 자연 누적) | B급 | 2026-06-08 강제 결정 | LLMAnalysis_* 자동 가동 중, 자연 누적 진행 |
+| Sprint B (Evaluator 6종) | B급 | Phase 3 시작 후 1개월 | 미진행 |
+| Sprint C (ADR-015 fund vehicle) | B급 | Phase 3 종료 시까지 | 미진행 |
+| Sprint D (분류 안정성) | B급 | Phase 3 종료 시 | 미진행 |
+| Sprint E (prompt v3) | B급 | A·B·D 결과 후 결정 | 조건부 |
+| Sprint F (운영 부수) | C급 | Phase 3 진입 전 | 일부 진행 (Sprint F #7 완료, 나머지는 사용자 시점) |
+
+7거래일 모니터링 종료 + Phase 2A 종료 보고 후 maintenance backlog 본격 처리 또는 Phase 3 진입 결정.
+
+### 7.G ADR-016 §4.1 사후 review (Phase 6·7 통합)
+
+§2.1·§2.2·§2.5 비건드림 확인 ✓:
+- §2.1: 모니터링 스크립트 read-only, 보고 작성 read-only. 주문 실행 무관
+- §2.2: 계층 3 외부 운영 도구·문서. 계층 1·2 미터치
+- §2.5: 신규 LLM 호출 0건. `daily_analysis_*`·`llm_calls` 미수정. JSONL은 발송 기록 운영 추적 (§4 사용자 통제권 부수)
+
+---
+
 (이후 Sprint A·B·C·D·E·F maintenance backlog는 ADR-016 §9.1-bis 만료일·후행 처리에 따라 별도 진행 시 본 문서에 누적)
